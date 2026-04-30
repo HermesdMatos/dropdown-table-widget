@@ -162,10 +162,13 @@ class DropdownTableWidget extends HTMLElement {
   _loadBinding() {
     try {
       var binding = this.myDataBinding;
-      if (!binding) return;
-
-      var state = binding.state;
-      if (state !== "Success") return;
+      console.log("DropdownTable: binding =", binding);
+      if (!binding) { console.log("DropdownTable: binding is null"); return; }
+      console.log("DropdownTable: metadata =", binding.metadata);
+      console.log("DropdownTable: data =", binding.data);
+      console.log("DropdownTable: state =", binding.state);
+      if (!binding.metadata) { console.log("DropdownTable: no metadata"); return; }
+      if (!binding.data) { console.log("DropdownTable: no data"); return; }
 
       this._metadata = binding.metadata;
       this._data = binding.data;
