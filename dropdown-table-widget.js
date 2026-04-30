@@ -431,4 +431,4 @@ class DropdownTableWidget extends HTMLElement {
   }
 }
 
-customElements.define("dropdown-table-widget", DropdownTableWidget);
+customElements.define("dropdowntable-widget", DropdownTableWidget);
