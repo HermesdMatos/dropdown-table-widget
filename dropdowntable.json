@@ -5,35 +5,25 @@
   "eula": "",
   "vendor": "Custom",
   "license": "MIT",
-  "id": "com.custom.dropdown.table",
+  "id": "dropdown_table",
   "version": "1.0.0",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdown-table-widget",
-      "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=2",
-      "integrity": "sha256-e4CHBdrcGQB2DJxDxFbY80fygdFZ9li9eT+SZLEfSsA="
+      "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
+      "integrity": "sha256-PLACEHOLDER"
     }
   ],
   "properties": {
-    "tableData": {
+    "dropdownDimensions": {
       "type": "string",
-      "description": "JSON string of table data rows",
-      "default": "[]"
-    },
-    "tableColumns": {
-      "type": "string",
-      "description": "JSON string of column definitions",
-      "default": "[]"
-    },
-    "dropdownColumns": {
-      "type": "string",
-      "description": "JSON string defining which columns use dropdowns and their options",
+      "description": "JSON array of dimension feed IDs to render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
       "default": "[]"
     },
     "selectedCellData": {
       "type": "string",
-      "description": "JSON string of the last selected cell {row, column, value}",
+      "description": "JSON string of the last selected cell {row, dimensionId, memberId, memberLabel}",
       "default": "{}"
     },
     "headerColor": {
@@ -76,68 +66,48 @@
     }
   },
   "methods": {
-    "setTableData": {
-      "description": "Set the table rows from a JSON string",
+    "setDropdownDimensions": {
+      "description": "Define which dimension feed IDs render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
       "parameters": [
-        { "name": "data", "type": "string", "description": "JSON array of row objects" }
+        { "name": "val", "type": "string", "description": "JSON array of dimension feed IDs" }
       ],
-      "body": "this.tableData = data;"
+      "body": "this.dropdownDimensions = val;"
     },
-    "getTableData": {
+    "getDropdownDimensions": {
       "returnType": "string",
-      "description": "Get current table data as JSON string",
+      "description": "Get dropdown dimension config as JSON string",
       "parameters": [],
-      "body": "return this.tableData || '[]';"
-    },
-    "setTableColumns": {
-      "description": "Set column definitions from a JSON string",
-      "parameters": [
-        { "name": "columns", "type": "string", "description": "JSON array of column definitions" }
-      ],
-      "body": "this.tableColumns = columns;"
-    },
-    "getTableColumns": {
-      "returnType": "string",
-      "description": "Get column definitions as JSON string",
-      "parameters": [],
-      "body": "return this.tableColumns || '[]';"
-    },
-    "setDropdownColumns": {
-      "description": "Define which columns show dropdowns and their option lists",
-      "parameters": [
-        { "name": "config", "type": "string", "description": "JSON array: [{columnKey, options:[]}]" }
-      ],
-      "body": "this.dropdownColumns = config;"
-    },
-    "getDropdownColumns": {
-      "returnType": "string",
-      "description": "Get dropdown column configuration as JSON string",
-      "parameters": [],
-      "body": "return this.dropdownColumns || '[]';"
+      "body": "return this.dropdownDimensions || '[]';"
     },
     "getSelectedCellData": {
       "returnType": "string",
-      "description": "Get the last selected cell data as JSON string {row, column, value}",
+      "description": "Get the last selected cell data as JSON string",
       "parameters": [],
       "body": "return this.selectedCellData || '{}';"
     },
-    "clearAllSelections": {
-      "description": "Clear all current cell selections",
+    "getActiveFilters": {
+      "returnType": "string",
+      "description": "Get all active dropdown filters as JSON string",
       "parameters": [],
-      "body": "this.selectedCellData = '{}';"
+      "body": "return this._activeFilters ? JSON.stringify(this._activeFilters) : '{}';"
+    },
+    "clearAllFilters": {
+      "description": "Clear all active dropdown filters",
+      "parameters": [],
+      "body": "this._activeFilters = {}; this._applyFiltersToBinding(); this._render();"
     }
   },
   "events": {
     "onDropdownChanged": {
-      "description": "Fired when a dropdown value is selected. selectedCellData contains {row, column, value}."
+      "description": "Fired when a dropdown value is selected. Read selectedCellData for {row, dimensionId, memberId, memberLabel}."
     }
   },
   "dataBindings": {
-    "tableDataBinding": {
+    "myDataBinding": {
       "feeds": [
         {
           "id": "dimensions",
-          "description": "Dimensions — will populate rows and dropdown option lists",
+          "description": "Dimensions — populate rows and dropdown option lists",
           "type": "dimension"
         },
         {
