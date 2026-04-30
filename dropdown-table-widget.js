@@ -269,7 +269,7 @@ class DropdownTableWidget extends HTMLElement {
         var cellLabel = cellData.label || cellData.id || "";
         var cellId = cellData.id || "";
 
-        var isDropdown = this._dropdownDimensions.indexOf(dim.id) !== -1;
+        var isDropdown = true; // todas as dimensões são dropdown automaticamente
 
         if (isDropdown) {
           var opts = [];
