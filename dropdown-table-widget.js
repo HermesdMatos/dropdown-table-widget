@@ -23,7 +23,7 @@ DROPDOWN_TABLE_TEMPLATE.innerHTML = `
     height: 36px;
     vertical-align: middle;
   }
-  .cell-plain { padding: 0 12px; }
+  .cell-plain { padding: 0 12px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cell-dropdown {
     position: relative;
     display: flex;
@@ -53,8 +53,6 @@ DROPDOWN_TABLE_TEMPLATE.innerHTML = `
     pointer-events: none;
     color: #555;
   }
-
-  /* Dropdown list */
   .dt-dropdown-list {
     position: fixed;
     background: #fff;
@@ -99,76 +97,46 @@ class DropdownTableWidget extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.shadowRoot.appendChild(DROPDOWN_TABLE_TEMPLATE.content.cloneNode(true));
 
-    this._tableData = [];
-    this._tableColumns = [];
-    this._dropdownColumns = [];
+    this._metadata = null;
+    this._data = null;
+    this._dropdownDimensions = [];
     this._selectedCellData = {};
-    this._activeDropdown = null;
+    this._activeFilters = {};
     this._activeCell = null;
-
     this._closeDropdownBound = this._closeDropdown.bind(this);
   }
 
-  // ─── Lifecycle ────────────────────────────────────────────────
   connectedCallback() {
     document.addEventListener("click", this._closeDropdownBound);
-    this._applyColors();
-    this._render();
+    this._applyColorDefaults();
   }
 
   disconnectedCallback() {
     document.removeEventListener("click", this._closeDropdownBound);
   }
 
-  // ─── SAC property accessors ───────────────────────────────────
-  set tableData(val) {
-    try { this._tableData = JSON.parse(val); } catch { this._tableData = []; }
-    this._render();
-  }
-  get tableData() { return JSON.stringify(this._tableData); }
-
-  set tableColumns(val) {
-    try { this._tableColumns = JSON.parse(val); } catch { this._tableColumns = []; }
-    this._render();
-  }
-  get tableColumns() { return JSON.stringify(this._tableColumns); }
-
-  set dropdownColumns(val) {
-    try { this._dropdownColumns = JSON.parse(val); } catch { this._dropdownColumns = []; }
-    this._render();
-  }
-  get dropdownColumns() { return JSON.stringify(this._dropdownColumns); }
-
-  get selectedCellData() { return JSON.stringify(this._selectedCellData); }
-  set selectedCellData(val) {
-    try { this._selectedCellData = JSON.parse(val); } catch { this._selectedCellData = {}; }
+  // ─── SAC Data Binding ─────────────────────────────────────────
+  // SAC calls this automatically when data binding updates
+  onCustomWidgetAfterUpdate(changedProperties) {
+    if (changedProperties.has("myDataBinding")) {
+      this._processBinding();
+    }
   }
 
-  // Color properties
-  set headerColor(v) { this.style.setProperty("--header-color", v); }
-  set headerTextColor(v) { this.style.setProperty("--header-text-color", v); }
-  set selectedRowColor(v) { this.style.setProperty("--selected-row-color", v); }
-  set hoverRowColor(v) { this.style.setProperty("--hover-row-color", v); }
-  set tableTextColor(v) { this.style.setProperty("--table-text-color", v); }
-  set dropdownHighlightColor(v) { this.style.setProperty("--dropdown-highlight-color", v); }
-  set width(v) { this.style.width = v + "px"; }
-  set height(v) { this.style.height = v + "px"; }
-
-  // ─── SAC Methods ──────────────────────────────────────────────
-  setTableData(data) { this.tableData = data; }
-  getTableData() { return this.tableData; }
-  setTableColumns(columns) { this.tableColumns = columns; }
-  getTableColumns() { return this.tableColumns; }
-  setDropdownColumns(config) { this.dropdownColumns = config; }
-  getDropdownColumns() { return this.dropdownColumns; }
-  getSelectedCellData() { return this.selectedCellData; }
-  clearAllSelections() {
-    this._selectedCellData = {};
-    this._render();
+  _processBinding() {
+    try {
+      const binding = this.myDataBinding;
+      if (!binding) return;
+      this._metadata = binding.metadata;
+      this._data = binding.data;
+      this._render();
+    } catch (e) {
+      console.error("DropdownTable: error processing binding", e);
+    }
   }
 
-  // ─── Rendering ────────────────────────────────────────────────
-  _applyColors() {
+  // ─── Color defaults ───────────────────────────────────────────
+  _applyColorDefaults() {
     const defaults = {
       "--header-color": "#1a73e8",
       "--header-text-color": "#ffffff",
@@ -182,10 +150,39 @@ class DropdownTableWidget extends HTMLElement {
     });
   }
 
-  _getDropdownConfig(columnKey) {
-    return this._dropdownColumns.find(d => d.columnKey === columnKey) || null;
+  // ─── Properties ───────────────────────────────────────────────
+  // JSON array of dimension feed IDs to render as dropdown
+  // e.g. '["dimensions_1","dimensions_2"]'
+  set dropdownDimensions(val) {
+    try { this._dropdownDimensions = JSON.parse(val); } catch { this._dropdownDimensions = []; }
+    this._render();
+  }
+  get dropdownDimensions() { return JSON.stringify(this._dropdownDimensions); }
+
+  get selectedCellData() { return JSON.stringify(this._selectedCellData); }
+
+  set headerColor(v) { this.style.setProperty("--header-color", v); }
+  set headerTextColor(v) { this.style.setProperty("--header-text-color", v); }
+  set selectedRowColor(v) { this.style.setProperty("--selected-row-color", v); }
+  set hoverRowColor(v) { this.style.setProperty("--hover-row-color", v); }
+  set tableTextColor(v) { this.style.setProperty("--table-text-color", v); }
+  set dropdownHighlightColor(v) { this.style.setProperty("--dropdown-highlight-color", v); }
+  set width(v) { this.style.width = v + "px"; }
+  set height(v) { this.style.height = v + "px"; }
+
+  // ─── SAC Methods ──────────────────────────────────────────────
+  setDropdownDimensions(val) { this.dropdownDimensions = val; }
+  getDropdownDimensions() { return this.dropdownDimensions; }
+  getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
+  getActiveFilters() { return JSON.stringify(this._activeFilters); }
+
+  clearAllFilters() {
+    this._activeFilters = {};
+    this._applyFiltersToBinding();
+    this._render();
   }
 
+  // ─── Rendering ────────────────────────────────────────────────
   _render() {
     const headerRow = this.shadowRoot.getElementById("dt-header");
     const tbody = this.shadowRoot.getElementById("dt-body");
@@ -194,41 +191,76 @@ class DropdownTableWidget extends HTMLElement {
     headerRow.innerHTML = "";
     tbody.innerHTML = "";
 
-    const cols = this._tableColumns;
-    const rows = this._tableData;
+    const metadata = this._metadata;
+    const data = this._data;
 
-    if (cols.length === 0 || rows.length === 0) {
+    if (!metadata || !data || data.length === 0) {
       emptyMsg.classList.remove("hidden");
       return;
     }
     emptyMsg.classList.add("hidden");
 
-    // Header
-    cols.forEach(col => {
+    // Dimensions and measures from SAC metadata
+    const dimensions = metadata.feeds.dimensions.values;
+    const measures = metadata.feeds.measures.values;
+
+    // Build header row
+    dimensions.forEach(dim => {
       const th = document.createElement("th");
-      th.textContent = col.label || col.key;
-      if (col.width) th.style.width = col.width;
+      th.textContent = dim.description || dim.id;
+      headerRow.appendChild(th);
+    });
+    measures.forEach(mes => {
+      const th = document.createElement("th");
+      th.textContent = mes.description || mes.id;
       headerRow.appendChild(th);
     });
 
-    // Rows
-    rows.forEach((row, rowIndex) => {
+    // Collect unique members per dimension for dropdown options
+    const dimMembers = {};
+    dimensions.forEach(dim => { dimMembers[dim.id] = {}; });
+    data.forEach(row => {
+      dimensions.forEach(dim => {
+        const cell = row[dim.id];
+        if (cell && cell.id) {
+          dimMembers[dim.id][cell.id] = cell.label || cell.id;
+        }
+      });
+    });
+
+    // Build data rows
+    data.forEach((row, rowIndex) => {
       const tr = document.createElement("tr");
       tr.dataset.rowIndex = rowIndex;
 
-      cols.forEach(col => {
+      dimensions.forEach(dim => {
         const td = document.createElement("td");
-        const ddConfig = this._getDropdownConfig(col.key);
+        const cell = row[dim.id] || {};
+        const cellLabel = cell.label || cell.id || "";
+        const cellId = cell.id || "";
 
-        if (ddConfig) {
-          this._buildDropdownCell(td, row, rowIndex, col.key, ddConfig);
+        const isDropdown = this._dropdownDimensions.indexOf(dim.id) !== -1;
+
+        if (isDropdown) {
+          const options = Object.entries(dimMembers[dim.id]).map(([id, label]) => ({ value: id, label: label }));
+          this._buildDropdownCell(td, rowIndex, dim.id, cellLabel, cellId, options);
         } else {
           const span = document.createElement("span");
           span.className = "cell-plain";
-          span.textContent = row[col.key] !== undefined ? row[col.key] : "";
+          span.textContent = cellLabel;
           td.appendChild(span);
         }
 
+        tr.appendChild(td);
+      });
+
+      measures.forEach(mes => {
+        const td = document.createElement("td");
+        const span = document.createElement("span");
+        span.className = "cell-plain";
+        const val = row[mes.id];
+        span.textContent = (val !== undefined && val !== null) ? val : "";
+        td.appendChild(span);
         tr.appendChild(td);
       });
 
@@ -236,15 +268,15 @@ class DropdownTableWidget extends HTMLElement {
     });
   }
 
-  _buildDropdownCell(td, row, rowIndex, columnKey, ddConfig) {
+  // ─── Dropdown cell builder ────────────────────────────────────
+  _buildDropdownCell(td, rowIndex, dimensionId, currentLabel, currentId, options) {
     const wrapper = document.createElement("div");
     wrapper.className = "cell-dropdown";
     wrapper.tabIndex = 0;
 
     const valueSpan = document.createElement("span");
-    const currentVal = row[columnKey];
-    valueSpan.className = "cell-value" + (currentVal ? "" : " empty");
-    valueSpan.textContent = currentVal || (ddConfig.placeholder || "Selecionar...");
+    valueSpan.className = "cell-value" + (currentLabel ? "" : " empty");
+    valueSpan.textContent = currentLabel || "Selecionar...";
 
     const arrow = document.createElement("span");
     arrow.className = "cell-arrow";
@@ -257,25 +289,20 @@ class DropdownTableWidget extends HTMLElement {
 
     wrapper.addEventListener("click", (e) => {
       e.stopPropagation();
-      this._openDropdown(wrapper, rowIndex, columnKey, ddConfig, currentVal);
+      this._openDropdown(wrapper, rowIndex, dimensionId, currentId, options);
     });
 
     wrapper.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        this._openDropdown(wrapper, rowIndex, columnKey, ddConfig, currentVal);
-      }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); wrapper.click(); }
       if (e.key === "Escape") this._closeDropdown();
     });
 
     td.appendChild(wrapper);
   }
 
-  _openDropdown(cellEl, rowIndex, columnKey, ddConfig, currentVal) {
+  _openDropdown(cellEl, rowIndex, dimensionId, currentId, options) {
     this._closeDropdown();
-
-    const options = ddConfig.options || [];
-    if (options.length === 0) return;
+    if (!options || options.length === 0) return;
 
     cellEl.classList.add("active");
     this._activeCell = cellEl;
@@ -285,31 +312,24 @@ class DropdownTableWidget extends HTMLElement {
     list.classList.remove("hidden");
 
     options.forEach(opt => {
-      const optVal = typeof opt === "object" ? opt.value : opt;
-      const optLabel = typeof opt === "object" ? opt.label : opt;
-
       const item = document.createElement("div");
-      item.className = "dt-dropdown-item" + (optVal === currentVal ? " selected" : "");
-      item.textContent = optLabel;
+      item.className = "dt-dropdown-item" + (opt.value === currentId ? " selected" : "");
+      item.textContent = opt.label;
 
       item.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        this._selectValue(rowIndex, columnKey, optVal);
+        this._selectValue(rowIndex, dimensionId, opt.value, opt.label);
         this._closeDropdown();
       });
 
       list.appendChild(item);
     });
 
-    // Position below the cell
     const rect = cellEl.getBoundingClientRect();
     list.style.left = rect.left + "px";
     list.style.top = (rect.bottom + 2) + "px";
     list.style.minWidth = rect.width + "px";
 
-    this._activeDropdown = list;
-
-    // Close on outside click (deferred to avoid immediate close)
     setTimeout(() => {
       document.addEventListener("click", this._closeDropdownBound, { once: true });
     }, 0);
@@ -323,32 +343,45 @@ class DropdownTableWidget extends HTMLElement {
       this._activeCell.classList.remove("active");
       this._activeCell = null;
     }
-    this._activeDropdown = null;
   }
 
-  _selectValue(rowIndex, columnKey, value) {
-    // Update internal data
-    if (this._tableData[rowIndex]) {
-      this._tableData[rowIndex][columnKey] = value;
-    }
-
-    // Store selected cell info for SAC Script to read
+  _selectValue(rowIndex, dimensionId, memberId, memberLabel) {
     this._selectedCellData = {
       row: rowIndex,
-      column: columnKey,
-      value: value,
-      rowData: this._tableData[rowIndex]
+      dimensionId: dimensionId,
+      memberId: memberId,
+      memberLabel: memberLabel
     };
 
-    // Re-render to reflect new value
-    this._render();
+    this._activeFilters[dimensionId] = memberId;
+    this._applyFiltersToBinding();
 
-    // Fire SAC event
     this.dispatchEvent(new CustomEvent("onDropdownChanged", {
       detail: this._selectedCellData,
       bubbles: true,
       composed: true
     }));
+  }
+
+  _applyFiltersToBinding() {
+    try {
+      const binding = this.myDataBinding;
+      if (!binding) return;
+
+      const dimensions = this._metadata.feeds.dimensions.values;
+
+      // Remove all existing dimension filters
+      dimensions.forEach(dim => {
+        try { binding.removeDimensionFilter(dim.id); } catch (e) {}
+      });
+
+      // Re-apply active filters
+      Object.entries(this._activeFilters).forEach(([dimId, memberId]) => {
+        if (memberId) binding.setDimensionFilter(dimId, [memberId]);
+      });
+    } catch (e) {
+      console.error("DropdownTable: error applying filters", e);
+    }
   }
 }
 
