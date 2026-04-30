@@ -1,0 +1,151 @@
+{
+  "name": "Dropdown Table Widget",
+  "description": "SAC Table Widget with inline dropdown cell selection from data binding dimensions",
+  "newInstancePrefix": "dropdown_table",
+  "eula": "",
+  "vendor": "Custom",
+  "license": "MIT",
+  "id": "dropdown_table",
+  "version": "1.0.0",
+  "webcomponents": [
+    {
+      "kind": "main",
+      "tag": "dropdown-table-widget",
+      "url": "https://your-host/dropdown-table-widget.js",
+      "integrity": "sha256-J7XHn40G3xqsEMIkSAv+LbnBhTiD45uFXHe9XDjI4es="
+    }
+  ],
+  "properties": {
+    "tableData": {
+      "type": "string",
+      "description": "JSON string of table data rows",
+      "default": "[]"
+    },
+    "tableColumns": {
+      "type": "string",
+      "description": "JSON string of column definitions",
+      "default": "[]"
+    },
+    "dropdownColumns": {
+      "type": "string",
+      "description": "JSON string defining which columns use dropdowns and their options",
+      "default": "[]"
+    },
+    "selectedCellData": {
+      "type": "string",
+      "description": "JSON string of the last selected cell {row, column, value}",
+      "default": "{}"
+    },
+    "headerColor": {
+      "type": "string",
+      "description": "Background color of the header row",
+      "default": "#1a73e8"
+    },
+    "headerTextColor": {
+      "type": "string",
+      "description": "Text color for table headers",
+      "default": "#ffffff"
+    },
+    "selectedRowColor": {
+      "type": "string",
+      "description": "Background color of selected rows",
+      "default": "#e8f0fe"
+    },
+    "hoverRowColor": {
+      "type": "string",
+      "description": "Background color of hovered rows",
+      "default": "#f5f5f5"
+    },
+    "tableTextColor": {
+      "type": "string",
+      "description": "Text color for table content",
+      "default": "#333333"
+    },
+    "dropdownHighlightColor": {
+      "type": "string",
+      "description": "Highlight color for selected dropdown item",
+      "default": "#e8f0fe"
+    },
+    "width": {
+      "type": "integer",
+      "default": 800
+    },
+    "height": {
+      "type": "integer",
+      "default": 400
+    }
+  },
+  "methods": {
+    "setTableData": {
+      "description": "Set the table rows from a JSON string",
+      "parameters": [
+        { "name": "data", "type": "string", "description": "JSON array of row objects" }
+      ],
+      "body": "this.tableData = data;"
+    },
+    "getTableData": {
+      "returnType": "string",
+      "description": "Get current table data as JSON string",
+      "parameters": [],
+      "body": "return this.tableData || '[]';"
+    },
+    "setTableColumns": {
+      "description": "Set column definitions from a JSON string",
+      "parameters": [
+        { "name": "columns", "type": "string", "description": "JSON array of column definitions" }
+      ],
+      "body": "this.tableColumns = columns;"
+    },
+    "getTableColumns": {
+      "returnType": "string",
+      "description": "Get column definitions as JSON string",
+      "parameters": [],
+      "body": "return this.tableColumns || '[]';"
+    },
+    "setDropdownColumns": {
+      "description": "Define which columns show dropdowns and their option lists",
+      "parameters": [
+        { "name": "config", "type": "string", "description": "JSON array: [{columnKey, options:[]}]" }
+      ],
+      "body": "this.dropdownColumns = config;"
+    },
+    "getDropdownColumns": {
+      "returnType": "string",
+      "description": "Get dropdown column configuration as JSON string",
+      "parameters": [],
+      "body": "return this.dropdownColumns || '[]';"
+    },
+    "getSelectedCellData": {
+      "returnType": "string",
+      "description": "Get the last selected cell data as JSON string {row, column, value}",
+      "parameters": [],
+      "body": "return this.selectedCellData || '{}';"
+    },
+    "clearAllSelections": {
+      "description": "Clear all current cell selections",
+      "parameters": [],
+      "body": "this.selectedCellData = '{}';"
+    }
+  },
+  "events": {
+    "onDropdownChanged": {
+      "description": "Fired when a dropdown value is selected. selectedCellData contains {row, column, value}."
+    }
+  },
+  "dataBindings": {
+    "tableDataBinding": {
+      "feeds": [
+        {
+          "id": "dimensions",
+          "description": "Dimensions — will populate rows and dropdown option lists",
+          "type": "dimension"
+        },
+        {
+          "id": "measures",
+          "description": "Measures — numeric columns",
+          "type": "mainStructureMember"
+        }
+      ]
+    }
+  }
+}
