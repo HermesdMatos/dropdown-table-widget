@@ -5,14 +5,14 @@
   "eula": "",
   "vendor": "Custom",
   "license": "MIT",
-  "id": "dropdown_table",
+  "id": "com.custom.dropdown.table",
   "version": "1.0.0",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdown-table-widget",
-      "url": "https://your-host/dropdown-table-widget.js",
-      "integrity": "sha256-J7XHn40G3xqsEMIkSAv+LbnBhTiD45uFXHe9XDjI4es="
+      "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=2",
+      "integrity": "sha256-e4CHBdrcGQB2DJxDxFbY80fygdFZ9li9eT+SZLEfSsA="
     }
   ],
   "properties": {
