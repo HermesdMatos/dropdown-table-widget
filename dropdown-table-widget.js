@@ -118,9 +118,7 @@ class DropdownTableWidget extends HTMLElement {
   // ─── SAC Data Binding ─────────────────────────────────────────
   // SAC calls this automatically when data binding updates
   onCustomWidgetAfterUpdate(changedProperties) {
-    if (changedProperties.has("myDataBinding")) {
-      this._processBinding();
-    }
+    this._processBinding();
   }
 
   _processBinding() {
