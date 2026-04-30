@@ -138,6 +138,10 @@ class DropdownTableWidget extends HTMLElement {
 
   // ─── SAC Lifecycle Hooks ──────────────────────────────────────
 
+  onCustomWidgetReady() {
+    this._loadBinding();
+  }
+
   onCustomWidgetBeforeUpdate(changedProps) {}
 
   onCustomWidgetAfterUpdate(changedProps) {
