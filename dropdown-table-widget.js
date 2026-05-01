@@ -247,20 +247,18 @@ class DropdownTableWidget extends HTMLElement {
     }
 
     // Collect unique members per dimension for dropdown options
+    // SAC data keys are dimensions_0, dimensions_1, etc. — NOT the dimension id
     var dimMembers = {};
     for (var d = 0; d < dimensions.length; d++) {
-      dimMembers[dimensions[d].id] = {};
+      dimMembers["dimensions_" + d] = {};
     }
     for (var r = 0; r < this._data.length; r++) {
       var row = this._data[r];
       for (var d2 = 0; d2 < dimensions.length; d2++) {
-        var dimId = dimensions[d2].id;
-        var cell = row[dimId];
+        var dataKey = "dimensions_" + d2;
+        var cell = row[dataKey];
         if (cell && cell.id) {
-          // usa o id completo como chave, label como texto exibido
-          var cellKey = cell.id;
-          var cellLbl = cell.label || cell.id;
-          dimMembers[dimId][cellKey] = cellLbl;
+          dimMembers[dataKey][cell.id] = cell.label || cell.id;
         }
       }
     }
@@ -272,25 +270,25 @@ class DropdownTableWidget extends HTMLElement {
 
       for (var di = 0; di < dimensions.length; di++) {
         var dim = dimensions[di];
+        var dataKey2 = "dimensions_" + di;
         var td = document.createElement("td");
-        var cellData = rowData[dim.id] || {};
+        var cellData = rowData[dataKey2] || {};
         var cellLabel = cellData.label || cellData.id || "";
         var cellId = cellData.id || "";
 
-        console.log("DropdownTable cell:", dim.id, cellData);
-
         // Se _dropdownDimensions estiver vazio, todas as dimensões são dropdown
         var isDropdown = this._dropdownDimensions.length === 0
+          || this._dropdownDimensions.indexOf(dataKey2) !== -1
           || this._dropdownDimensions.indexOf(dim.id) !== -1;
 
         if (isDropdown) {
           var opts = [];
-          var members = dimMembers[dim.id];
+          var members = dimMembers[dataKey2];
           var keys = Object.keys(members);
           for (var ki = 0; ki < keys.length; ki++) {
             opts.push({ value: keys[ki], label: members[keys[ki]] });
           }
-          this._buildDropdownCell(td, ri, dim.id, cellLabel, cellId, opts);
+          this._buildDropdownCell(td, ri, dataKey2, cellLabel, cellId, opts);
         } else {
           var span = document.createElement("span");
           span.className = "cell-plain";
@@ -302,12 +300,13 @@ class DropdownTableWidget extends HTMLElement {
       }
 
       for (var mi = 0; mi < measures.length; mi++) {
-        var mes = measures[mi];
+        var mesKey = "measures_" + mi;
         var tdm = document.createElement("td");
         var spanm = document.createElement("span");
         spanm.className = "cell-plain";
-        var mesVal = rowData[mes.id];
-        spanm.textContent = (mesVal !== undefined && mesVal !== null) ? mesVal : "";
+        var mesVal = rowData[mesKey];
+        var mesFormatted = mesVal ? (mesVal.formatted || mesVal.raw || "") : "";
+        spanm.textContent = mesFormatted;
         tdm.appendChild(spanm);
         tr.appendChild(tdm);
       }
