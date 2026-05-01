@@ -210,44 +210,78 @@ class DropdownTableWidget extends HTMLElement {
       headerRow.appendChild(thm);
     }
 
-    // ── Collect unique members — exclude only root node (isCollapsed:true) ──
-    // In SAC ALL hierarchy nodes have isNode:true including children.
-    // Root node is identified by isCollapsed:true on first occurrence per dim.
-    var dimRootIds = {};
-    for (var dr = 0; dr < dimensions.length; dr++) {
-      dimRootIds["dimensions_" + dr] = null;
-      for (var rr = 0; rr < this._data.length; rr++) {
-        var cr = this._data[rr]["dimensions_" + dr];
-        if (cr && cr.isCollapsed === true && dimRootIds["dimensions_" + dr] === null) {
-          dimRootIds["dimensions_" + dr] = cr.id;
-          break;
-        }
-      }
-    }
-
-    var dimMembers = {};
+    // ── Fetch dropdown options from dimension members (not from data rows) ──
+    // This avoids row multiplication when dropdown dimensions are in the binding
+    var dimOptions = {};
     for (var d = 0; d < dimensions.length; d++) {
-      dimMembers["dimensions_" + d] = {};
+      dimOptions["dimensions_" + d] = [];
     }
-    for (var r = 0; r < this._data.length; r++) {
-      var row = this._data[r];
-      for (var d2 = 0; d2 < dimensions.length; d2++) {
-        var dk = "dimensions_" + d2;
-        var cell = row[dk];
-        // Include all members except the root node
-        if (cell && cell.id && cell.id !== dimRootIds[dk]) {
-          dimMembers[dk][cell.id] = cell.label || cell.id;
+
+    try {
+      var binding = this.myDataBinding;
+      for (var dm = 0; dm < dimensions.length; dm++) {
+        var dk = "dimensions_" + dm;
+        var dimId = dimensions[dm].id;
+        var members = binding.getDimensionMembers(dimId);
+        if (members && members.length > 0) {
+          for (var mx = 0; mx < members.length; mx++) {
+            var mem = members[mx];
+            // Skip root node (no parent or id contains root marker)
+            if (mem && mem.id && mem.parentId) {
+              dimOptions[dk].push({ value: mem.id, label: mem.description || mem.id });
+            }
+          }
+        }
+      }
+    } catch(e) {
+      // Fallback: collect from data rows excluding root
+      var dimRootIds = {};
+      for (var dr = 0; dr < dimensions.length; dr++) {
+        dimRootIds["dimensions_" + dr] = null;
+        for (var rr = 0; rr < this._data.length; rr++) {
+          var cr = this._data[rr]["dimensions_" + dr];
+          if (cr && cr.isCollapsed === true && dimRootIds["dimensions_" + dr] === null) {
+            dimRootIds["dimensions_" + dr] = cr.id;
+            break;
+          }
+        }
+      }
+      for (var r = 0; r < this._data.length; r++) {
+        var row = this._data[r];
+        for (var d2 = 0; d2 < dimensions.length; d2++) {
+          var dkf = "dimensions_" + d2;
+          var cell = row[dkf];
+          if (cell && cell.id && cell.id !== dimRootIds[dkf]) {
+            var exists = false;
+            for (var ex = 0; ex < dimOptions[dkf].length; ex++) {
+              if (dimOptions[dkf][ex].value === cell.id) { exists = true; break; }
+            }
+            if (!exists) {
+              dimOptions[dkf].push({ value: cell.id, label: cell.label || cell.id });
+            }
+          }
         }
       }
     }
 
-    // ── Rows — skip root node rows only ──────────────────────────
-    for (var ri = 0; ri < this._data.length; ri++) {
-      var rowData   = this._data[ri];
-      var firstCell = rowData["dimensions_0"] || {};
+    // ── Collect unique row keys from first dimension only ────────
+    // Show one row per unique member of dimensions_0, ignore other dims
+    var rowKeys = {};
+    var rowOrder = [];
+    for (var r2 = 0; r2 < this._data.length; r2++) {
+      var c0 = this._data[r2]["dimensions_0"] || {};
+      if (c0.id && !rowKeys[c0.id] && c0.isCollapsed !== true) {
+        rowKeys[c0.id] = { label: c0.label || c0.id, rowIndex: r2 };
+        rowOrder.push(c0.id);
+      }
+    }
 
-      // Skip only root node rows
-      if (firstCell.id && firstCell.id === dimRootIds["dimensions_0"]) { continue; }
+    // ── Rows — one per unique dimensions_0 member ────────────────
+    for (var ro = 0; ro < rowOrder.length; ro++) {
+      var rowKey  = rowOrder[ro];
+      var rowInfo = rowKeys[rowKey];
+      var ri      = rowInfo.rowIndex;
+      var rowData = this._data[ri];
 
       var tr = document.createElement("tr");
       tr.dataset.rowIndex = ri;
@@ -266,13 +300,7 @@ class DropdownTableWidget extends HTMLElement {
           || this._dropdownDimensions.indexOf(dim.id) !== -1;
 
         if (isDrop) {
-          var opts  = [];
-          var mems  = dimMembers[dk2];
-          var mkeys = Object.keys(mems);
-          for (var ki = 0; ki < mkeys.length; ki++) {
-            opts.push({ value: mkeys[ki], label: mems[mkeys[ki]] });
-          }
-          this._buildDropdownCell(td, ri, dk2, cLbl, cId, opts);
+          this._buildDropdownCell(td, ri, dk2, cLbl, cId, dimOptions[dk2]);
         } else {
           var sp = document.createElement("span");
           sp.className = "cell-plain";
