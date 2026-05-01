@@ -230,7 +230,9 @@ class DropdownTableWidget extends HTMLElement {
     emptyMsg.classList.add("hidden");
 
     var dimensions = this._metadata.feeds.dimensions.values;
-    var measures = this._metadata.feeds.measures.values;
+    var measures = this._metadata.feeds.mainStructureMembers
+      ? this._metadata.feeds.mainStructureMembers.values
+      : (this._metadata.feeds.measures ? this._metadata.feeds.measures.values : []);
 
     // Header
     for (var i = 0; i < dimensions.length; i++) {
@@ -272,7 +274,9 @@ class DropdownTableWidget extends HTMLElement {
         var cellLabel = cellData.label || cellData.id || "";
         var cellId = cellData.id || "";
 
-        var isDropdown = true; // todas as dimensões são dropdown automaticamente
+        // Se _dropdownDimensions estiver vazio, todas as dimensões são dropdown
+        var isDropdown = this._dropdownDimensions.length === 0
+          || this._dropdownDimensions.indexOf(dim.id) !== -1;
 
         if (isDropdown) {
           var opts = [];
