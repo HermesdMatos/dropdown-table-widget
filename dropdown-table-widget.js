@@ -210,7 +210,21 @@ class DropdownTableWidget extends HTMLElement {
       headerRow.appendChild(thm);
     }
 
-    // ── Collect unique members per dimension (only leaf nodes) ───
+    // ── Collect unique members — exclude only root node (isCollapsed:true) ──
+    // In SAC ALL hierarchy nodes have isNode:true including children.
+    // Root node is identified by isCollapsed:true on first occurrence per dim.
+    var dimRootIds = {};
+    for (var dr = 0; dr < dimensions.length; dr++) {
+      dimRootIds["dimensions_" + dr] = null;
+      for (var rr = 0; rr < this._data.length; rr++) {
+        var cr = this._data[rr]["dimensions_" + dr];
+        if (cr && cr.isCollapsed === true && dimRootIds["dimensions_" + dr] === null) {
+          dimRootIds["dimensions_" + dr] = cr.id;
+          break;
+        }
+      }
+    }
+
     var dimMembers = {};
     for (var d = 0; d < dimensions.length; d++) {
       dimMembers["dimensions_" + d] = {};
@@ -220,20 +234,20 @@ class DropdownTableWidget extends HTMLElement {
       for (var d2 = 0; d2 < dimensions.length; d2++) {
         var dk = "dimensions_" + d2;
         var cell = row[dk];
-        // Only collect leaf nodes (not parent nodes) for dropdown options
-        if (cell && cell.id && cell.isNode !== true) {
+        // Include all members except the root node
+        if (cell && cell.id && cell.id !== dimRootIds[dk]) {
           dimMembers[dk][cell.id] = cell.label || cell.id;
         }
       }
     }
 
-    // ── Rows — skip parent nodes (isNode === true) ───────────────
+    // ── Rows — skip root node rows only ──────────────────────────
     for (var ri = 0; ri < this._data.length; ri++) {
       var rowData   = this._data[ri];
       var firstCell = rowData["dimensions_0"] || {};
 
-      // Skip parent/node rows — show only leaf rows
-      if (firstCell.isNode === true) { continue; }
+      // Skip only root node rows
+      if (firstCell.id && firstCell.id === dimRootIds["dimensions_0"]) { continue; }
 
       var tr = document.createElement("tr");
       tr.dataset.rowIndex = ri;
