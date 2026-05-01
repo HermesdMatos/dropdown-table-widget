@@ -257,7 +257,10 @@ class DropdownTableWidget extends HTMLElement {
         var dimId = dimensions[d2].id;
         var cell = row[dimId];
         if (cell && cell.id) {
-          dimMembers[dimId][cell.id] = cell.label || cell.id;
+          // usa o id completo como chave, label como texto exibido
+          var cellKey = cell.id;
+          var cellLbl = cell.label || cell.id;
+          dimMembers[dimId][cellKey] = cellLbl;
         }
       }
     }
@@ -273,6 +276,8 @@ class DropdownTableWidget extends HTMLElement {
         var cellData = rowData[dim.id] || {};
         var cellLabel = cellData.label || cellData.id || "";
         var cellId = cellData.id || "";
+
+        console.log("DropdownTable cell:", dim.id, cellData);
 
         // Se _dropdownDimensions estiver vazio, todas as dimensões são dropdown
         var isDropdown = this._dropdownDimensions.length === 0
