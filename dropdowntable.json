@@ -1,18 +1,18 @@
 {
   "name": "Dropdown Table Widget",
   "description": "SAC Table Widget with inline dropdown cell selection from data binding dimensions",
-  "newInstancePrefix": "dropdown_table",
+  "newInstancePrefix": "dropdowntable",
   "eula": "",
   "vendor": "Custom",
   "license": "MIT",
-  "id": "dropdown_table",
-  "version": "1.0.0",
+  "id": "dropdowntable",
+  "version": "1.0.4",
   "webcomponents": [
     {
       "kind": "main",
-      "tag": "dropdown-table-widget",
+      "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-PLACEHOLDER"
+      "integrity": "sha256-YV9LgmlI4tdAFuZWSOxIVJAIXyykE5s/7WNJx6Jz3WE="
     }
   ],
   "properties": {
@@ -89,12 +89,12 @@
       "returnType": "string",
       "description": "Get all active dropdown filters as JSON string",
       "parameters": [],
-      "body": "return this._activeFilters ? JSON.stringify(this._activeFilters) : '{}';"
+      "body": "return this.selectedCellData || '{}';"
     },
     "clearAllFilters": {
       "description": "Clear all active dropdown filters",
       "parameters": [],
-      "body": "this._activeFilters = {}; this._applyFiltersToBinding(); this._render();"
+      "body": "this.selectedCellData = '{}';"
     }
   },
   "events": {
