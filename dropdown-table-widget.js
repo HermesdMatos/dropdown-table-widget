@@ -118,12 +118,14 @@ class DropdownTableWidget extends HTMLElement {
     this.shadowRoot.appendChild(TMPL.content.cloneNode(true));
 
     this._dropdownDimensions = [];
-    this._dropdownOptions = {};  // { "dimensions_1": [{value, label}], ... }
+    this._dropdownOptions = {};
     this._selectedCellData = {};
     this._activeFilters = {};
     this._activeCell = null;
     this._metadata = null;
     this._data = null;
+    this._localSelections = {};
+    this._localMeasures = {};
 
     this._onDocClick = this._closeDropdown.bind(this);
   }
@@ -228,6 +230,7 @@ class DropdownTableWidget extends HTMLElement {
 
   // ─── Render ───────────────────────────────────────────────────
   _render() {
+    var self      = this;
     var headerRow = this.shadowRoot.getElementById("dt-header");
     var tbody     = this.shadowRoot.getElementById("dt-body");
     var emptyMsg  = this.shadowRoot.getElementById("dt-empty");
@@ -250,12 +253,14 @@ class DropdownTableWidget extends HTMLElement {
     for (var i = 0; i < dimensions.length; i++) {
       var th = document.createElement("th");
       th.textContent = dimensions[i].description || dimensions[i].id;
+      th.style.minWidth = "120px";
       headerRow.appendChild(th);
     }
     for (var j = 0; j < measures.length; j++) {
       var thm = document.createElement("th");
       thm.textContent = measures[j].description || measures[j].id;
       thm.style.textAlign = "right";
+      thm.style.minWidth = "100px";
       headerRow.appendChild(thm);
     }
 
@@ -369,16 +374,71 @@ class DropdownTableWidget extends HTMLElement {
         tr.appendChild(td);
       }
 
-      // Measure cells
+      // Measure cells — editable input
       for (var mi = 0; mi < measures.length; mi++) {
         var mk  = "measures_" + mi;
         var tdm = document.createElement("td");
-        var spm = document.createElement("span");
-        spm.className = "cell-plain";
-        spm.style.textAlign = "right";
+        tdm.style.padding = "0";
+
         var mv  = rowData[mk];
-        spm.textContent = mv ? (mv.formatted || mv.raw || "") : "";
-        tdm.appendChild(spm);
+        var mvVal = mv ? (mv.raw !== undefined ? mv.raw : (mv.formatted || "")) : "";
+
+        // Check local measure edits
+        if (this._localMeasures && this._localMeasures[ri] && this._localMeasures[ri][mk] !== undefined) {
+          mvVal = this._localMeasures[ri][mk];
+        }
+
+        var input = document.createElement("input");
+        input.type = "text";
+        input.value = mvVal;
+        input.style.cssText = "width:100%;height:36px;border:none;background:transparent;text-align:right;padding:0 12px;font-size:13px;color:var(--table-text-color,#333);box-sizing:border-box;outline:none;cursor:pointer;";
+
+        input.addEventListener("focus", function(e) {
+          e.target.style.background = "#fffbe6";
+          e.target.style.outline = "2px solid #1a73e8";
+          e.target.style.cursor = "text";
+        });
+        input.addEventListener("blur", function(e) {
+          e.target.style.background = "transparent";
+          e.target.style.outline = "none";
+          e.target.style.cursor = "pointer";
+        });
+
+        (function(inputEl, rowIdx, measureKey, measureId, dimData) {
+          inputEl.addEventListener("change", function() {
+            var newVal = parseFloat(inputEl.value.replace(",", "."));
+            if (isNaN(newVal)) { newVal = 0; }
+
+            // Store locally
+            if (!self._localMeasures) { self._localMeasures = {}; }
+            if (!self._localMeasures[rowIdx]) { self._localMeasures[rowIdx] = {}; }
+            self._localMeasures[rowIdx][measureKey] = newVal;
+
+            // Write-back to SAC
+            try {
+              var b = self.myDataBinding;
+              if (b && b.setValueState) {
+                var addr = {};
+                var dims = self._metadata.feeds.dimensions.values;
+                for (var x = 0; x < dims.length; x++) {
+                  var dc = dimData["dimensions_" + x] || {};
+                  if (dc.id) { addr[dims[x].id] = dc.id; }
+                }
+                addr[measureId] = newVal;
+                b.setValueState(addr, function(err) {
+                  if (!err) {
+                    if (self._localMeasures && self._localMeasures[rowIdx]) {
+                      delete self._localMeasures[rowIdx][measureKey];
+                    }
+                    self._loadBinding();
+                  }
+                });
+              }
+            } catch(e) { console.error("Measure write-back error:", e); }
+          });
+        })(input, ri, mk, measures[mi].id, rowData);
+
+        tdm.appendChild(input);
         tr.appendChild(tdm);
       }
 
