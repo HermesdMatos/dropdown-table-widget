@@ -6,16 +6,27 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.2.0",
+  "version": "2.5.0",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-TQlMksCBf4ybO8+/YQrAG8NNnCAcNxS/oxMCu3VVqEw="
+      "integrity": "sha256-fiDSnM6FlAeSCkPIjc+mRK962Y5IfQ2vxZQtRho2xek="
+    },
+    {
+      "kind": "styling",
+      "tag": "dropdowntable-styling",
+      "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js",
+      "integrity": "sha256-PLACEHOLDER_STYLE"
     }
   ],
   "properties": {
+    "dropdownOptions": {
+      "type": "string",
+      "description": "JSON array defining options per column: [{dimensionKey, options:[]}]",
+      "default": "[]"
+    },
     "dropdownDimensions": {
       "type": "string",
       "description": "JSON array of dimension feed IDs to render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
@@ -66,6 +77,19 @@
     }
   },
   "methods": {
+    "setDropdownOptions": {
+      "description": "Define dropdown options per column. Pass array: [{dimensionKey:'dimensions_1', options:['Mensal','Bimestral',...]}]",
+      "parameters": [
+        { "name": "v", "type": "string", "description": "JSON array of {dimensionKey, options[]}" }
+      ],
+      "body": "this.dropdownOptions = v;"
+    },
+    "getDropdownOptions": {
+      "returnType": "string",
+      "description": "Get current dropdown options configuration",
+      "parameters": [],
+      "body": "return this.dropdownOptions || '[]';"
+    },
     "setDropdownDimensions": {
       "description": "Define which dimension feed IDs render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
       "parameters": [
