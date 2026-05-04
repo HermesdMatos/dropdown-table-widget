@@ -150,6 +150,28 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   // ─── Properties ───────────────────────────────────────────────
+  get dropdownOptions() { return JSON.stringify(this._dropdownOptions || {}); }
+  set dropdownOptions(v) {
+    try {
+      var cfg = JSON.parse(v);
+      this._dropdownOptions = {};
+      for (var i = 0; i < cfg.length; i++) {
+        var item = cfg[i];
+        var opts = [];
+        for (var j = 0; j < item.options.length; j++) {
+          var o = item.options[j];
+          if (typeof o === "string") {
+            opts.push({ value: o, label: o });
+          } else {
+            opts.push({ value: o.value || o.id || o, label: o.label || o.description || o.value || o });
+          }
+        }
+        this._dropdownOptions[item.dimensionKey] = opts;
+      }
+      this._render();
+    } catch(e) { console.error("dropdownOptions set error:", e); }
+  }
+
   get dropdownDimensions() { return JSON.stringify(this._dropdownDimensions); }
   set dropdownDimensions(v) {
     try { this._dropdownDimensions = JSON.parse(v); } catch(e) { this._dropdownDimensions = []; }
