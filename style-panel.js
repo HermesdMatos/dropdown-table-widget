@@ -97,6 +97,21 @@ STYLE_PANEL_TMPL.innerHTML = `
   }
   .toggle-btn.active { background: #e8f0fe; border-color: #1a73e8; color: #1a73e8; }
   .toggle-btn:hover { background: #f1f3f4; }
+  .btn-apply {
+    width: 100%;
+    height: 32px;
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: background 0.15s;
+  }
+  .btn-apply:hover { background: #1558b0; }
+  .btn-apply:active { background: #0d47a1; }
 </style>
 
 <div class="section" id="sec-font">
@@ -216,6 +231,8 @@ STYLE_PANEL_TMPL.innerHTML = `
     </div>
   </div>
 </div>
+
+<button class="btn-apply" id="btn-apply">✓ Aplicar</button>
 `;
 
 class DropdownTableStyling extends HTMLElement {
@@ -230,6 +247,11 @@ class DropdownTableStyling extends HTMLElement {
 
   connectedCallback() {
     var self = this;
+
+    // Apply button
+    self.shadowRoot.getElementById("btn-apply").addEventListener("click", function() {
+      self._applyChange();
+    });
 
     // Section collapse toggles
     ["font", "table"].forEach(function(sec) {

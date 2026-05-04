@@ -165,10 +165,10 @@ class DropdownTableWidget extends HTMLElement {
   // ─── Properties ───────────────────────────────────────────────
   get dropdownOptions() { return JSON.stringify(this._dropdownOptions || {}); }
   set styleConfig(v) {
+    console.log("DropdownTable: styleConfig received", v);
     try {
-      var cfg = JSON.parse(v);
       this.applyStyleConfig(v);
-    } catch(e) {}
+    } catch(e) { console.error("styleConfig set error:", e); }
   }
 
   applyStyleConfig(v) {
