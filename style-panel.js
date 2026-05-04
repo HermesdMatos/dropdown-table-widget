@@ -271,13 +271,7 @@ class DropdownTableStyling extends HTMLElement {
     });
   }
 
-  // SAC calls this to pass the widget reference
-  set widget(w) {
-    this._widget = w;
-  }
-
   _getWidget() {
-    // SAC injects the main widget as this.myWidget in styling components
     return this._widget || this.myWidget || null;
   }
 
@@ -286,62 +280,57 @@ class DropdownTableStyling extends HTMLElement {
   }
 
   _applyChange() {
-    var w = this._getWidget();
-    if (!w) {
-      console.warn("DropdownTable styling: no widget reference");
-      return;
-    }
-
-    var fontFamily   = this._getVal("fontFamily");
-    var fontSize     = this._getVal("fontSize");
-    var fontWeight   = this._getVal("fontWeight");
-    var colorText    = this._getVal("color-text");
-    var colorHeader  = this._getVal("color-header");
-    var colorEdit    = this._getVal("color-editable");
-    var rowHeight    = this._getVal("rowHeight");
-    var colWidth     = this._getVal("colWidth");
-    var showUnit     = this._getVal("showUnit");
-    var template     = this._getVal("template");
+    var fontFamily  = this._getVal("fontFamily");
+    var fontSize    = this._getVal("fontSize");
+    var fontWeight  = this._getVal("fontWeight");
+    var colorText   = this._getVal("color-text");
+    var colorHeader = this._getVal("color-header");
+    var colorEdit   = this._getVal("color-editable");
+    var rowHeight   = this._getVal("rowHeight");
+    var colWidth    = this._getVal("colWidth");
+    var showUnit    = this._getVal("showUnit");
+    var template    = this._getVal("template");
 
     var textDecor = [];
     if (this._underline)     textDecor.push("underline");
     if (this._strikethrough) textDecor.push("line-through");
 
-    // Apply template presets
     var headerColor = colorHeader;
     var headerText  = "#ffffff";
     var hoverColor  = "#f5f5f5";
 
     if (template === "dark") {
-      headerColor = "#1a1a2e";
-      headerText  = "#e0e0e0";
-      hoverColor  = "#2a2a3e";
+      headerColor = "#1a1a2e"; headerText = "#e0e0e0"; hoverColor = "#2a2a3e";
     } else if (template === "minimal") {
-      headerColor = "#f8f9fa";
-      headerText  = "#333333";
-      hoverColor  = "#f0f0f0";
+      headerColor = "#f8f9fa"; headerText = "#333333"; hoverColor = "#f0f0f0";
     }
 
-    // Set properties on main widget — SAC syncs declared properties automatically
-    w.headerColor        = headerColor;
-    w.headerTextColor    = headerText;
-    w.hoverRowColor      = hoverColor;
-    w.tableTextColor     = colorText;
+    // Build style config as JSON string and set as property
+    // SAC will sync this to the main widget via the declared property
+    var styleConfig = JSON.stringify({
+      headerColor:       headerColor,
+      headerTextColor:   headerText,
+      hoverRowColor:     hoverColor,
+      tableTextColor:    colorText,
+      editableCellColor: colorEdit,
+      rowHeight:         parseInt(rowHeight, 10),
+      colWidth:          colWidth,
+      fontFamily:        fontFamily,
+      fontSize:          fontSize + "px",
+      fontWeight:        fontWeight.indexOf("bold") !== -1 ? "bold" : "normal",
+      fontStyle:         fontWeight.indexOf("italic") !== -1 ? "italic" : "normal",
+      textDecoration:    textDecor.length > 0 ? textDecor.join(" ") : "none",
+      showUnit:          showUnit
+    });
 
-    // Set internal style properties
-    w._editableCellColor = colorEdit;
-    w._rowHeight         = parseInt(rowHeight, 10);
-    w._colWidth          = colWidth;
-    w._fontFamily        = fontFamily;
-    w._fontSize          = fontSize + "px";
-    w._fontWeight        = fontWeight.indexOf("bold") !== -1 ? "bold" : "normal";
-    w._fontStyle         = fontWeight.indexOf("italic") !== -1 ? "italic" : "normal";
-    w._textDecoration    = textDecor.length > 0 ? textDecor.join(" ") : "none";
-    w._showUnit          = showUnit;
+    // Set on self as property — SAC syncs to main widget
+    this.styleConfig = styleConfig;
 
-    // Trigger re-render on main widget
-    if (typeof w._applyDynamicStyles === "function") { w._applyDynamicStyles(); }
-    if (typeof w._render === "function") { w._render(); }
+    // Also try direct widget reference
+    var w = this._getWidget();
+    if (w && typeof w.applyStyleConfig === "function") {
+      w.applyStyleConfig(styleConfig);
+    }
   }
 }
 
