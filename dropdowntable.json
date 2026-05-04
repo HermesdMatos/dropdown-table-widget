@@ -6,22 +6,27 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-S6bCp/PVY2Ay+9kFvZy+44svk8gycSQd0VP2d2lvUKQ="
+      "integrity": "sha256-sMCXK5m6nfjUSAW1caIrFYQSylQLbo+pL7bdHGc+IKU="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js",
-      "integrity": "sha256-ZSINIzEc1QIrqFf8d5JsRtP7tR98BElGeV9uX7MssVg="
+      "integrity": "sha256-WngaI9s2zbJvqh/UAxBUdAiXkZeyMe6vHob5NFz7xLM="
     }
   ],
   "properties": {
+    "styleConfig": {
+      "type": "string",
+      "description": "JSON string with style configuration from styling panel",
+      "default": "{}"
+    },
     "dropdownOptions": {
       "type": "string",
       "description": "JSON array defining options per column: [{dimensionKey, options:[]}]",
