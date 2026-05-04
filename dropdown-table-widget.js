@@ -127,6 +127,17 @@ class DropdownTableWidget extends HTMLElement {
     this._localSelections = {};
     this._localMeasures = {};
 
+    // Style properties
+    this._rowHeight        = 36;
+    this._colWidth         = "auto";
+    this._fontFamily       = "Arial, sans-serif";
+    this._fontSize         = "13px";
+    this._fontWeight       = "normal";
+    this._fontStyle        = "normal";
+    this._textDecoration   = "none";
+    this._editableCellColor = "#fffbe6";
+    this._showUnit         = "none";
+
     this._onDocClick = this._closeDropdown.bind(this);
   }
 
@@ -228,6 +239,17 @@ class DropdownTableWidget extends HTMLElement {
     this._render();
   }
 
+  _applyDynamicStyles() {
+    var wrapper = this.shadowRoot.getElementById("dt-wrapper");
+    if (wrapper) {
+      wrapper.style.fontFamily   = this._fontFamily;
+      wrapper.style.fontSize     = this._fontSize;
+      wrapper.style.fontWeight   = this._fontWeight;
+      wrapper.style.fontStyle    = this._fontStyle;
+      wrapper.style.textDecoration = this._textDecoration;
+    }
+  }
+
   // ─── Render ───────────────────────────────────────────────────
   _render() {
     var self      = this;
@@ -253,14 +275,14 @@ class DropdownTableWidget extends HTMLElement {
     for (var i = 0; i < dimensions.length; i++) {
       var th = document.createElement("th");
       th.textContent = dimensions[i].description || dimensions[i].id;
-      th.style.minWidth = "120px";
+      th.style.minWidth = this._colWidth === "auto" ? "120px" : this._colWidth + "px";
       headerRow.appendChild(th);
     }
     for (var j = 0; j < measures.length; j++) {
       var thm = document.createElement("th");
       thm.textContent = measures[j].description || measures[j].id;
       thm.style.textAlign = "right";
-      thm.style.minWidth = "100px";
+      thm.style.minWidth = this._colWidth === "auto" ? "100px" : this._colWidth + "px";
       headerRow.appendChild(thm);
     }
 
@@ -339,6 +361,7 @@ class DropdownTableWidget extends HTMLElement {
 
       var tr = document.createElement("tr");
       tr.dataset.rowIndex = ri;
+      tr.style.height = this._rowHeight + "px";
 
       // Dimension cells
       for (var di = 0; di < dimensions.length; di++) {
@@ -394,7 +417,7 @@ class DropdownTableWidget extends HTMLElement {
         input.style.cssText = "width:100%;height:36px;border:none;background:transparent;text-align:right;padding:0 12px;font-size:13px;color:var(--table-text-color,#333);box-sizing:border-box;outline:none;cursor:pointer;";
 
         input.addEventListener("focus", function(e) {
-          e.target.style.background = "#fffbe6";
+          e.target.style.background = self._editableCellColor || "#fffbe6";
           e.target.style.outline = "2px solid #1a73e8";
           e.target.style.cursor = "text";
         });
