@@ -341,6 +341,12 @@ class DropdownTableWidget extends HTMLElement {
         var dk2   = "dimensions_" + di;
         var td    = document.createElement("td");
         var cData = rowData[dk2] || {};
+
+        // Apply local selection if available (overrides binding data)
+        if (this._localSelections && this._localSelections[ri] && this._localSelections[ri][dk2]) {
+          cData = this._localSelections[ri][dk2];
+        }
+
         var cLbl  = cData.label || cData.id || "";
         var cId   = cData.id || "";
 
@@ -472,7 +478,15 @@ class DropdownTableWidget extends HTMLElement {
       memberLabel: memberLabel
     };
 
-    // Write-back to SAC planning model
+    // Store selection locally for visual update
+    if (!this._localSelections) { this._localSelections = {}; }
+    if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
+    this._localSelections[rowIndex][dimensionId] = { id: memberId, label: memberLabel };
+
+    // Re-render immediately to show selected value
+    this._render();
+
+    // Write-back to SAC planning model in background
     try {
       var binding    = this.myDataBinding;
       var rowData    = this._data[rowIndex];
@@ -480,34 +494,27 @@ class DropdownTableWidget extends HTMLElement {
 
       if (binding && binding.setValueState) {
         var cellAddress = {};
-
-        // Build full dimensional context for this row
         for (var di = 0; di < dimensions.length; di++) {
           var dk   = "dimensions_" + di;
           var cell = rowData[dk] || {};
           if (cell.id) { cellAddress[dimensions[di].id] = cell.id; }
         }
-
-        // Override the changed dimension with new member
         var dimIdx = parseInt(dimensionId.replace("dimensions_", ""), 10);
         if (!isNaN(dimIdx) && dimensions[dimIdx]) {
           cellAddress[dimensions[dimIdx].id] = memberId;
         }
-
         binding.setValueState(cellAddress, function(err) {
-          if (!err) { self._loadBinding(); }
+          if (!err) {
+            // Clear local selection after binding confirms save
+            if (self._localSelections && self._localSelections[rowIndex]) {
+              delete self._localSelections[rowIndex][dimensionId];
+            }
+            self._loadBinding();
+          }
         });
-      } else {
-        // Fallback: apply as filter
-        this._activeFilters[dimensionId] = memberId;
-        this._applyFilters();
-        this._render();
       }
     } catch(e) {
       console.error("DropdownTable write-back error:", e);
-      this._activeFilters[dimensionId] = memberId;
-      this._applyFilters();
-      this._render();
     }
 
     this.dispatchEvent(new CustomEvent("onDropdownChanged", {
