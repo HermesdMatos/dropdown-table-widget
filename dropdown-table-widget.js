@@ -2,7 +2,7 @@ var TMPL = document.createElement("template");
 TMPL.innerHTML = `
 <style>
   :host { display: block; font-family: Arial, sans-serif; position: relative; box-sizing: border-box; }
-  .dt-wrapper { width: 100%; height: 100%; overflow: auto; box-sizing: border-box; }
+  .dt-wrapper { width: 100%; height: 100%; overflow: auto; box-sizing: border-box; position: relative; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
   thead tr { background: var(--header-color, #1a73e8); }
@@ -71,7 +71,7 @@ TMPL.innerHTML = `
   }
 
   .dt-dropdown-list {
-    position: fixed;
+    position: absolute;
     background: #ffffff;
     border: 1px solid #dadce0;
     border-radius: 4px;
@@ -100,14 +100,14 @@ TMPL.innerHTML = `
   .dt-empty { padding: 32px; text-align: center; color: #999; font-size: 13px; }
   .dt-empty.hidden { display: none; }
 </style>
-<div class="dt-wrapper">
+<div class="dt-wrapper" id="dt-wrapper">
   <table id="dt-table">
     <thead><tr id="dt-header"></tr></thead>
     <tbody id="dt-body"></tbody>
   </table>
   <div class="dt-empty" id="dt-empty">Nenhum dado disponível</div>
+  <div class="dt-dropdown-list hidden" id="dt-dropdown"></div>
 </div>
-<div class="dt-dropdown-list hidden" id="dt-dropdown"></div>
 `;
 
 class DropdownTableWidget extends HTMLElement {
@@ -488,7 +488,18 @@ class DropdownTableWidget extends HTMLElement {
     list.innerHTML = "";
     list.classList.remove("hidden");
 
-    for (var i = 0; i < options.length; i++) {
+    // Filter out root node — label same as dimension name or value contains "root"
+    var filteredOptions = [];
+    for (var fi = 0; fi < options.length; fi++) {
+      var opt = options[fi];
+      var lbl = (opt.label || "").toLowerCase();
+      var val = (opt.value || "").toLowerCase();
+      // Skip if value contains root marker or label equals dimension feed name
+      if (val.indexOf("root") !== -1 || val.indexOf("].&[root]") !== -1) { continue; }
+      filteredOptions.push(opt);
+    }
+
+    for (var i = 0; i < filteredOptions.length; i++) {
       (function(opt) {
         var item = document.createElement("div");
         item.className = opt.value === currentId ? "dt-dropdown-item selected" : "dt-dropdown-item";
@@ -499,21 +510,29 @@ class DropdownTableWidget extends HTMLElement {
           self._closeDropdown();
         });
         list.appendChild(item);
-      })(options[i]);
+      })(filteredOptions[i]);
     }
 
-    // Position below cell, flip if near edge
-    var rect  = cellEl.getBoundingClientRect();
-    var listW = Math.max(rect.width, 160);
-    var left  = rect.left;
-    var top   = rect.bottom + 2;
+    // Position relative to the wrapper element (not fixed to window)
+    // This works correctly inside SAC iframes
+    var wrapper = this.shadowRoot.getElementById("dt-wrapper");
+    var wrapperRect = wrapper.getBoundingClientRect();
+    var cellRect = cellEl.getBoundingClientRect();
 
-    if (left + listW > window.innerWidth - 8) { left = window.innerWidth - listW - 8; }
-    var listH = Math.min(options.length * 36 + 8, 220);
-    if (top + listH > window.innerHeight - 8) { top = rect.top - listH - 2; }
+    var listW = Math.max(cellRect.width, 160);
+    var left  = cellRect.left - wrapperRect.left + wrapper.scrollLeft;
+    var top   = cellRect.bottom - wrapperRect.top + wrapper.scrollTop;
 
-    list.style.left     = left  + "px";
-    list.style.top      = top   + "px";
+    // Flip up if near bottom
+    var listH = Math.min(filteredOptions.length * 36 + 8, 220);
+    if (cellRect.bottom + listH > window.innerHeight - 8) {
+      top = cellRect.top - wrapperRect.top + wrapper.scrollTop - listH - 2;
+    }
+
+    // Change dropdown to absolute positioning inside wrapper
+    list.style.position = "absolute";
+    list.style.left     = left + "px";
+    list.style.top      = top  + "px";
     list.style.minWidth = listW + "px";
 
     setTimeout(function() {
