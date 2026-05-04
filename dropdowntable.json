@@ -6,19 +6,19 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-fiDSnM6FlAeSCkPIjc+mRK962Y5IfQ2vxZQtRho2xek="
+      "integrity": "sha256-S6bCp/PVY2Ay+9kFvZy+44svk8gycSQd0VP2d2lvUKQ="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js",
-      "integrity": "sha256-PLACEHOLDER_STYLE"
+      "integrity": "sha256-ZSINIzEc1QIrqFf8d5JsRtP7tR98BElGeV9uX7MssVg="
     }
   ],
   "properties": {
@@ -66,6 +66,26 @@
       "type": "string",
       "description": "Highlight color for selected dropdown item",
       "default": "#e8f0fe"
+    },
+    "rowHeight": {
+      "type": "integer",
+      "description": "Height of each row in pixels",
+      "default": 36
+    },
+    "colWidth": {
+      "type": "string",
+      "description": "Column width: auto or pixel value",
+      "default": "auto"
+    },
+    "fontFamily": {
+      "type": "string",
+      "description": "Font family for table content",
+      "default": "Arial, sans-serif"
+    },
+    "fontSize": {
+      "type": "string",
+      "description": "Font size for table content",
+      "default": "13px"
     },
     "width": {
       "type": "integer",
