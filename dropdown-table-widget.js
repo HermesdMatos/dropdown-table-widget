@@ -199,6 +199,10 @@ class DropdownTableWidget extends HTMLElement {
   set hoverRowColor(v) { this.style.setProperty("--hover-row-color", v); }
   set tableTextColor(v) { this.style.setProperty("--table-text-color", v); }
   set dropdownHighlightColor(v) { this.style.setProperty("--dropdown-highlight-color", v); }
+  set rowHeight(v) { this._rowHeight = parseInt(v, 10) || 36; this._render(); }
+  set colWidth(v) { this._colWidth = v; this._render(); }
+  set fontFamily(v) { this._fontFamily = v; this._applyDynamicStyles(); }
+  set fontSize(v) { this._fontSize = v; this._applyDynamicStyles(); }
   set width(v) { this.style.width = v + "px"; }
   set height(v) { this.style.height = v + "px"; }
 
