@@ -1,482 +1,152 @@
-var TMPL = document.createElement("template");
-TMPL.innerHTML = `
-<style>
-  :host { display: block; font-family: Arial, sans-serif; position: relative; box-sizing: border-box; }
-  .dt-wrapper { width: 100%; height: 100%; overflow: auto; box-sizing: border-box; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-
-  thead tr { background: var(--header-color, #1a73e8); }
-  thead th {
-    color: var(--header-text-color, #ffffff);
-    padding: 8px 12px;
-    text-align: left;
-    font-weight: 600;
-    border: 1px solid rgba(255,255,255,0.2);
-    white-space: nowrap;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-  }
-
-  tbody tr { border-bottom: 1px solid #e0e0e0; }
-  tbody tr:hover td { background: var(--hover-row-color, #f5f5f5); }
-  tbody td {
-    padding: 0;
-    color: var(--table-text-color, #333333);
-    border-right: 1px solid #e0e0e0;
-    height: 36px;
-    vertical-align: middle;
-    background: #fff;
-  }
-
-  .cell-plain {
-    padding: 0 12px;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 36px;
-  }
-
-  .cell-dropdown {
-    position: relative;
-    display: flex;
-    align-items: center;
-    height: 36px;
-    cursor: pointer;
-    user-select: none;
-    box-sizing: border-box;
-  }
-  .cell-dropdown:hover { background: rgba(26,115,232,0.06); }
-  .cell-dropdown.active { outline: 2px solid #1a73e8; outline-offset: -2px; }
-  .cell-value {
-    flex: 1;
-    padding: 0 28px 0 12px;
-    font-size: 13px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--table-text-color, #333333);
-  }
-  .cell-value.empty { color: #aaa; font-style: italic; }
-  .cell-arrow {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 10px;
-    height: 10px;
-    pointer-events: none;
-    color: #888;
-  }
-
-  .dt-dropdown-list {
-    position: fixed;
-    background: #ffffff;
-    border: 1px solid #dadce0;
-    border-radius: 4px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    z-index: 99999;
-    min-width: 160px;
-    max-height: 220px;
-    overflow-y: auto;
-    padding: 4px 0;
-  }
-  .dt-dropdown-list.hidden { display: none; }
-  .dt-dropdown-item {
-    padding: 8px 16px;
-    font-size: 13px;
-    cursor: pointer;
-    color: #333;
-    white-space: nowrap;
-  }
-  .dt-dropdown-item:hover { background: #f1f3f4; }
-  .dt-dropdown-item.selected {
-    background: var(--dropdown-highlight-color, #e8f0fe);
-    color: #1a73e8;
-    font-weight: 600;
-  }
-
-  .dt-empty { padding: 32px; text-align: center; color: #999; font-size: 13px; }
-  .dt-empty.hidden { display: none; }
-</style>
-<div class="dt-wrapper">
-  <table id="dt-table">
-    <thead><tr id="dt-header"></tr></thead>
-    <tbody id="dt-body"></tbody>
-  </table>
-  <div class="dt-empty" id="dt-empty">Nenhum dado disponível</div>
-</div>
-<div class="dt-dropdown-list hidden" id="dt-dropdown"></div>
-`;
-
 class DropdownTableWidget extends HTMLElement {
+    constructor() {
+        super();
 
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this.shadowRoot.appendChild(TMPL.content.cloneNode(true));
+        this._dropdownOptions = {};
+        this._selectedCell = null;
 
-    this._dropdownDimensions = [];
-    this._selectedCellData = {};
-    this._activeFilters = {};
-    this._activeCell = null;
-    this._metadata = null;
-    this._data = null;
+        this.attachShadow({ mode: "open" });
+        this.shadowRoot.innerHTML = `
+            <style>
+                table {
+                    border-collapse: collapse;
+                    width: 100%;
+                    font-family: Arial;
+                }
 
-    this._onDocClick = this._closeDropdown.bind(this);
-  }
+                td, th {
+                    border: 1px solid #ccc;
+                    padding: 6px;
+                    position: relative;
+                }
 
-  connectedCallback() { document.addEventListener("click", this._onDocClick); }
-  disconnectedCallback() { document.removeEventListener("click", this._onDocClick); }
+                td.editable {
+                    background: #fafafa;
+                    cursor: pointer;
+                }
 
-  // ─── SAC Lifecycle ────────────────────────────────────────────
-  onCustomWidgetReady() { this._loadBinding(); }
-  onCustomWidgetBeforeUpdate(c) {}
-  onCustomWidgetAfterUpdate(c) { this._loadBinding(); }
-  onCustomWidgetResize(w, h) { this.style.width = w + "px"; this.style.height = h + "px"; }
-  onCustomWidgetDestroy() { document.removeEventListener("click", this._onDocClick); }
+                input {
+                    width: 100%;
+                    border: none;
+                    outline: none;
+                }
 
-  // ─── Binding ──────────────────────────────────────────────────
-  _loadBinding() {
-    try {
-      var b = this.myDataBinding;
-      if (!b || !b.metadata || !b.data) return;
-      this._metadata = b.metadata;
-      this._data = b.data;
-      this._render();
-    } catch(e) { console.error("DropdownTable _loadBinding:", e); }
-  }
-
-  // ─── Properties ───────────────────────────────────────────────
-  get dropdownDimensions() { return JSON.stringify(this._dropdownDimensions); }
-  set dropdownDimensions(v) {
-    try { this._dropdownDimensions = JSON.parse(v); } catch(e) { this._dropdownDimensions = []; }
-    this._render();
-  }
-  get selectedCellData() { return JSON.stringify(this._selectedCellData); }
-  set selectedCellData(v) { try { this._selectedCellData = JSON.parse(v); } catch(e) {} }
-
-  set headerColor(v) { this.style.setProperty("--header-color", v); }
-  set headerTextColor(v) { this.style.setProperty("--header-text-color", v); }
-  set selectedRowColor(v) { this.style.setProperty("--selected-row-color", v); }
-  set hoverRowColor(v) { this.style.setProperty("--hover-row-color", v); }
-  set tableTextColor(v) { this.style.setProperty("--table-text-color", v); }
-  set dropdownHighlightColor(v) { this.style.setProperty("--dropdown-highlight-color", v); }
-  set width(v) { this.style.width = v + "px"; }
-  set height(v) { this.style.height = v + "px"; }
-
-  // ─── Methods ──────────────────────────────────────────────────
-  setDropdownDimensions(v) { this.dropdownDimensions = v; }
-  getDropdownDimensions() { return this.dropdownDimensions; }
-  getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
-  getActiveFilters() { return JSON.stringify(this._activeFilters); }
-  clearAllFilters() {
-    this._activeFilters = {};
-    this._applyFilters();
-    this._render();
-  }
-
-  // ─── Render ───────────────────────────────────────────────────
-  _render() {
-    var headerRow = this.shadowRoot.getElementById("dt-header");
-    var tbody     = this.shadowRoot.getElementById("dt-body");
-    var emptyMsg  = this.shadowRoot.getElementById("dt-empty");
-
-    headerRow.innerHTML = "";
-    tbody.innerHTML = "";
-
-    if (!this._metadata || !this._data || this._data.length === 0) {
-      emptyMsg.classList.remove("hidden");
-      return;
-    }
-    emptyMsg.classList.add("hidden");
-
-    var dimensions = this._metadata.feeds.dimensions.values;
-    var measures   = this._metadata.feeds.mainStructureMembers
-      ? this._metadata.feeds.mainStructureMembers.values
-      : (this._metadata.feeds.measures ? this._metadata.feeds.measures.values : []);
-
-    // ── Header ───────────────────────────────────────────────────
-    for (var i = 0; i < dimensions.length; i++) {
-      var th = document.createElement("th");
-      th.textContent = dimensions[i].description || dimensions[i].id;
-      headerRow.appendChild(th);
-    }
-    for (var j = 0; j < measures.length; j++) {
-      var thm = document.createElement("th");
-      thm.textContent = measures[j].description || measures[j].id;
-      thm.style.textAlign = "right";
-      headerRow.appendChild(thm);
+                select {
+                    width: 100%;
+                }
+            </style>
+            <div id="container"></div>
+        `;
     }
 
-    // ── Fetch dropdown options from dimension members (not from data rows) ──
-    // This avoids row multiplication when dropdown dimensions are in the binding
-    var dimOptions = {};
-    for (var d = 0; d < dimensions.length; d++) {
-      dimOptions["dimensions_" + d] = [];
-    }
-
-    try {
-      var binding = this.myDataBinding;
-      for (var dm = 0; dm < dimensions.length; dm++) {
-        var dk = "dimensions_" + dm;
-        var dimId = dimensions[dm].id;
-        var members = binding.getDimensionMembers(dimId);
-        if (members && members.length > 0) {
-          for (var mx = 0; mx < members.length; mx++) {
-            var mem = members[mx];
-            // Skip root node (no parent or id contains root marker)
-            if (mem && mem.id && mem.parentId) {
-              dimOptions[dk].push({ value: mem.id, label: mem.description || mem.id });
-            }
-          }
-        }
-      }
-    } catch(e) {
-      // Fallback: collect from data rows excluding root
-      var dimRootIds = {};
-      for (var dr = 0; dr < dimensions.length; dr++) {
-        dimRootIds["dimensions_" + dr] = null;
-        for (var rr = 0; rr < this._data.length; rr++) {
-          var cr = this._data[rr]["dimensions_" + dr];
-          if (cr && cr.isCollapsed === true && dimRootIds["dimensions_" + dr] === null) {
-            dimRootIds["dimensions_" + dr] = cr.id;
-            break;
-          }
-        }
-      }
-      for (var r = 0; r < this._data.length; r++) {
-        var row = this._data[r];
-        for (var d2 = 0; d2 < dimensions.length; d2++) {
-          var dkf = "dimensions_" + d2;
-          var cell = row[dkf];
-          if (cell && cell.id && cell.id !== dimRootIds[dkf]) {
-            var exists = false;
-            for (var ex = 0; ex < dimOptions[dkf].length; ex++) {
-              if (dimOptions[dkf][ex].value === cell.id) { exists = true; break; }
-            }
-            if (!exists) {
-              dimOptions[dkf].push({ value: cell.id, label: cell.label || cell.id });
-            }
-          }
-        }
-      }
-    }
-
-    // ── Collect unique row keys from first dimension only ────────
-    // Show one row per unique member of dimensions_0, ignore other dims
-    var rowKeys = {};
-    var rowOrder = [];
-    for (var r2 = 0; r2 < this._data.length; r2++) {
-      var c0 = this._data[r2]["dimensions_0"] || {};
-      if (c0.id && !rowKeys[c0.id] && c0.isCollapsed !== true) {
-        rowKeys[c0.id] = { label: c0.label || c0.id, rowIndex: r2 };
-        rowOrder.push(c0.id);
-      }
-    }
-
-    // ── Rows — one per unique dimensions_0 member ────────────────
-    for (var ro = 0; ro < rowOrder.length; ro++) {
-      var rowKey  = rowOrder[ro];
-      var rowInfo = rowKeys[rowKey];
-      var ri      = rowInfo.rowIndex;
-      var rowData = this._data[ri];
-
-      var tr = document.createElement("tr");
-      tr.dataset.rowIndex = ri;
-
-      // Dimension cells
-      for (var di = 0; di < dimensions.length; di++) {
-        var dim   = dimensions[di];
-        var dk2   = "dimensions_" + di;
-        var td    = document.createElement("td");
-        var cData = rowData[dk2] || {};
-        var cLbl  = cData.label || cData.id || "";
-        var cId   = cData.id || "";
-
-        var isDrop = this._dropdownDimensions.length === 0
-          || this._dropdownDimensions.indexOf(dk2) !== -1
-          || this._dropdownDimensions.indexOf(dim.id) !== -1;
-
-        if (isDrop) {
-          this._buildDropdownCell(td, ri, dk2, cLbl, cId, dimOptions[dk2]);
-        } else {
-          var sp = document.createElement("span");
-          sp.className = "cell-plain";
-          sp.textContent = cLbl;
-          td.appendChild(sp);
-        }
-        tr.appendChild(td);
-      }
-
-      // Measure cells
-      for (var mi = 0; mi < measures.length; mi++) {
-        var mk  = "measures_" + mi;
-        var tdm = document.createElement("td");
-        var spm = document.createElement("span");
-        spm.className = "cell-plain";
-        spm.style.textAlign = "right";
-        var mv  = rowData[mk];
-        spm.textContent = mv ? (mv.formatted || mv.raw || "") : "";
-        tdm.appendChild(spm);
-        tr.appendChild(tdm);
-      }
-
-      tbody.appendChild(tr);
-    }
-  }
-
-  // ─── Dropdown cell ────────────────────────────────────────────
-  _buildDropdownCell(td, rowIndex, dimensionId, currentLabel, currentId, options) {
-    var self    = this;
-    var wrapper = document.createElement("div");
-    wrapper.className = "cell-dropdown";
-    wrapper.tabIndex  = 0;
-
-    var valueSpan = document.createElement("span");
-    valueSpan.className = currentLabel ? "cell-value" : "cell-value empty";
-    valueSpan.textContent = currentLabel || "Selecionar...";
-
-    var arrow = document.createElement("span");
-    arrow.className = "cell-arrow";
-    arrow.innerHTML = '<svg viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-    wrapper.appendChild(valueSpan);
-    wrapper.appendChild(arrow);
-
-    wrapper.addEventListener("click", function(e) {
-      e.stopPropagation();
-      self._openDropdown(wrapper, rowIndex, dimensionId, currentId, options);
-    });
-    wrapper.addEventListener("keydown", function(e) {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); wrapper.click(); }
-      if (e.key === "Escape") self._closeDropdown();
-    });
-
-    td.appendChild(wrapper);
-  }
-
-  _openDropdown(cellEl, rowIndex, dimensionId, currentId, options) {
-    var self = this;
-    this._closeDropdown();
-    if (!options || options.length === 0) return;
-
-    cellEl.classList.add("active");
-    this._activeCell = cellEl;
-
-    var list = this.shadowRoot.getElementById("dt-dropdown");
-    list.innerHTML = "";
-    list.classList.remove("hidden");
-
-    for (var i = 0; i < options.length; i++) {
-      (function(opt) {
-        var item = document.createElement("div");
-        item.className = opt.value === currentId ? "dt-dropdown-item selected" : "dt-dropdown-item";
-        item.textContent = opt.label;
-        item.addEventListener("mousedown", function(e) {
-          e.preventDefault();
-          self._selectValue(rowIndex, dimensionId, opt.value, opt.label);
-          self._closeDropdown();
-        });
-        list.appendChild(item);
-      })(options[i]);
-    }
-
-    // Position below cell, flip if near edge
-    var rect  = cellEl.getBoundingClientRect();
-    var listW = Math.max(rect.width, 160);
-    var left  = rect.left;
-    var top   = rect.bottom + 2;
-
-    if (left + listW > window.innerWidth - 8) { left = window.innerWidth - listW - 8; }
-    var listH = Math.min(options.length * 36 + 8, 220);
-    if (top + listH > window.innerHeight - 8) { top = rect.top - listH - 2; }
-
-    list.style.left     = left  + "px";
-    list.style.top      = top   + "px";
-    list.style.minWidth = listW + "px";
-
-    setTimeout(function() {
-      document.addEventListener("click", self._onDocClick, { once: true });
-    }, 0);
-  }
-
-  _closeDropdown() {
-    var list = this.shadowRoot.getElementById("dt-dropdown");
-    if (list) { list.classList.add("hidden"); list.innerHTML = ""; }
-    if (this._activeCell) { this._activeCell.classList.remove("active"); this._activeCell = null; }
-  }
-
-  // ─── Select & write-back ──────────────────────────────────────
-  _selectValue(rowIndex, dimensionId, memberId, memberLabel) {
-    var self = this;
-
-    this._selectedCellData = {
-      row: rowIndex,
-      dimensionId: dimensionId,
-      memberId: memberId,
-      memberLabel: memberLabel
-    };
-
-    // Write-back to SAC planning model
-    try {
-      var binding    = this.myDataBinding;
-      var rowData    = this._data[rowIndex];
-      var dimensions = this._metadata.feeds.dimensions.values;
-
-      if (binding && binding.setValueState) {
-        var cellAddress = {};
-
-        // Build full dimensional context for this row
-        for (var di = 0; di < dimensions.length; di++) {
-          var dk   = "dimensions_" + di;
-          var cell = rowData[dk] || {};
-          if (cell.id) { cellAddress[dimensions[di].id] = cell.id; }
-        }
-
-        // Override the changed dimension with new member
-        var dimIdx = parseInt(dimensionId.replace("dimensions_", ""), 10);
-        if (!isNaN(dimIdx) && dimensions[dimIdx]) {
-          cellAddress[dimensions[dimIdx].id] = memberId;
-        }
-
-        binding.setValueState(cellAddress, function(err) {
-          if (!err) { self._loadBinding(); }
-        });
-      } else {
-        // Fallback: apply as filter
-        this._activeFilters[dimensionId] = memberId;
-        this._applyFilters();
+    onCustomWidgetAfterUpdate() {
         this._render();
-      }
-    } catch(e) {
-      console.error("DropdownTable write-back error:", e);
-      this._activeFilters[dimensionId] = memberId;
-      this._applyFilters();
-      this._render();
     }
 
-    this.dispatchEvent(new CustomEvent("onDropdownChanged", {
-      bubbles: true, composed: true, detail: this._selectedCellData
-    }));
-  }
+    setDropdownOptions(optionsJson) {
+        this._dropdownOptions = JSON.parse(optionsJson);
+        this._render();
+    }
 
-  _applyFilters() {
-    try {
-      var binding = this.myDataBinding;
-      if (!binding || !this._metadata) return;
-      var dimensions = this._metadata.feeds.dimensions.values;
-      for (var i = 0; i < dimensions.length; i++) {
-        try { binding.removeDimensionFilter(dimensions[i].id); } catch(e) {}
-      }
-      var keys = Object.keys(this._activeFilters);
-      for (var k = 0; k < keys.length; k++) {
-        var mid = this._activeFilters[keys[k]];
-        if (mid) { binding.setDimensionFilter(keys[k], [mid]); }
-      }
-    } catch(e) { console.error("DropdownTable _applyFilters:", e); }
-  }
+    _getLookupOptions(dimensionName) {
+        if (!this.lookupBinding || !this.lookupBinding.data) {
+            return [];
+        }
+
+        return [
+            ...new Set(
+                this.lookupBinding.data
+                    .map(row => row["dimensions_0"])
+                    .filter(x => x && x.isCollapsed === false)
+                    .map(x => x.label)
+            )
+        ];
+    }
+
+    _fireSubmit(payload) {
+        this.dispatchEvent(
+            new CustomEvent("onCellSubmit", {
+                detail: payload
+            })
+        );
+    }
+
+    _render() {
+        if (!this.tableBinding || !this.tableBinding.data) return;
+
+        const data = this.tableBinding.data;
+        const metadata = this.tableBinding.metadata;
+
+        const container = this.shadowRoot.getElementById("container");
+
+        let html = "<table>";
+
+        html += "<tr>";
+
+        metadata.feeds.dimensions.values.forEach(dim => {
+            html += `<th>${dim.description}</th>`;
+        });
+
+        metadata.feeds.mainStructureMembers.values.forEach(measure => {
+            html += `<th>${measure.label}</th>`;
+        });
+
+        html += "</tr>";
+
+        data.forEach((row, rowIndex) => {
+            html += "<tr>";
+
+            metadata.feeds.dimensions.values.forEach((dim, i) => {
+                const cell = row["dimensions_" + i];
+                html += `<td>${cell?.label || ""}</td>`;
+            });
+
+            metadata.feeds.mainStructureMembers.values.forEach((measure, i) => {
+                const measureKey = "measures_" + i;
+                const value = row[measureKey]?.formatted || "";
+
+                html += `
+                    <td class="editable"
+                        data-row="${rowIndex}"
+                        data-measure="${measure.id}"
+                        data-key="${measureKey}">
+                        ${value}
+                    </td>
+                `;
+            });
+
+            html += "</tr>";
+        });
+
+        html += "</table>";
+
+        container.innerHTML = html;
+
+        container.querySelectorAll(".editable").forEach(cell => {
+            cell.addEventListener("click", e => {
+                const td = e.target;
+
+                const currentValue = td.innerText;
+
+                td.innerHTML = `<input value="${currentValue}" />`;
+
+                const input = td.querySelector("input");
+                input.focus();
+
+                input.addEventListener("blur", () => {
+                    const newValue = input.value;
+
+                    td.innerHTML = newValue;
+
+                    this._fireSubmit({
+                        row: td.dataset.row,
+                        measure: td.dataset.measure,
+                        value: newValue
+                    });
+                });
+            });
+        });
+    }
 }
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
