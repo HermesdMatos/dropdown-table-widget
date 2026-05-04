@@ -164,6 +164,34 @@ class DropdownTableWidget extends HTMLElement {
 
   // ─── Properties ───────────────────────────────────────────────
   get dropdownOptions() { return JSON.stringify(this._dropdownOptions || {}); }
+  set styleConfig(v) {
+    try {
+      var cfg = JSON.parse(v);
+      this.applyStyleConfig(v);
+    } catch(e) {}
+  }
+
+  applyStyleConfig(v) {
+    try {
+      var cfg = typeof v === "string" ? JSON.parse(v) : v;
+      if (cfg.headerColor)       { this.style.setProperty("--header-color", cfg.headerColor); }
+      if (cfg.headerTextColor)   { this.style.setProperty("--header-text-color", cfg.headerTextColor); }
+      if (cfg.hoverRowColor)     { this.style.setProperty("--hover-row-color", cfg.hoverRowColor); }
+      if (cfg.tableTextColor)    { this.style.setProperty("--table-text-color", cfg.tableTextColor); }
+      if (cfg.editableCellColor) { this._editableCellColor = cfg.editableCellColor; }
+      if (cfg.rowHeight)         { this._rowHeight = cfg.rowHeight; }
+      if (cfg.colWidth)          { this._colWidth = cfg.colWidth; }
+      if (cfg.fontFamily)        { this._fontFamily = cfg.fontFamily; }
+      if (cfg.fontSize)          { this._fontSize = cfg.fontSize; }
+      if (cfg.fontWeight)        { this._fontWeight = cfg.fontWeight; }
+      if (cfg.fontStyle)         { this._fontStyle = cfg.fontStyle; }
+      if (cfg.textDecoration)    { this._textDecoration = cfg.textDecoration; }
+      if (cfg.showUnit)          { this._showUnit = cfg.showUnit; }
+      this._applyDynamicStyles();
+      this._render();
+    } catch(e) { console.error("applyStyleConfig error:", e); }
+  }
+
   set dropdownOptions(v) {
     try {
       var cfg = JSON.parse(v);
