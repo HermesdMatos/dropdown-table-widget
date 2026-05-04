@@ -276,12 +276,21 @@ class DropdownTableStyling extends HTMLElement {
     this._widget = w;
   }
 
+  _getWidget() {
+    // SAC injects the main widget as this.myWidget in styling components
+    return this._widget || this.myWidget || null;
+  }
+
   _getVal(id) {
     return this.shadowRoot.getElementById(id).value;
   }
 
   _applyChange() {
-    if (!this._widget) return;
+    var w = this._getWidget();
+    if (!w) {
+      console.warn("DropdownTable styling: no widget reference");
+      return;
+    }
 
     var fontFamily   = this._getVal("fontFamily");
     var fontSize     = this._getVal("fontSize");
@@ -313,28 +322,26 @@ class DropdownTableStyling extends HTMLElement {
       hoverColor  = "#f0f0f0";
     }
 
-    // Push styles to main widget
-    this._widget.headerColor          = headerColor;
-    this._widget.headerTextColor      = headerText;
-    this._widget.hoverRowColor        = hoverColor;
-    this._widget.tableTextColor       = colorText;
-    this._widget._editableCellColor   = colorEdit;
-    this._widget._rowHeight           = parseInt(rowHeight, 10);
-    this._widget._colWidth            = colWidth;
-    this._widget._fontFamily          = fontFamily;
-    this._widget._fontSize            = fontSize + "px";
-    this._widget._fontWeight          = fontWeight.indexOf("bold") !== -1 ? "bold" : "normal";
-    this._widget._fontStyle           = fontWeight.indexOf("italic") !== -1 ? "italic" : "normal";
-    this._widget._textDecoration      = textDecor.length > 0 ? textDecor.join(" ") : "none";
-    this._widget._showUnit            = showUnit;
+    // Set properties on main widget — SAC syncs declared properties automatically
+    w.headerColor        = headerColor;
+    w.headerTextColor    = headerText;
+    w.hoverRowColor      = hoverColor;
+    w.tableTextColor     = colorText;
 
-    // Trigger re-render
-    if (typeof this._widget._applyDynamicStyles === "function") {
-      this._widget._applyDynamicStyles();
-    }
-    if (typeof this._widget._render === "function") {
-      this._widget._render();
-    }
+    // Set internal style properties
+    w._editableCellColor = colorEdit;
+    w._rowHeight         = parseInt(rowHeight, 10);
+    w._colWidth          = colWidth;
+    w._fontFamily        = fontFamily;
+    w._fontSize          = fontSize + "px";
+    w._fontWeight        = fontWeight.indexOf("bold") !== -1 ? "bold" : "normal";
+    w._fontStyle         = fontWeight.indexOf("italic") !== -1 ? "italic" : "normal";
+    w._textDecoration    = textDecor.length > 0 ? textDecor.join(" ") : "none";
+    w._showUnit          = showUnit;
+
+    // Trigger re-render on main widget
+    if (typeof w._applyDynamicStyles === "function") { w._applyDynamicStyles(); }
+    if (typeof w._render === "function") { w._render(); }
   }
 }
 
