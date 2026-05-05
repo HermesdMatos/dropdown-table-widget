@@ -304,21 +304,50 @@ class DropdownTableWidget extends HTMLElement {
       ? this._metadata.feeds.mainStructureMembers.values
       : (this._metadata.feeds.measures ? this._metadata.feeds.measures.values : []);
 
+    // Log full structure of first items to understand label field
+    console.log("DropdownTable dim[0] full:", JSON.stringify(dimensions[0]));
+    console.log("DropdownTable mes[0] full:", JSON.stringify(measures[0]));
+    console.log("DropdownTable data[0] dim0 full:", JSON.stringify(this._data[0] ? this._data[0]["dimensions_0"] : null));
+
+    // Get dimension labels from data rows (label stored in cell data)
+    // SAC stores dimension descriptions in cell.label of first data row
+    var dimLabels = [];
+    var mesLabels = [];
+
+    for (var di = 0; di < dimensions.length; di++) {
+      var firstCell = this._data[0] ? this._data[0]["dimensions_" + di] : null;
+      var dimLabel = (firstCell && firstCell.parentDescription) ||
+                     (firstCell && firstCell.dimensionDescription) ||
+                     dimensions[di].description ||
+                     dimensions[di].label ||
+                     dimensions[di].text ||
+                     dimensions[di].name ||
+                     dimensions[di].id || ("Dim " + di);
+      dimLabels.push(dimLabel);
+    }
+
+    for (var mi2 = 0; mi2 < measures.length; mi2++) {
+      var mesLabel2 = measures[mi2].description ||
+                      measures[mi2].label ||
+                      measures[mi2].text ||
+                      measures[mi2].name ||
+                      measures[mi2].id || ("Med " + mi2);
+      mesLabels.push(mesLabel2);
+    }
+
+    console.log("DropdownTable dimLabels:", JSON.stringify(dimLabels));
+    console.log("DropdownTable mesLabels:", JSON.stringify(mesLabels));
+
     // ── Header ───────────────────────────────────────────────────
-    console.log("DropdownTable metadata feeds:", JSON.stringify(Object.keys(this._metadata.feeds)));
-    console.log("DropdownTable dim[0]:", JSON.stringify(dimensions[0]));
-    console.log("DropdownTable mes[0]:", JSON.stringify(measures[0]));
-    for (var i = 0; i < dimensions.length; i++) {
+    for (var i = 0; i < dimLabels.length; i++) {
       var th = document.createElement("th");
-      var dimLabel = dimensions[i].description || dimensions[i].label || dimensions[i].name || dimensions[i].id || ("Dim " + i);
-      th.textContent = dimLabel;
+      th.textContent = dimLabels[i];
       th.style.minWidth = this._colWidth === "auto" ? "120px" : this._colWidth + "px";
       headerRow.appendChild(th);
     }
-    for (var j = 0; j < measures.length; j++) {
+    for (var j = 0; j < mesLabels.length; j++) {
       var thm = document.createElement("th");
-      var mesLabel = measures[j].description || measures[j].label || measures[j].name || measures[j].id || ("Med " + j);
-      thm.textContent = mesLabel;
+      thm.textContent = mesLabels[j];
       thm.style.textAlign = "right";
       thm.style.minWidth = this._colWidth === "auto" ? "100px" : this._colWidth + "px";
       headerRow.appendChild(thm);
