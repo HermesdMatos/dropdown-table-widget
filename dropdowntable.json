@@ -6,7 +6,7 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "webcomponents": [
     {
       "kind": "main",
@@ -18,7 +18,7 @@
       "kind": "styling",
       "tag": "dropdowntable-styling",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js",
-      "integrity": "sha256-oEmbkNto8zU4d8gvbaVD04uMM5SfBEKCcixM3qFOjNg="
+      "integrity": "sha256-EEpBC3UsLTj6AbVMVD8PXTA24SnThE2D53gcwFX2aDs="
     }
   ],
   "properties": {

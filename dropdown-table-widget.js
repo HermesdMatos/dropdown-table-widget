@@ -8,6 +8,7 @@ TMPL.innerHTML = `
   thead tr { background: var(--header-color, #1a73e8); }
   thead th {
     color: var(--header-text-color, #ffffff);
+    background: var(--header-color, #1a73e8);
     padding: 8px 12px;
     text-align: left;
     font-weight: 600;
@@ -304,15 +305,18 @@ class DropdownTableWidget extends HTMLElement {
       : (this._metadata.feeds.measures ? this._metadata.feeds.measures.values : []);
 
     // ── Header ───────────────────────────────────────────────────
+    console.log("DropdownTable header: dimensions=", dimensions.length, "measures=", measures.length);
     for (var i = 0; i < dimensions.length; i++) {
       var th = document.createElement("th");
       th.textContent = dimensions[i].description || dimensions[i].id;
+      console.log("DropdownTable th:", th.textContent);
       th.style.minWidth = this._colWidth === "auto" ? "120px" : this._colWidth + "px";
       headerRow.appendChild(th);
     }
     for (var j = 0; j < measures.length; j++) {
       var thm = document.createElement("th");
       thm.textContent = measures[j].description || measures[j].id;
+      console.log("DropdownTable thm:", thm.textContent);
       thm.style.textAlign = "right";
       thm.style.minWidth = this._colWidth === "auto" ? "100px" : this._colWidth + "px";
       headerRow.appendChild(thm);
