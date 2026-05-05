@@ -540,11 +540,16 @@ class DropdownTableWidget extends HTMLElement {
           || this._dropdownDimensions.indexOf(dk2) !== -1
           || this._dropdownDimensions.indexOf(dim.id) !== -1;
 
+        // For hierarchical dimensions: only show dropdown if cell has children (isNode === true)
+        // Leaf nodes (no isNode or isNode === false) show as plain text
+        if (isDrop && cData.isNode === false) { isDrop = false; }
+        // Also disable dropdown if cell has no options
+        var opts = (this._dropdownOptions && this._dropdownOptions[dk2])
+          ? this._dropdownOptions[dk2]
+          : dimOptions[dk2];
+        if (isDrop && (!opts || opts.length === 0)) { isDrop = false; }
+
         if (isDrop) {
-          // Use manually set options if available, otherwise fall back to binding data
-          var opts = (this._dropdownOptions && this._dropdownOptions[dk2])
-            ? this._dropdownOptions[dk2]
-            : dimOptions[dk2];
           this._buildDropdownCell(td, ri, dk2, cLbl, cId, opts);
         } else {
           var sp = document.createElement("span");
