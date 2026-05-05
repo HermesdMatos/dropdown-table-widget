@@ -556,9 +556,13 @@ class DropdownTableWidget extends HTMLElement {
         // Follow PlanifyIT: formattedValue || formatted || raw
         var mvVal = "";
         if (mv) {
-          if (mv.formattedValue !== undefined) { mvVal = mv.formattedValue; }
-          else if (mv.formatted !== undefined && mv.formatted !== "") { mvVal = mv.formatted; }
-          else if (mv.raw !== null && mv.raw !== undefined) { mvVal = String(mv.raw); }
+          if (mv.formattedValue !== undefined && mv.formattedValue !== null && mv.formattedValue !== "") {
+            mvVal = mv.formattedValue;
+          } else if (mv.formatted !== undefined && mv.formatted !== null && mv.formatted !== "") {
+            mvVal = mv.formatted;
+          } else if (mv.raw !== null && mv.raw !== undefined && !isNaN(mv.raw)) {
+            mvVal = String(mv.raw);
+          }
         }
 
         // Check local measure edits
