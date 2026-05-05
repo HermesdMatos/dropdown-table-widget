@@ -6,7 +6,7 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "webcomponents": [
     {
       "kind": "main",
