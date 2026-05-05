@@ -127,6 +127,7 @@ class DropdownTableWidget extends HTMLElement {
     this._data = null;
     this._localSelections = {};
     this._localMeasures = {};
+    this._measureLabels = [];
 
     // Style properties
     this._rowHeight        = 36;
@@ -148,7 +149,18 @@ class DropdownTableWidget extends HTMLElement {
   // ─── SAC Lifecycle ────────────────────────────────────────────
   onCustomWidgetReady() { this._loadBinding(); }
   onCustomWidgetBeforeUpdate(c) {}
-  onCustomWidgetAfterUpdate(c) { this._loadBinding(); }
+  onCustomWidgetAfterUpdate(changedProperties) {
+    // Follow PlanifyIT pattern — check changedProperties for binding update
+    if (changedProperties && "myDataBinding" in changedProperties) {
+      var dataBinding = changedProperties.myDataBinding;
+      if (dataBinding && dataBinding.state === "success") {
+        this._processDataBinding(dataBinding);
+        return;
+      }
+    }
+    // Fallback to direct binding
+    this._loadBinding();
+  }
   onCustomWidgetResize(w, h) { this.style.width = w + "px"; this.style.height = h + "px"; }
   onCustomWidgetDestroy() { document.removeEventListener("click", this._onDocClick); }
 
@@ -157,10 +169,81 @@ class DropdownTableWidget extends HTMLElement {
     try {
       var b = this.myDataBinding;
       if (!b || !b.metadata || !b.data) return;
-      this._metadata = b.metadata;
-      this._data = b.data;
-      this._render();
+      if (b.state && b.state !== "success") return;
+      this._processDataBinding(b);
     } catch(e) { console.error("DropdownTable _loadBinding:", e); }
+  }
+
+  _processDataBinding(dataBinding) {
+    try {
+      if (!dataBinding || !dataBinding.metadata || !dataBinding.data) return;
+
+      var meta = dataBinding.metadata;
+      var dimLabels = [];
+      var mesLabels = [];
+
+      // ── Dimension labels — follow PlanifyIT pattern ──
+      var dims = meta.feeds ? meta.feeds.dimensions : null;
+      var dimValues = dims ? dims.values : [];
+      for (var di = 0; di < dimValues.length; di++) {
+        var dv = dimValues[di];
+        // Try parentId extraction first (most reliable in SAC)
+        var firstRow = dataBinding.data[0];
+        var firstCell = firstRow ? firstRow["dimensions_" + di] : null;
+        var dimLabel = "";
+        if (firstCell && firstCell.parentId) {
+          var m = firstCell.parentId.match(/^\[([^\]]+)\]/);
+          if (m) { dimLabel = m[1].replace(/_/g, " "); }
+        }
+        if (!dimLabel) {
+          if (typeof dv === "object") {
+            dimLabel = dv.description || dv.label || dv.id || ("Dim " + di);
+          } else {
+            dimLabel = "Dim " + di;
+          }
+        }
+        dimLabels.push(dimLabel);
+      }
+
+      // ── Measure labels — follow PlanifyIT pattern ──
+      // PlanifyIT uses: dataBinding.metadata.mainStructureMembers (object or array)
+      var measMeta = meta.mainStructureMembers || (meta.feeds && meta.feeds.measures) || null;
+      var measValues = [];
+      if (measMeta) {
+        if (Array.isArray(measMeta)) {
+          measValues = measMeta;
+        } else if (measMeta.values) {
+          measValues = measMeta.values;
+        } else if (typeof measMeta === "object") {
+          // Object format like PlanifyIT: { "measures_0": {label, id}, ... }
+          var mkeys = Object.keys(measMeta);
+          for (var mk = 0; mk < mkeys.length; mk++) {
+            measValues.push(measMeta[mkeys[mk]]);
+          }
+        }
+      }
+
+      for (var mi = 0; mi < measValues.length; mi++) {
+        var mv = measValues[mi];
+        var mesLabel = "";
+        if (this._measureLabels && this._measureLabels[mi]) {
+          mesLabel = this._measureLabels[mi];
+        } else if (typeof mv === "object" && mv !== null) {
+          mesLabel = mv.label || mv.description || mv.id || ("Med " + mi);
+        } else {
+          mesLabel = "Med " + mi;
+        }
+        mesLabels.push(mesLabel);
+      }
+
+      // ── Store processed metadata ──
+      this._metadata = meta;
+      this._metadata._dimLabels = dimLabels;
+      this._metadata._mesLabels = mesLabels;
+      this._metadata._measCount = mesLabels.length;
+      this._data = dataBinding.data;
+      this._render();
+    } catch(e) { console.error("DropdownTable _processDataBinding:", e); }
   }
 
   // ─── Properties ───────────────────────────────────────────────
@@ -266,6 +349,16 @@ class DropdownTableWidget extends HTMLElement {
   }
   getDropdownOptions() { return JSON.stringify(this._dropdownOptions); }
 
+  // setMeasureLabels — define nomes das medidas manualmente
+  // Ex: dropdowntable_1.setMeasureLabels('["Custo","Quantidade"]')
+  setMeasureLabels(v) {
+    try {
+      this._measureLabels = JSON.parse(v);
+      this._render();
+    } catch(e) { console.error("setMeasureLabels error:", e); }
+  }
+  getMeasureLabels() { return JSON.stringify(this._measureLabels || []); }
+
   clearAllFilters() {
     this._activeFilters = {};
     this._applyFilters();
@@ -301,52 +394,30 @@ class DropdownTableWidget extends HTMLElement {
 
     var dimensions = this._metadata.feeds.dimensions.values;
     var measFeed   = this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures;
-    var measures   = measFeed ? measFeed.values : [];
-
-    // Get dimension labels from parentId of first data row
-    // parentId format: "[DIMENSION_NAME].[HIERARCHY_NAME].&[MEMBER]" or "[DIMENSION_NAME].&[MEMBER]"
-    var dimLabels = [];
-    var mesLabels = [];
-
-    for (var di = 0; di < dimensions.length; di++) {
-      var firstCell = this._data[0] ? this._data[0]["dimensions_" + di] : null;
-      var dimLabel = "Dim " + di;
-
-      if (firstCell && firstCell.parentId) {
-        var match = firstCell.parentId.match(/^\[([^\]]+)\]/);
-        if (match) { dimLabel = match[1].replace(/_/g, " "); }
-      } else if (firstCell && firstCell.id) {
-        var match2 = firstCell.id.match(/^\[([^\]]+)\]/);
-        if (match2) { dimLabel = match2[1].replace(/_/g, " "); }
+    // SAC measures.values can be array of strings ["measures_0","measures_1"] or array of objects
+    var measValues = measFeed ? measFeed.values : [];
+    var measures   = [];
+    for (var mvi = 0; mvi < measValues.length; mvi++) {
+      var mv2 = measValues[mvi];
+      if (typeof mv2 === "string") {
+        measures.push({ id: mv2, description: "" });
+      } else {
+        measures.push(mv2);
       }
-      dimLabels.push(dimLabel);
     }
 
-    // Measure labels: extract from measure id e.g. "[Custo]" → "Custo"
-    for (var mi2 = 0; mi2 < measures.length; mi2++) {
-      var mesObj   = measures[mi2];
-      var mesLabel2 = mesObj.description || mesObj.label || mesObj.text || mesObj.name || "";
+    // Use pre-processed labels from _processDataBinding
+    var dimLabels = this._metadata._dimLabels || [];
+    var mesLabels = this._metadata._mesLabels || [];
 
-      if (!mesLabel2) {
-        var mesId = mesObj.id || "";
-        // Format: "[MEASURE_NAME]" or "measures_N"
-        var mesMatch = mesId.match(/^\[([^\]]+)\]/);
-        if (mesMatch) {
-          mesLabel2 = mesMatch[1];
-        } else {
-          // Fallback: try to get from data binding feed description
-          var feedMes = this._metadata.feeds.measures || this._metadata.feeds.mainStructureMembers;
-          if (feedMes && feedMes.values && feedMes.values[mi2]) {
-            var fv = feedMes.values[mi2];
-            mesLabel2 = fv.description || fv.label || fv.id || ("Med " + mi2);
-            var mesMatch2 = mesLabel2.match(/^\[([^\]]+)\]/);
-            if (mesMatch2) { mesLabel2 = mesMatch2[1]; }
-          } else {
-            mesLabel2 = "Med " + mi2;
-          }
-        }
+    // Fallback counts
+    if (dimLabels.length === 0) {
+      for (var dfl = 0; dfl < dimensions.length; dfl++) { dimLabels.push("Dim " + dfl); }
+    }
+    if (mesLabels.length === 0) {
+      for (var mfl = 0; mfl < measures.length; mfl++) {
+        mesLabels.push((this._measureLabels && this._measureLabels[mfl]) || "Med " + mfl);
       }
-      mesLabels.push(mesLabel2);
     }
 
     // ── Header ───────────────────────────────────────────────────
@@ -482,7 +553,13 @@ class DropdownTableWidget extends HTMLElement {
         tdm.style.padding = "0";
 
         var mv  = rowData[mk];
-        var mvVal = mv ? (mv.raw !== undefined ? mv.raw : (mv.formatted || "")) : "";
+        // Follow PlanifyIT: formattedValue || formatted || raw
+        var mvVal = "";
+        if (mv) {
+          if (mv.formattedValue !== undefined) { mvVal = mv.formattedValue; }
+          else if (mv.formatted !== undefined && mv.formatted !== "") { mvVal = mv.formatted; }
+          else if (mv.raw !== null && mv.raw !== undefined) { mvVal = String(mv.raw); }
+        }
 
         // Check local measure edits
         if (this._localMeasures && this._localMeasures[ri] && this._localMeasures[ri][mk] !== undefined) {
