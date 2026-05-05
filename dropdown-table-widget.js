@@ -304,39 +304,44 @@ class DropdownTableWidget extends HTMLElement {
       ? this._metadata.feeds.mainStructureMembers.values
       : (this._metadata.feeds.measures ? this._metadata.feeds.measures.values : []);
 
-    // Log full structure of first items to understand label field
-    console.log("DropdownTable dim[0] full:", JSON.stringify(dimensions[0]));
-    console.log("DropdownTable mes[0] full:", JSON.stringify(measures[0]));
-    console.log("DropdownTable data[0] dim0 full:", JSON.stringify(this._data[0] ? this._data[0]["dimensions_0"] : null));
-
-    // Get dimension labels from data rows (label stored in cell data)
-    // SAC stores dimension descriptions in cell.label of first data row
+    // Get dimension labels from parentId of first data row
+    // parentId format: "[DIMENSION_NAME].[HIERARCHY_NAME].&[MEMBER]" or "[DIMENSION_NAME].&[MEMBER]"
     var dimLabels = [];
     var mesLabels = [];
 
     for (var di = 0; di < dimensions.length; di++) {
       var firstCell = this._data[0] ? this._data[0]["dimensions_" + di] : null;
-      var dimLabel = (firstCell && firstCell.parentDescription) ||
-                     (firstCell && firstCell.dimensionDescription) ||
-                     dimensions[di].description ||
-                     dimensions[di].label ||
-                     dimensions[di].text ||
-                     dimensions[di].name ||
-                     dimensions[di].id || ("Dim " + di);
+      var dimLabel = "Dim " + di;
+
+      if (firstCell && firstCell.parentId) {
+        // Extract dimension name from parentId: "[DIM_NAME].[...]" → "DIM_NAME"
+        var match = firstCell.parentId.match(/^\[([^\]]+)\]/);
+        if (match) {
+          dimLabel = match[1].replace(/_/g, " ");
+        }
+      } else if (firstCell && firstCell.id) {
+        var match2 = firstCell.id.match(/^\[([^\]]+)\]/);
+        if (match2) { dimLabel = match2[1].replace(/_/g, " "); }
+      }
+
       dimLabels.push(dimLabel);
     }
 
     for (var mi2 = 0; mi2 < measures.length; mi2++) {
+      var mesCell = this._data[0] ? this._data[0]["measures_" + mi2] : null;
       var mesLabel2 = measures[mi2].description ||
                       measures[mi2].label ||
-                      measures[mi2].text ||
-                      measures[mi2].name ||
                       measures[mi2].id || ("Med " + mi2);
+
+      // Try to get measure label from metadata id
+      if (mesLabel2 === "measures_" + mi2 || mesLabel2 === ("Med " + mi2)) {
+        var mesId = measures[mi2].id || "";
+        var mesMatch = mesId.match(/^\[([^\]]+)\]/);
+        if (mesMatch) { mesLabel2 = mesMatch[1].replace(/_/g, " "); }
+      }
+
       mesLabels.push(mesLabel2);
     }
-
-    console.log("DropdownTable dimLabels:", JSON.stringify(dimLabels));
-    console.log("DropdownTable mesLabels:", JSON.stringify(mesLabels));
 
     // ── Header ───────────────────────────────────────────────────
     for (var i = 0; i < dimLabels.length; i++) {
