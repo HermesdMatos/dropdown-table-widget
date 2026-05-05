@@ -195,6 +195,15 @@ class DropdownTableWidget extends HTMLElement {
           var m = firstCell.parentId.match(/^\[([^\]]+)\]/);
           if (m) { dimLabel = m[1].replace(/_/g, " "); }
         }
+        // Fallback: extract from cell id directly
+        if (!dimLabel && firstCell && firstCell.id) {
+          var m4 = firstCell.id.match(/^\[([^\]]+)\]/);
+          if (m4) { dimLabel = m4[1].replace(/_/g, " "); }
+        }
+        // Fallback: use cell label if it's the root node label (dimension name)
+        if (!dimLabel && firstCell && firstCell.label && firstCell.isCollapsed) {
+          dimLabel = firstCell.label;
+        }
         if (!dimLabel) {
           if (typeof dv === "object") {
             dimLabel = dv.description || dv.label || dv.id || ("Dim " + di);
