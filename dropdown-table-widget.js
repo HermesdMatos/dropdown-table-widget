@@ -305,18 +305,20 @@ class DropdownTableWidget extends HTMLElement {
       : (this._metadata.feeds.measures ? this._metadata.feeds.measures.values : []);
 
     // ── Header ───────────────────────────────────────────────────
-    console.log("DropdownTable header: dimensions=", dimensions.length, "measures=", measures.length);
+    console.log("DropdownTable metadata feeds:", JSON.stringify(Object.keys(this._metadata.feeds)));
+    console.log("DropdownTable dim[0]:", JSON.stringify(dimensions[0]));
+    console.log("DropdownTable mes[0]:", JSON.stringify(measures[0]));
     for (var i = 0; i < dimensions.length; i++) {
       var th = document.createElement("th");
-      th.textContent = dimensions[i].description || dimensions[i].id;
-      console.log("DropdownTable th:", th.textContent);
+      var dimLabel = dimensions[i].description || dimensions[i].label || dimensions[i].name || dimensions[i].id || ("Dim " + i);
+      th.textContent = dimLabel;
       th.style.minWidth = this._colWidth === "auto" ? "120px" : this._colWidth + "px";
       headerRow.appendChild(th);
     }
     for (var j = 0; j < measures.length; j++) {
       var thm = document.createElement("th");
-      thm.textContent = measures[j].description || measures[j].id;
-      console.log("DropdownTable thm:", thm.textContent);
+      var mesLabel = measures[j].description || measures[j].label || measures[j].name || measures[j].id || ("Med " + j);
+      thm.textContent = mesLabel;
       thm.style.textAlign = "right";
       thm.style.minWidth = this._colWidth === "auto" ? "100px" : this._colWidth + "px";
       headerRow.appendChild(thm);
