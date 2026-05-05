@@ -1,359 +1,271 @@
-var STYLE_PANEL_TMPL = document.createElement("template");
-STYLE_PANEL_TMPL.innerHTML = `
-<style>
-  :host { display: block; font-family: Arial, sans-serif; font-size: 13px; color: #333; }
-  .section { margin-bottom: 16px; }
-  .section-title {
-    font-weight: 700;
-    font-size: 13px;
-    padding: 8px 0 6px 0;
-    border-bottom: 1px solid #e0e0e0;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    user-select: none;
-  }
-  .section-title .chevron {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    transition: transform 0.15s;
-  }
-  .section-title.collapsed .chevron { transform: rotate(-90deg); }
-  .section-body { padding: 0 2px; }
-  .section-body.hidden { display: none; }
+(function() {
+    var template = document.createElement("template");
+    template.innerHTML = `
+        <style>
+            :host { display: block; padding: 1em; font-family: Arial, sans-serif; font-size: 13px; }
+            fieldset {
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 12px;
+                margin-bottom: 12px;
+            }
+            legend { font-weight: bold; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; }
+            td { padding: 6px; vertical-align: middle; }
+            input[type="text"], select {
+                width: 100%;
+                padding: 5px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                box-sizing: border-box;
+                font-size: 12px;
+            }
+            input[type="color"] {
+                width: 40px;
+                height: 26px;
+                padding: 0;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            select { height: 30px; }
+            .color-row { display: flex; align-items: center; gap: 6px; }
+            .color-input { flex-grow: 1; }
+            .apply-button {
+                background-color: #1a73e8;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 10px;
+                width: 100%;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            .apply-button:hover { background-color: #1557b0; }
+        </style>
+        <form id="form">
+            <fieldset>
+                <legend>Table Appearance</legend>
+                <table>
+                    <tr>
+                        <td>Header Background Color</td>
+                        <td class="color-row">
+                            <input id="style_header_color" type="text" class="color-input" value="#1a73e8">
+                            <input id="style_header_color_picker" type="color" value="#1a73e8">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Header Text Color</td>
+                        <td class="color-row">
+                            <input id="style_header_text_color" type="text" class="color-input" value="#ffffff">
+                            <input id="style_header_text_color_picker" type="color" value="#ffffff">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Selected Row Color</td>
+                        <td class="color-row">
+                            <input id="style_selected_row_color" type="text" class="color-input" value="#e8f0fe">
+                            <input id="style_selected_row_color_picker" type="color" value="#e8f0fe">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Hover Row Color</td>
+                        <td class="color-row">
+                            <input id="style_hover_row_color" type="text" class="color-input" value="#f5f5f5">
+                            <input id="style_hover_row_color_picker" type="color" value="#f5f5f5">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Table Text Color</td>
+                        <td class="color-row">
+                            <input id="style_table_text_color" type="text" class="color-input" value="#333333">
+                            <input id="style_table_text_color_picker" type="color" value="#333333">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Editable Cell Color</td>
+                        <td class="color-row">
+                            <input id="style_editable_color" type="text" class="color-input" value="#fffbe6">
+                            <input id="style_editable_color_picker" type="color" value="#fffbe6">
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
 
-  .field { margin-bottom: 10px; }
-  .field label {
-    display: block;
-    font-size: 11px;
-    color: #666;
-    margin-bottom: 4px;
-  }
-  .field select, .field input[type="text"], .field input[type="number"] {
-    width: 100%;
-    height: 28px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 0 8px;
-    font-size: 12px;
-    box-sizing: border-box;
-    background: #fff;
-  }
-  .field select:focus, .field input:focus {
-    outline: none;
-    border-color: #1a73e8;
-  }
+            <fieldset>
+                <legend>Fonte</legend>
+                <table>
+                    <tr>
+                        <td>Fonte</td>
+                        <td>
+                            <select id="style_font_family">
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="'Helvetica Neue', sans-serif">Helvetica</option>
+                                <option value="'72', Arial, sans-serif">72-Web</option>
+                                <option value="'Roboto', sans-serif">Roboto</option>
+                                <option value="'Open Sans', sans-serif">Open Sans</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Tamanho</td>
+                        <td>
+                            <select id="style_font_size">
+                                <option value="11px">11</option>
+                                <option value="12px">12</option>
+                                <option value="13px" selected>13</option>
+                                <option value="14px">14</option>
+                                <option value="15px">15</option>
+                                <option value="16px">16</option>
+                                <option value="18px">18</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Estilo</td>
+                        <td>
+                            <select id="style_font_weight">
+                                <option value="normal">Padrão</option>
+                                <option value="bold">Negrito</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
 
-  .field-row { display: flex; gap: 8px; }
-  .field-row .field { flex: 1; }
+            <fieldset>
+                <legend>Propriedades tabela</legend>
+                <table>
+                    <tr>
+                        <td>Altura da linha</td>
+                        <td>
+                            <select id="style_row_height">
+                                <option value="32">Compacta (32px)</option>
+                                <option value="36" selected>Padrão (36px)</option>
+                                <option value="44">Confortável (44px)</option>
+                                <option value="52">Espaçosa (52px)</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Largura da coluna</td>
+                        <td>
+                            <select id="style_col_width">
+                                <option value="auto" selected>Redimensionamento automático</option>
+                                <option value="120">Fixa - Pequena (120px)</option>
+                                <option value="160">Fixa - Média (160px)</option>
+                                <option value="200">Fixa - Grande (200px)</option>
+                                <option value="240">Fixa - Extra Grande (240px)</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
 
-  .color-btn {
-    width: 28px;
-    height: 28px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 2px;
-    box-sizing: border-box;
-    background: #fff;
-    position: relative;
-  }
-  .color-btn input[type="color"] {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    opacity: 0;
-    cursor: pointer;
-    border: none;
-    padding: 0;
-  }
-  .color-swatch {
-    width: 100%;
-    height: 100%;
-    border-radius: 2px;
-    pointer-events: none;
-  }
-  .field-color-row { display: flex; align-items: center; gap: 8px; }
-  .field-color-row .color-btn { flex-shrink: 0; }
-  .field-color-row select { flex: 1; }
+            <button type="button" id="apply_styles" class="apply-button">✓ Aplicar</button>
+            <input type="submit" style="display:none;">
+        </form>
+    `;
 
-  .toggle-row { display: flex; gap: 4px; }
-  .toggle-btn {
-    width: 28px;
-    height: 28px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.1s;
-  }
-  .toggle-btn.active { background: #e8f0fe; border-color: #1a73e8; color: #1a73e8; }
-  .toggle-btn:hover { background: #f1f3f4; }
-  .btn-apply {
-    width: 100%;
-    height: 32px;
-    background: #1a73e8;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 12px;
-    transition: background 0.15s;
-  }
-  .btn-apply:hover { background: #1558b0; }
-  .btn-apply:active { background: #0d47a1; }
-</style>
+    class DropdownTableStyling extends HTMLElement {
+        constructor() {
+            super();
+            this._shadowRoot = this.attachShadow({ mode: "open" });
+            this._shadowRoot.appendChild(template.content.cloneNode(true));
 
-<div class="section" id="sec-font">
-  <div class="section-title" id="sec-font-title">
-    <span class="chevron">▼</span>
-    <span>Fonte</span>
-  </div>
-  <div class="section-body" id="sec-font-body">
-    <div class="field-row">
-      <div class="field">
-        <label>Fonte:</label>
-        <select id="fontFamily">
-          <option value="Arial, sans-serif">Arial</option>
-          <option value="'Helvetica Neue', sans-serif">Helvetica</option>
-          <option value="'72', Arial, sans-serif">72-Web</option>
-          <option value="'Roboto', sans-serif">Roboto</option>
-          <option value="'Open Sans', sans-serif">Open Sans</option>
-          <option value="Georgia, serif">Georgia</option>
-          <option value="'Courier New', monospace">Courier New</option>
-        </select>
-      </div>
-      <div class="field" style="max-width:80px">
-        <label>Tamanho:</label>
-        <select id="fontSize">
-          <option value="11">11</option>
-          <option value="12">12</option>
-          <option value="13" selected>13</option>
-          <option value="14">14</option>
-          <option value="15">15</option>
-          <option value="16">16</option>
-          <option value="18">18</option>
-          <option value="20">20</option>
-        </select>
-      </div>
-      <div class="field" style="max-width:48px">
-        <label>Cor:</label>
-        <div class="color-btn" id="colorBtn-text">
-          <div class="color-swatch" id="colorSwatch-text" style="background:#333333"></div>
-          <input type="color" id="color-text" value="#333333">
-        </div>
-      </div>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Estilo da fonte:</label>
-        <select id="fontWeight">
-          <option value="normal">Padrão</option>
-          <option value="bold">Negrito</option>
-          <option value="italic">Itálico</option>
-          <option value="bold italic">Negrito + Itálico</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Estilo do texto:</label>
-        <div class="toggle-row">
-          <button class="toggle-btn" id="btn-underline" title="Sublinhado"><u>U</u></button>
-          <button class="toggle-btn" id="btn-strikethrough" title="Riscado"><s>S</s></button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+            this._form = this._shadowRoot.getElementById("form");
 
-<div class="section" id="sec-table">
-  <div class="section-title" id="sec-table-title">
-    <span class="chevron">▼</span>
-    <span>Propriedades tabela</span>
-  </div>
-  <div class="section-body" id="sec-table-body">
-    <div class="field">
-      <label>Template:</label>
-      <select id="template">
-        <option value="light">Padrão</option>
-        <option value="dark">Escuro</option>
-        <option value="minimal">Minimalista</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Preenchimento de cor para células editáveis:</label>
-      <div class="color-btn" id="colorBtn-editable">
-        <div class="color-swatch" id="colorSwatch-editable" style="background:#fffbe6"></div>
-        <input type="color" id="color-editable" value="#fffbe6">
-      </div>
-    </div>
-    <div class="field">
-      <label>Preenchimento de cor para header:</label>
-      <div class="color-btn" id="colorBtn-header">
-        <div class="color-swatch" id="colorSwatch-header" style="background:#1a73e8"></div>
-        <input type="color" id="color-header" value="#1a73e8">
-      </div>
-    </div>
-    <div class="field">
-      <label>Altura da linha:</label>
-      <select id="rowHeight">
-        <option value="32">Compacta (32px)</option>
-        <option value="36" selected>Padrão (36px)</option>
-        <option value="44">Confortável (44px)</option>
-        <option value="52">Espaçosa (52px)</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Largura da coluna:</label>
-      <select id="colWidth">
-        <option value="auto" selected>Redimensionamento automático</option>
-        <option value="120">Fixa - Pequena (120px)</option>
-        <option value="160">Fixa - Média (160px)</option>
-        <option value="200">Fixa - Grande (200px)</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Exibir unidade/moedas:</label>
-      <select id="showUnit">
-        <option value="none" selected>Padrão</option>
-        <option value="prefix">Prefixo (R$)</option>
-        <option value="suffix">Sufixo (BRL)</option>
-      </select>
-    </div>
-  </div>
-</div>
+            // Color inputs
+            this._headerColorInput       = this._shadowRoot.getElementById("style_header_color");
+            this._headerColorPicker      = this._shadowRoot.getElementById("style_header_color_picker");
+            this._headerTextColorInput   = this._shadowRoot.getElementById("style_header_text_color");
+            this._headerTextColorPicker  = this._shadowRoot.getElementById("style_header_text_color_picker");
+            this._selectedRowColorInput  = this._shadowRoot.getElementById("style_selected_row_color");
+            this._selectedRowColorPicker = this._shadowRoot.getElementById("style_selected_row_color_picker");
+            this._hoverRowColorInput     = this._shadowRoot.getElementById("style_hover_row_color");
+            this._hoverRowColorPicker    = this._shadowRoot.getElementById("style_hover_row_color_picker");
+            this._tableTextColorInput    = this._shadowRoot.getElementById("style_table_text_color");
+            this._tableTextColorPicker   = this._shadowRoot.getElementById("style_table_text_color_picker");
+            this._editableColorInput     = this._shadowRoot.getElementById("style_editable_color");
+            this._editableColorPicker    = this._shadowRoot.getElementById("style_editable_color_picker");
 
-<button class="btn-apply" id="btn-apply">✓ Aplicar</button>
-`;
+            // Font + table inputs
+            this._fontFamilySelect = this._shadowRoot.getElementById("style_font_family");
+            this._fontSizeSelect   = this._shadowRoot.getElementById("style_font_size");
+            this._fontWeightSelect = this._shadowRoot.getElementById("style_font_weight");
+            this._rowHeightSelect  = this._shadowRoot.getElementById("style_row_height");
+            this._colWidthSelect   = this._shadowRoot.getElementById("style_col_width");
 
-class DropdownTableStyling extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this.shadowRoot.appendChild(STYLE_PANEL_TMPL.content.cloneNode(true));
-    this._widget = null;
-    this._underline = false;
-    this._strikethrough = false;
-  }
+            this._applyButton = this._shadowRoot.getElementById("apply_styles");
 
-  connectedCallback() {
-    var self = this;
+            this._connectColorPickers();
+            this._form.addEventListener("submit", this._submit.bind(this));
+            this._applyButton.addEventListener("click", this._submit.bind(this));
+        }
 
-    // Apply button
-    self.shadowRoot.getElementById("btn-apply").addEventListener("click", function() {
-      self._applyChange();
-    });
+        _connectColorPickers() {
+            var pairs = [
+                [this._headerColorInput,      this._headerColorPicker],
+                [this._headerTextColorInput,   this._headerTextColorPicker],
+                [this._selectedRowColorInput,  this._selectedRowColorPicker],
+                [this._hoverRowColorInput,     this._hoverRowColorPicker],
+                [this._tableTextColorInput,    this._tableTextColorPicker],
+                [this._editableColorInput,     this._editableColorPicker]
+            ];
+            pairs.forEach(function(pair) {
+                var textInput = pair[0];
+                var picker    = pair[1];
+                picker.addEventListener("input", function() { textInput.value = picker.value; });
+                textInput.addEventListener("change", function() { picker.value = textInput.value; });
+            });
+        }
 
-    // Section collapse toggles
-    ["font", "table"].forEach(function(sec) {
-      var title = self.shadowRoot.getElementById("sec-" + sec + "-title");
-      var body  = self.shadowRoot.getElementById("sec-" + sec + "-body");
-      title.addEventListener("click", function() {
-        var collapsed = body.classList.toggle("hidden");
-        title.classList.toggle("collapsed", collapsed);
-      });
-    });
+        _submit(e) {
+            e.preventDefault();
 
-    // Color pickers
-    ["text", "editable", "header"].forEach(function(id) {
-      var inp    = self.shadowRoot.getElementById("color-" + id);
-      var swatch = self.shadowRoot.getElementById("colorSwatch-" + id);
-      inp.addEventListener("input", function() {
-        swatch.style.background = inp.value;
-        self._applyChange();
-      });
-    });
+            // Dispatch propertiesChanged — SAC syncs these to the main widget automatically
+            this.dispatchEvent(new CustomEvent("propertiesChanged", {
+                detail: {
+                    properties: {
+                        headerColor:       this._headerColorInput.value,
+                        headerTextColor:   this._headerTextColorInput.value,
+                        selectedRowColor:  this._selectedRowColorInput.value,
+                        hoverRowColor:     this._hoverRowColorInput.value,
+                        tableTextColor:    this._tableTextColorInput.value,
+                        styleConfig: JSON.stringify({
+                            editableCellColor: this._editableColorInput.value,
+                            rowHeight:         parseInt(this._rowHeightSelect.value, 10),
+                            colWidth:          this._colWidthSelect.value,
+                            fontFamily:        this._fontFamilySelect.value,
+                            fontSize:          this._fontSizeSelect.value,
+                            fontWeight:        this._fontWeightSelect.value
+                        })
+                    }
+                }
+            }));
+        }
 
-    // Toggle buttons
-    self.shadowRoot.getElementById("btn-underline").addEventListener("click", function() {
-      self._underline = !self._underline;
-      this.classList.toggle("active", self._underline);
-      self._applyChange();
-    });
-    self.shadowRoot.getElementById("btn-strikethrough").addEventListener("click", function() {
-      self._strikethrough = !self._strikethrough;
-      this.classList.toggle("active", self._strikethrough);
-      self._applyChange();
-    });
+        // Getters/setters for SAC to populate current values
+        get headerColor() { return this._headerColorInput.value; }
+        set headerColor(v) { if (v) { this._headerColorInput.value = v; this._headerColorPicker.value = v; } }
 
-    // Selects
-    ["fontFamily","fontSize","fontWeight","template","rowHeight","colWidth","showUnit"].forEach(function(id) {
-      self.shadowRoot.getElementById(id).addEventListener("change", function() {
-        self._applyChange();
-      });
-    });
-  }
+        get headerTextColor() { return this._headerTextColorInput.value; }
+        set headerTextColor(v) { if (v) { this._headerTextColorInput.value = v; this._headerTextColorPicker.value = v; } }
 
-  _getWidget() {
-    return this._widget || this.myWidget || null;
-  }
+        get selectedRowColor() { return this._selectedRowColorInput.value; }
+        set selectedRowColor(v) { if (v) { this._selectedRowColorInput.value = v; this._selectedRowColorPicker.value = v; } }
 
-  _getVal(id) {
-    return this.shadowRoot.getElementById(id).value;
-  }
+        get hoverRowColor() { return this._hoverRowColorInput.value; }
+        set hoverRowColor(v) { if (v) { this._hoverRowColorInput.value = v; this._hoverRowColorPicker.value = v; } }
 
-  _applyChange() {
-    var fontFamily  = this._getVal("fontFamily");
-    var fontSize    = this._getVal("fontSize");
-    var fontWeight  = this._getVal("fontWeight");
-    var colorText   = this._getVal("color-text");
-    var colorHeader = this._getVal("color-header");
-    var colorEdit   = this._getVal("color-editable");
-    var rowHeight   = this._getVal("rowHeight");
-    var colWidth    = this._getVal("colWidth");
-    var showUnit    = this._getVal("showUnit");
-    var template    = this._getVal("template");
+        get tableTextColor() { return this._tableTextColorInput.value; }
+        set tableTextColor(v) { if (v) { this._tableTextColorInput.value = v; this._tableTextColorPicker.value = v; } }
 
-    var textDecor = [];
-    if (this._underline)     textDecor.push("underline");
-    if (this._strikethrough) textDecor.push("line-through");
-
-    var headerColor = colorHeader;
-    var headerText  = "#ffffff";
-    var hoverColor  = "#f5f5f5";
-
-    if (template === "dark") {
-      headerColor = "#1a1a2e"; headerText = "#e0e0e0"; hoverColor = "#2a2a3e";
-    } else if (template === "minimal") {
-      headerColor = "#f8f9fa"; headerText = "#333333"; hoverColor = "#f0f0f0";
+        get styleConfig() { return "{}"; }
+        set styleConfig(v) { /* populated by main widget */ }
     }
 
-    // Build style config as JSON string and set as property
-    // SAC will sync this to the main widget via the declared property
-    var styleConfig = JSON.stringify({
-      headerColor:       headerColor,
-      headerTextColor:   headerText,
-      hoverRowColor:     hoverColor,
-      tableTextColor:    colorText,
-      editableCellColor: colorEdit,
-      rowHeight:         parseInt(rowHeight, 10),
-      colWidth:          colWidth,
-      fontFamily:        fontFamily,
-      fontSize:          fontSize + "px",
-      fontWeight:        fontWeight.indexOf("bold") !== -1 ? "bold" : "normal",
-      fontStyle:         fontWeight.indexOf("italic") !== -1 ? "italic" : "normal",
-      textDecoration:    textDecor.length > 0 ? textDecor.join(" ") : "none",
-      showUnit:          showUnit
-    });
-
-    // Set on self as property — SAC syncs to main widget
-    this.styleConfig = styleConfig;
-
-    // Also try direct widget reference
-    var w = this._getWidget();
-    if (w && typeof w.applyStyleConfig === "function") {
-      w.applyStyleConfig(styleConfig);
-    }
-  }
-}
-
-customElements.define("dropdowntable-styling", DropdownTableStyling);
+    customElements.define("dropdowntable-styling", DropdownTableStyling);
+})();
