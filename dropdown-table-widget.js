@@ -498,6 +498,31 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
+    // ── Build children map per parentId for hierarchical dropdowns ──
+    // childrenByParent[dimKey][parentId] = [{value, label}]
+    var childrenByParent = {};
+    for (var cbd = 0; cbd < dimensions.length; cbd++) {
+      var cbdk = "dimensions_" + cbd;
+      childrenByParent[cbdk] = {};
+      for (var cbr = 0; cbr < this._data.length; cbr++) {
+        var cbCell = this._data[cbr][cbdk];
+        if (cbCell && cbCell.id && cbCell.parentId) {
+          var pid = cbCell.parentId;
+          if (!childrenByParent[cbdk][pid]) {
+            childrenByParent[cbdk][pid] = [];
+          }
+          // Add if not already present
+          var alreadyIn = false;
+          for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
+            if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
+          }
+          if (!alreadyIn) {
+            childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
+          }
+        }
+      }
+    }
+
     // ── Collect unique row keys from first dimension only ────────
     // Show one row per unique member of dimensions_0, ignore other dims
     var rowKeys = {};
@@ -543,10 +568,17 @@ class DropdownTableWidget extends HTMLElement {
         // For hierarchical dimensions: only show dropdown if cell has children (isNode === true)
         // Leaf nodes (no isNode or isNode === false) show as plain text
         if (isDrop && cData.isNode === false) { isDrop = false; }
-        // Also disable dropdown if cell has no options
-        var opts = (this._dropdownOptions && this._dropdownOptions[dk2])
-          ? this._dropdownOptions[dk2]
-          : dimOptions[dk2];
+
+        // Get options: use manually set options, or children of current cell's parent (siblings)
+        var opts = [];
+        if (this._dropdownOptions && this._dropdownOptions[dk2]) {
+          opts = this._dropdownOptions[dk2];
+        } else if (cData.parentId && childrenByParent[dk2] && childrenByParent[dk2][cData.parentId]) {
+          // Show siblings (members with same parent)
+          opts = childrenByParent[dk2][cData.parentId];
+        } else {
+          opts = dimOptions[dk2];
+        }
         if (isDrop && (!opts || opts.length === 0)) { isDrop = false; }
 
         if (isDrop) {
