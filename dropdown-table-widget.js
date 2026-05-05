@@ -300,9 +300,8 @@ class DropdownTableWidget extends HTMLElement {
     emptyMsg.classList.add("hidden");
 
     var dimensions = this._metadata.feeds.dimensions.values;
-    var measures   = this._metadata.feeds.mainStructureMembers
-      ? this._metadata.feeds.mainStructureMembers.values
-      : (this._metadata.feeds.measures ? this._metadata.feeds.measures.values : []);
+    var measFeed   = this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures;
+    var measures   = measFeed ? measFeed.values : [];
 
     // Get dimension labels from parentId of first data row
     // parentId format: "[DIMENSION_NAME].[HIERARCHY_NAME].&[MEMBER]" or "[DIMENSION_NAME].&[MEMBER]"
@@ -314,32 +313,39 @@ class DropdownTableWidget extends HTMLElement {
       var dimLabel = "Dim " + di;
 
       if (firstCell && firstCell.parentId) {
-        // Extract dimension name from parentId: "[DIM_NAME].[...]" → "DIM_NAME"
         var match = firstCell.parentId.match(/^\[([^\]]+)\]/);
-        if (match) {
-          dimLabel = match[1].replace(/_/g, " ");
-        }
+        if (match) { dimLabel = match[1].replace(/_/g, " "); }
       } else if (firstCell && firstCell.id) {
         var match2 = firstCell.id.match(/^\[([^\]]+)\]/);
         if (match2) { dimLabel = match2[1].replace(/_/g, " "); }
       }
-
       dimLabels.push(dimLabel);
     }
 
+    // Measure labels: extract from measure id e.g. "[Custo]" → "Custo"
     for (var mi2 = 0; mi2 < measures.length; mi2++) {
-      var mesCell = this._data[0] ? this._data[0]["measures_" + mi2] : null;
-      var mesLabel2 = measures[mi2].description ||
-                      measures[mi2].label ||
-                      measures[mi2].id || ("Med " + mi2);
+      var mesObj   = measures[mi2];
+      var mesLabel2 = mesObj.description || mesObj.label || mesObj.text || mesObj.name || "";
 
-      // Try to get measure label from metadata id
-      if (mesLabel2 === "measures_" + mi2 || mesLabel2 === ("Med " + mi2)) {
-        var mesId = measures[mi2].id || "";
+      if (!mesLabel2) {
+        var mesId = mesObj.id || "";
+        // Format: "[MEASURE_NAME]" or "measures_N"
         var mesMatch = mesId.match(/^\[([^\]]+)\]/);
-        if (mesMatch) { mesLabel2 = mesMatch[1].replace(/_/g, " "); }
+        if (mesMatch) {
+          mesLabel2 = mesMatch[1];
+        } else {
+          // Fallback: try to get from data binding feed description
+          var feedMes = this._metadata.feeds.measures || this._metadata.feeds.mainStructureMembers;
+          if (feedMes && feedMes.values && feedMes.values[mi2]) {
+            var fv = feedMes.values[mi2];
+            mesLabel2 = fv.description || fv.label || fv.id || ("Med " + mi2);
+            var mesMatch2 = mesLabel2.match(/^\[([^\]]+)\]/);
+            if (mesMatch2) { mesLabel2 = mesMatch2[1]; }
+          } else {
+            mesLabel2 = "Med " + mi2;
+          }
+        }
       }
-
       mesLabels.push(mesLabel2);
     }
 
