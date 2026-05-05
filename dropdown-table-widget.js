@@ -553,14 +553,13 @@ class DropdownTableWidget extends HTMLElement {
         tdm.style.padding = "0";
 
         var mv  = rowData[mk];
-        // Follow PlanifyIT: formattedValue || formatted || raw
         var mvVal = "";
         if (mv) {
-          if (mv.formattedValue !== undefined && mv.formattedValue !== null && mv.formattedValue !== "") {
-            mvVal = mv.formattedValue;
-          } else if (mv.formatted !== undefined && mv.formatted !== null && mv.formatted !== "") {
-            mvVal = mv.formatted;
-          } else if (mv.raw !== null && mv.raw !== undefined && !isNaN(mv.raw)) {
+          if (mv.formattedValue !== undefined && mv.formattedValue !== null && String(mv.formattedValue) !== "") {
+            mvVal = String(mv.formattedValue);
+          } else if (mv.formatted !== undefined && mv.formatted !== null && String(mv.formatted) !== "" && mv.formatted !== "NaN") {
+            mvVal = String(mv.formatted);
+          } else if (mv.raw !== null && mv.raw !== undefined && String(mv.raw) !== "NaN" && String(mv.raw) !== "null") {
             mvVal = String(mv.raw);
           }
         }
