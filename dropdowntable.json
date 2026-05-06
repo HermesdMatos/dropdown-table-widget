@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.8.3",
+  "version": "2.8.4",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-neqeXGdxdXP+oMw0dO/rT7U7f0+Ye9o+sxoGjd+Vof8="
+      "integrity": "sha256-ylF3AYzLXMhKK24Cf+7zGmOro2QFxZ8THrEFbZh7Tdo="
     },
     {
       "kind": "styling",

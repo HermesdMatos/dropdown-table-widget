@@ -560,12 +560,19 @@ class DropdownTableWidget extends HTMLElement {
       var c1 = this._data[r3]["dimensions_0"] || {};
       if (!c1.id) continue;
 
-      // Skip nodes that ARE group headers (they appear as rows but should be headers)
-      // A node is a group header if its own id appears as a parentId of other rows
-      // AND it has isCollapsed:true
-      if (c1.isCollapsed === true && hasChildren["dimensions_0"] && hasChildren["dimensions_0"][c1.id]) {
-        // This is a collapsible group header — skip as data row, it'll become a header
-        continue;
+      // Skip nodes that ARE top-level group headers
+      // A top-level group header = isCollapsed:true AND its parentId points to another isCollapsed node
+      // In other words: skip only if it's a "section header" (its children are the main data rows)
+      // We detect section headers as: isCollapsed:true AND all its children also have isCollapsed:true OR no parentId member
+      // Simple rule: skip isCollapsed nodes whose parentId does NOT contain ".&[" (direct children of hierarchy root)
+      if (c1.isCollapsed === true) {
+        // Check if parentId points to a member (has .&[) or just to the hierarchy
+        var hasMemParent = c1.parentId && c1.parentId.indexOf(".&[") !== -1;
+        if (!hasMemParent) {
+          // Direct child of root → this IS a section header, skip as data row
+          continue;
+        }
+        // Otherwise: isCollapsed but has a member parent → show as row with dropdown
       }
 
       if (c1.parentId) {
