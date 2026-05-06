@@ -537,9 +537,7 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // ── Build children map and hasChildren from isCollapsed ──────
-    // isCollapsed:true = this node HAS children (intermediate node)
-    // isCollapsed:undefined/false = leaf node (no children)
+    // ── Build children map and hasChildren ───────────────────────
     var childrenByParent = {};
     var hasChildren = {};
 
@@ -549,27 +547,20 @@ class DropdownTableWidget extends HTMLElement {
       hasChildren[cbdk] = {};
       for (var cbr = 0; cbr < this._data.length; cbr++) {
         var cbCell = this._data[cbr][cbdk];
-        if (cbCell && cbCell.id) {
-          // Mark as having children if isCollapsed is true
-          if (cbCell.isCollapsed === true) {
-            hasChildren[cbdk][cbCell.id] = true;
+        if (cbCell && cbCell.id && cbCell.parentId) {
+          var pid = cbCell.parentId;
+          if (!childrenByParent[cbdk][pid]) {
+            childrenByParent[cbdk][pid] = [];
           }
-          // Build parent-child map
-          if (cbCell.parentId) {
-            var pid = cbCell.parentId;
-            if (!childrenByParent[cbdk][pid]) {
-              childrenByParent[cbdk][pid] = [];
-            }
-            var alreadyIn = false;
-            for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
-              if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
-            }
-            if (!alreadyIn) {
-              childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
-            }
-            // Also mark parentId as having children
-            hasChildren[cbdk][pid] = true;
+          var alreadyIn = false;
+          for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
+            if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
           }
+          if (!alreadyIn) {
+            childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
+          }
+          // Mark parent as having children
+          hasChildren[cbdk][pid] = true;
         }
       }
     }
@@ -684,13 +675,16 @@ class DropdownTableWidget extends HTMLElement {
           self2._childrenFromBinding[dk2] &&
           self2._childrenFromBinding[dk2][cId] &&
           self2._childrenFromBinding[dk2][cId].length > 0;
-        if (isDrop && !hasChildren[dk2][cId] && !hasChildrenInBinding) { isDrop = false; }
+        // Has children if: in hasChildren map OR in childrenByParent OR in childrenFromBinding
+        var cellHasChildren = hasChildren[dk2][cId] ||
+          (childrenByParent[dk2] && childrenByParent[dk2][cId] && childrenByParent[dk2][cId].length > 0) ||
+          hasChildrenInBinding;
+        if (isDrop && !cellHasChildren) { isDrop = false; }
 
         var opts = [];
         if (self2._dropdownOptions && self2._dropdownOptions[dk2]) {
           opts = self2._dropdownOptions[dk2];
         } else if (self2._childrenFromBinding && self2._childrenFromBinding[dk2] && self2._childrenFromBinding[dk2][cId]) {
-          // Use children from the secondary binding (Nível 3)
           opts = self2._childrenFromBinding[dk2][cId];
         } else if (childrenByParent[dk2] && childrenByParent[dk2][cId]) {
           opts = childrenByParent[dk2][cId];
