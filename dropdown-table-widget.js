@@ -528,67 +528,61 @@ class DropdownTableWidget extends HTMLElement {
     }
 
     // ── Build grouped structure ───────────────────────────────────
-    // Root groups = cells whose parentId points to a root node (parentId contains "<root>" or has no parent itself)
-    // Identify root node IDs first
-    var rootNodeIds = {};
-    for (var rni = 0; rni < this._data.length; rni++) {
-      var rnCell = this._data[rni]["dimensions_0"] || {};
-      if (rnCell.id && rnCell.isCollapsed === true) {
-        rootNodeIds[rnCell.id] = true;
-      }
-    }
+    // Root-level members = those whose parentId does NOT contain ".&["
+    // (they are direct children of the hierarchy root, not of another member)
+    // e.g. parentId="[DESCRICAO_DA_CONTA].[Hierarquia_DESC_CONTA].&[ASSESSORIAS]" → has .&[ → NOT root
+    // e.g. parentId="[DESCRICAO_DA_CONTA].[Hierarquia_DESC_CONTA].&[EXPEDIENTE]" → has .&[ → NOT root
+    // Root group headers come from isCollapsed:true nodes that appear in data
 
-    var groups = [];
-    var groupMap = {};
-    var noParentRows = [];
+    // Collect group headers: isCollapsed nodes whose parentId has .&[ (intermediate collapsed nodes)
+    // AND flat group headers: nodes that ARE parents of others but not in the data themselves
+    var groupHeaders = {}; // parentId string → label
+    var rowParentIds = {}; // collect all parentIds seen in data
 
     for (var r2 = 0; r2 < this._data.length; r2++) {
       var c0 = this._data[r2]["dimensions_0"] || {};
       if (!c0.id) continue;
-      if (rootNodeIds[c0.id]) continue; // skip root nodes themselves
+      if (c0.parentId) {
+        // Extract the member part from parentId: ".&[LABEL]" → "LABEL"
+        var pMatch0 = c0.parentId.match(/\.&\[([^\]]+)\]$/);
+        if (pMatch0) {
+          rowParentIds[c0.parentId] = pMatch0[1];
+        }
+      }
+    }
 
-      if (c0.parentId && rootNodeIds[c0.parentId]) {
-        // Direct child of root → group header
-        var gpid = c0.parentId;
-        if (groupMap[gpid] === undefined) {
-          var pMatch = gpid.match(/\.&\[([^\]]+)\]$/);
-          var pLabel = pMatch ? pMatch[1] : gpid;
-          groupMap[gpid] = groups.length;
-          groups.push({ parentLabel: pLabel, parentId: gpid, rows: [] });
-        }
-        groups[groupMap[gpid]].rows.push(r2);
-      } else if (c0.parentId) {
-        // Non-root child — find its root ancestor group
-        var ancestorId = c0.parentId;
-        var maxDepth = 10;
-        while (ancestorId && maxDepth > 0) {
-          maxDepth--;
-          if (rootNodeIds[ancestorId]) break;
-          // Find the row with this id to get its parentId
-          var found = false;
-          for (var ar = 0; ar < this._data.length; ar++) {
-            var arCell = this._data[ar]["dimensions_0"] || {};
-            if (arCell.id === ancestorId) {
-              ancestorId = arCell.parentId || "";
-              found = true;
-              break;
-            }
+    // Group rows by their immediate parentId's member label
+    var groups = [];
+    var groupMap = {};
+    var noParentRows = [];
+
+    for (var r3 = 0; r3 < this._data.length; r3++) {
+      var c1 = this._data[r3]["dimensions_0"] || {};
+      if (!c1.id) continue;
+
+      // Skip nodes that ARE group headers (they appear as rows but should be headers)
+      // A node is a group header if its own id appears as a parentId of other rows
+      // AND it has isCollapsed:true
+      if (c1.isCollapsed === true && hasChildren["dimensions_0"] && hasChildren["dimensions_0"][c1.id]) {
+        // This is a collapsible group header — skip as data row, it'll become a header
+        continue;
+      }
+
+      if (c1.parentId) {
+        var pMatch1 = c1.parentId.match(/\.&\[([^\]]+)\]$/);
+        if (pMatch1) {
+          var gpid = c1.parentId;
+          var pLabel = pMatch1[1];
+          if (groupMap[gpid] === undefined) {
+            groupMap[gpid] = groups.length;
+            groups.push({ parentLabel: pLabel, parentId: gpid, rows: [] });
           }
-          if (!found) break;
-        }
-        if (ancestorId && rootNodeIds[ancestorId]) {
-          if (groupMap[ancestorId] === undefined) {
-            var pMatch2 = ancestorId.match(/\.&\[([^\]]+)\]$/);
-            var pLabel2 = pMatch2 ? pMatch2[1] : ancestorId;
-            groupMap[ancestorId] = groups.length;
-            groups.push({ parentLabel: pLabel2, parentId: ancestorId, rows: [] });
-          }
-          groups[groupMap[ancestorId]].rows.push(r2);
+          groups[groupMap[gpid]].rows.push(r3);
         } else {
-          noParentRows.push(r2);
+          noParentRows.push(r3);
         }
       } else {
-        noParentRows.push(r2);
+        noParentRows.push(r3);
       }
     }
 
