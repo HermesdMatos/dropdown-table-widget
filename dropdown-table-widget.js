@@ -150,7 +150,6 @@ class DropdownTableWidget extends HTMLElement {
   onCustomWidgetReady() { this._loadBinding(); }
   onCustomWidgetBeforeUpdate(c) {}
   onCustomWidgetAfterUpdate(changedProperties) {
-    // Follow PlanifyIT pattern — check changedProperties for binding update
     if (changedProperties && "myDataBinding" in changedProperties) {
       var dataBinding = changedProperties.myDataBinding;
       if (dataBinding && dataBinding.state === "success") {
@@ -158,7 +157,11 @@ class DropdownTableWidget extends HTMLElement {
         return;
       }
     }
-    // Fallback to direct binding
+    if (changedProperties && "childrenBinding" in changedProperties) {
+      this._processChildrenBinding();
+      this._render();
+      return;
+    }
     this._loadBinding();
   }
   onCustomWidgetResize(w, h) { this.style.width = w + "px"; this.style.height = h + "px"; }
@@ -251,8 +254,44 @@ class DropdownTableWidget extends HTMLElement {
       this._metadata._mesLabels = mesLabels;
       this._metadata._measCount = mesLabels.length;
       this._data = dataBinding.data;
+
+      // Process childrenBinding if available
+      this._processChildrenBinding();
+
       this._render();
     } catch(e) { console.error("DropdownTable _processDataBinding:", e); }
+  }
+
+  _processChildrenBinding() {
+    try {
+      var cb = this.childrenBinding;
+      if (!cb || !cb.data || cb.data.length === 0) return;
+      if (!this._metadata) return;
+
+      var dims = this._metadata.feeds.dimensions.values;
+      this._childrenFromBinding = {};
+
+      for (var di = 0; di < dims.length; di++) {
+        var dk = "dimensions_" + di;
+        this._childrenFromBinding[dk] = {};
+        for (var r = 0; r < cb.data.length; r++) {
+          var cell = cb.data[r][dk];
+          if (cell && cell.id && cell.parentId) {
+            var pid = cell.parentId;
+            if (!this._childrenFromBinding[dk][pid]) {
+              this._childrenFromBinding[dk][pid] = [];
+            }
+            var exists = false;
+            for (var ex = 0; ex < this._childrenFromBinding[dk][pid].length; ex++) {
+              if (this._childrenFromBinding[dk][pid][ex].value === cell.id) { exists = true; break; }
+            }
+            if (!exists) {
+              this._childrenFromBinding[dk][pid].push({ value: cell.id, label: cell.label || cell.id });
+            }
+          }
+        }
+      }
+    } catch(e) { console.error("DropdownTable _processChildrenBinding:", e); }
   }
 
   // ─── Properties ───────────────────────────────────────────────
@@ -620,13 +659,19 @@ class DropdownTableWidget extends HTMLElement {
           || self2._dropdownDimensions.indexOf(dim2.id) !== -1;
 
         // Only show dropdown if this cell actually HAS children in the data
-        if (isDrop && !hasChildren[dk2][cId]) { isDrop = false; }
+        var hasChildrenInBinding = self2._childrenFromBinding &&
+          self2._childrenFromBinding[dk2] &&
+          self2._childrenFromBinding[dk2][cId] &&
+          self2._childrenFromBinding[dk2][cId].length > 0;
+        if (isDrop && !hasChildren[dk2][cId] && !hasChildrenInBinding) { isDrop = false; }
 
         var opts = [];
         if (self2._dropdownOptions && self2._dropdownOptions[dk2]) {
           opts = self2._dropdownOptions[dk2];
+        } else if (self2._childrenFromBinding && self2._childrenFromBinding[dk2] && self2._childrenFromBinding[dk2][cId]) {
+          // Use children from the secondary binding (Nível 3)
+          opts = self2._childrenFromBinding[dk2][cId];
         } else if (childrenByParent[dk2] && childrenByParent[dk2][cId]) {
-          // Show children of this cell
           opts = childrenByParent[dk2][cId];
         }
         if (isDrop && (!opts || opts.length === 0)) { isDrop = false; }
