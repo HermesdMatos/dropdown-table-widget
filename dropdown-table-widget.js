@@ -523,58 +523,62 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // ── Collect unique row keys from first dimension only ────────
-    // Show one row per unique member of dimensions_0, ignore other dims
-    var rowKeys = {};
-    var rowOrder = [];
+    // ── Build grouped structure: parent → children ───────────────
+    var groups = [];
+    var groupMap = {};
+    var noParentRows = [];
+
     for (var r2 = 0; r2 < this._data.length; r2++) {
       var c0 = this._data[r2]["dimensions_0"] || {};
-      if (c0.id && !rowKeys[c0.id] && c0.isCollapsed !== true) {
-        rowKeys[c0.id] = { label: c0.label || c0.id, rowIndex: r2 };
-        rowOrder.push(c0.id);
+      if (!c0.id) continue;
+      if (c0.isCollapsed === true) continue;
+
+      if (c0.parentId) {
+        var gpid = c0.parentId;
+        if (groupMap[gpid] === undefined) {
+          var pMatch = gpid.match(/\.&\[([^\]]+)\]$/);
+          var pLabel = pMatch ? pMatch[1] : gpid;
+          groupMap[gpid] = groups.length;
+          groups.push({ parentLabel: pLabel, parentId: gpid, rows: [] });
+        }
+        groups[groupMap[gpid]].rows.push(r2);
+      } else {
+        noParentRows.push(r2);
       }
     }
 
-    // ── Rows — one per unique dimensions_0 member ────────────────
-    for (var ro = 0; ro < rowOrder.length; ro++) {
-      var rowKey  = rowOrder[ro];
-      var rowInfo = rowKeys[rowKey];
-      var ri      = rowInfo.rowIndex;
-      var rowData = this._data[ri];
+    var totalCols = dimensions.length + measures.length;
+    var self2 = this;
 
+    var renderRow = function(ri) {
+      var rowData = self2._data[ri];
       var tr = document.createElement("tr");
       tr.dataset.rowIndex = ri;
-      tr.style.height = this._rowHeight + "px";
+      tr.style.height = self2._rowHeight + "px";
 
-      // Dimension cells
-      for (var di = 0; di < dimensions.length; di++) {
-        var dim   = dimensions[di];
-        var dk2   = "dimensions_" + di;
+      for (var di2 = 0; di2 < dimensions.length; di2++) {
+        var dim2  = dimensions[di2];
+        var dk2   = "dimensions_" + di2;
         var td    = document.createElement("td");
         var cData = rowData[dk2] || {};
 
-        // Apply local selection if available (overrides binding data)
-        if (this._localSelections && this._localSelections[ri] && this._localSelections[ri][dk2]) {
-          cData = this._localSelections[ri][dk2];
+        if (self2._localSelections && self2._localSelections[ri] && self2._localSelections[ri][dk2]) {
+          cData = self2._localSelections[ri][dk2];
         }
 
-        var cLbl  = cData.label || cData.id || "";
-        var cId   = cData.id || "";
+        var cLbl = cData.label || cData.id || "";
+        var cId  = cData.id || "";
 
-        var isDrop = this._dropdownDimensions.length === 0
-          || this._dropdownDimensions.indexOf(dk2) !== -1
-          || this._dropdownDimensions.indexOf(dim.id) !== -1;
+        var isDrop = self2._dropdownDimensions.length === 0
+          || self2._dropdownDimensions.indexOf(dk2) !== -1
+          || self2._dropdownDimensions.indexOf(dim2.id) !== -1;
 
-        // For hierarchical dimensions: only show dropdown if cell has children (isNode === true)
-        // Leaf nodes (no isNode or isNode === false) show as plain text
         if (isDrop && cData.isNode === false) { isDrop = false; }
 
-        // Get options: use manually set options, or children of current cell's parent (siblings)
         var opts = [];
-        if (this._dropdownOptions && this._dropdownOptions[dk2]) {
-          opts = this._dropdownOptions[dk2];
+        if (self2._dropdownOptions && self2._dropdownOptions[dk2]) {
+          opts = self2._dropdownOptions[dk2];
         } else if (cData.parentId && childrenByParent[dk2] && childrenByParent[dk2][cData.parentId]) {
-          // Show siblings (members with same parent)
           opts = childrenByParent[dk2][cData.parentId];
         } else {
           opts = dimOptions[dk2];
@@ -582,7 +586,7 @@ class DropdownTableWidget extends HTMLElement {
         if (isDrop && (!opts || opts.length === 0)) { isDrop = false; }
 
         if (isDrop) {
-          this._buildDropdownCell(td, ri, dk2, cLbl, cId, opts);
+          self2._buildDropdownCell(td, ri, dk2, cLbl, cId, opts);
         } else {
           var sp = document.createElement("span");
           sp.className = "cell-plain";
@@ -592,36 +596,32 @@ class DropdownTableWidget extends HTMLElement {
         tr.appendChild(td);
       }
 
-      // Measure cells — editable input
-      for (var mi = 0; mi < measures.length; mi++) {
-        var mk  = "measures_" + mi;
-        var tdm = document.createElement("td");
+      for (var mi2 = 0; mi2 < measures.length; mi2++) {
+        var mk2  = "measures_" + mi2;
+        var tdm  = document.createElement("td");
         tdm.style.padding = "0";
-
-        var mv  = rowData[mk];
+        var mv2  = rowData[mk2];
         var mvVal = "";
-        if (mv) {
-          if (mv.formattedValue !== undefined && mv.formattedValue !== null && String(mv.formattedValue) !== "") {
-            mvVal = String(mv.formattedValue);
-          } else if (mv.formatted !== undefined && mv.formatted !== null && String(mv.formatted) !== "" && mv.formatted !== "NaN") {
-            mvVal = String(mv.formatted);
-          } else if (mv.raw !== null && mv.raw !== undefined && String(mv.raw) !== "NaN" && String(mv.raw) !== "null") {
-            mvVal = String(mv.raw);
+        if (mv2) {
+          if (mv2.formattedValue !== undefined && mv2.formattedValue !== null && String(mv2.formattedValue) !== "") {
+            mvVal = String(mv2.formattedValue);
+          } else if (mv2.formatted !== undefined && mv2.formatted !== null && String(mv2.formatted) !== "" && mv2.formatted !== "NaN") {
+            mvVal = String(mv2.formatted);
+          } else if (mv2.raw !== null && mv2.raw !== undefined && String(mv2.raw) !== "NaN" && String(mv2.raw) !== "null") {
+            mvVal = String(mv2.raw);
           }
         }
-
-        // Check local measure edits
-        if (this._localMeasures && this._localMeasures[ri] && this._localMeasures[ri][mk] !== undefined) {
-          mvVal = this._localMeasures[ri][mk];
+        if (self2._localMeasures && self2._localMeasures[ri] && self2._localMeasures[ri][mk2] !== undefined) {
+          mvVal = self2._localMeasures[ri][mk2];
         }
 
         var input = document.createElement("input");
         input.type = "text";
         input.value = mvVal;
-        input.style.cssText = "width:100%;height:36px;border:none;background:transparent;text-align:right;padding:0 12px;font-size:13px;color:var(--table-text-color,#333);box-sizing:border-box;outline:none;cursor:pointer;";
+        input.style.cssText = "width:100%;height:" + self2._rowHeight + "px;border:none;background:transparent;text-align:right;padding:0 12px;font-size:13px;color:var(--table-text-color,#333);box-sizing:border-box;outline:none;cursor:pointer;";
 
         input.addEventListener("focus", function(e) {
-          e.target.style.background = self._editableCellColor || "#fffbe6";
+          e.target.style.background = self2._editableCellColor || "#fffbe6";
           e.target.style.outline = "2px solid #1a73e8";
           e.target.style.cursor = "text";
         });
@@ -631,45 +631,64 @@ class DropdownTableWidget extends HTMLElement {
           e.target.style.cursor = "pointer";
         });
 
-        (function(inputEl, rowIdx, measureKey, measureId, dimData) {
+        (function(inputEl, rowIdx, measureKey, measureId, rowD) {
           inputEl.addEventListener("change", function() {
             var newVal = parseFloat(inputEl.value.replace(",", "."));
             if (isNaN(newVal)) { newVal = 0; }
-
-            // Store locally
-            if (!self._localMeasures) { self._localMeasures = {}; }
-            if (!self._localMeasures[rowIdx]) { self._localMeasures[rowIdx] = {}; }
-            self._localMeasures[rowIdx][measureKey] = newVal;
-
-            // Write-back to SAC
+            if (!self2._localMeasures) { self2._localMeasures = {}; }
+            if (!self2._localMeasures[rowIdx]) { self2._localMeasures[rowIdx] = {}; }
+            self2._localMeasures[rowIdx][measureKey] = newVal;
             try {
-              var b = self.myDataBinding;
+              var b = self2.myDataBinding;
               if (b && b.setValueState) {
                 var addr = {};
-                var dims = self._metadata.feeds.dimensions.values;
-                for (var x = 0; x < dims.length; x++) {
-                  var dc = dimData["dimensions_" + x] || {};
-                  if (dc.id) { addr[dims[x].id] = dc.id; }
+                var dims3 = self2._metadata.feeds.dimensions.values;
+                for (var x = 0; x < dims3.length; x++) {
+                  var dc = rowD["dimensions_" + x] || {};
+                  if (dc.id) { addr[dims3[x].id] = dc.id; }
                 }
                 addr[measureId] = newVal;
                 b.setValueState(addr, function(err) {
                   if (!err) {
-                    if (self._localMeasures && self._localMeasures[rowIdx]) {
-                      delete self._localMeasures[rowIdx][measureKey];
+                    if (self2._localMeasures && self2._localMeasures[rowIdx]) {
+                      delete self2._localMeasures[rowIdx][measureKey];
                     }
-                    self._loadBinding();
+                    self2._loadBinding();
                   }
                 });
               }
-            } catch(e) { console.error("Measure write-back error:", e); }
+            } catch(e3) { console.error("Measure write-back:", e3); }
           });
-        })(input, ri, mk, measures[mi].id, rowData);
+        })(input, ri, mk2, measures[mi2].id || mk2, rowData);
 
         tdm.appendChild(input);
         tr.appendChild(tdm);
       }
 
       tbody.appendChild(tr);
+    };
+
+    // Flat rows (no grouping)
+    for (var fn = 0; fn < noParentRows.length; fn++) {
+      renderRow(noParentRows[fn]);
+    }
+
+    // Grouped rows with header
+    for (var gi = 0; gi < groups.length; gi++) {
+      var group = groups[gi];
+
+      var trGroup = document.createElement("tr");
+      trGroup.className = "dt-group-header";
+      var tdGroup = document.createElement("td");
+      tdGroup.colSpan = totalCols;
+      tdGroup.style.cssText = "font-weight:700;background:#f0f4ff;color:#1a3a6e;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;letter-spacing:0.5px;";
+      tdGroup.textContent = group.parentLabel;
+      trGroup.appendChild(tdGroup);
+      tbody.appendChild(trGroup);
+
+      for (var gr = 0; gr < group.rows.length; gr++) {
+        renderRow(group.rows[gr]);
+      }
     }
   }
 
