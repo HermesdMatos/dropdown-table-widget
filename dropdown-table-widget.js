@@ -499,11 +499,14 @@ class DropdownTableWidget extends HTMLElement {
     }
 
     // ── Build children map per parentId for hierarchical dropdowns ──
-    // childrenByParent[dimKey][parentId] = [{value, label}]
     var childrenByParent = {};
+    // Also track which cell IDs have children (are parents)
+    var hasChildren = {}; // hasChildren[dimKey][cellId] = true
+
     for (var cbd = 0; cbd < dimensions.length; cbd++) {
       var cbdk = "dimensions_" + cbd;
       childrenByParent[cbdk] = {};
+      hasChildren[cbdk] = {};
       for (var cbr = 0; cbr < this._data.length; cbr++) {
         var cbCell = this._data[cbr][cbdk];
         if (cbCell && cbCell.id && cbCell.parentId) {
@@ -511,7 +514,6 @@ class DropdownTableWidget extends HTMLElement {
           if (!childrenByParent[cbdk][pid]) {
             childrenByParent[cbdk][pid] = [];
           }
-          // Add if not already present
           var alreadyIn = false;
           for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
             if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
@@ -519,6 +521,8 @@ class DropdownTableWidget extends HTMLElement {
           if (!alreadyIn) {
             childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
           }
+          // Mark the parent as having children
+          hasChildren[cbdk][pid] = true;
         }
       }
     }
@@ -573,15 +577,15 @@ class DropdownTableWidget extends HTMLElement {
           || self2._dropdownDimensions.indexOf(dk2) !== -1
           || self2._dropdownDimensions.indexOf(dim2.id) !== -1;
 
-        if (isDrop && cData.isNode === false) { isDrop = false; }
+        // Only show dropdown if this cell actually HAS children in the data
+        if (isDrop && !hasChildren[dk2][cId]) { isDrop = false; }
 
         var opts = [];
         if (self2._dropdownOptions && self2._dropdownOptions[dk2]) {
           opts = self2._dropdownOptions[dk2];
-        } else if (cData.parentId && childrenByParent[dk2] && childrenByParent[dk2][cData.parentId]) {
-          opts = childrenByParent[dk2][cData.parentId];
-        } else {
-          opts = dimOptions[dk2];
+        } else if (childrenByParent[dk2] && childrenByParent[dk2][cId]) {
+          // Show children of this cell
+          opts = childrenByParent[dk2][cId];
         }
         if (isDrop && (!opts || opts.length === 0)) { isDrop = false; }
 
