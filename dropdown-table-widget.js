@@ -649,6 +649,16 @@ class DropdownTableWidget extends HTMLElement {
       tr.dataset.rowIndex = ri;
       tr.style.height = self2._rowHeight + "px";
 
+      // Check if this row is a parent node (isCollapsed:true on dimensions_0)
+      var firstDimCell = rowData["dimensions_0"] || {};
+      var isParentRow = firstDimCell.isCollapsed === true;
+
+      // Apply parent row styling
+      if (isParentRow) {
+        tr.style.background = "#e8f0fe";
+        tr.style.fontWeight = "600";
+      }
+
       for (var di2 = 0; di2 < dimensions.length; di2++) {
         var dim2  = dimensions[di2];
         var dk2   = "dimensions_" + di2;
@@ -662,11 +672,14 @@ class DropdownTableWidget extends HTMLElement {
         var cLbl = cData.label || cData.id || "";
         var cId  = cData.id || "";
 
-        var isDrop = self2._dropdownDimensions.length === 0
+        // dimensions_0 (Descrição da Conta) never shows dropdown — always plain text
+        // Other dimensions show dropdown based on hasChildren
+        var isDrop = di2 !== 0 && (
+          self2._dropdownDimensions.length === 0
           || self2._dropdownDimensions.indexOf(dk2) !== -1
-          || self2._dropdownDimensions.indexOf(dim2.id) !== -1;
+          || self2._dropdownDimensions.indexOf(dim2.id) !== -1
+        );
 
-        // Only show dropdown if this cell actually HAS children in the data
         var hasChildrenInBinding = self2._childrenFromBinding &&
           self2._childrenFromBinding[dk2] &&
           self2._childrenFromBinding[dk2][cId] &&
