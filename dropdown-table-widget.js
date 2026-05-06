@@ -594,23 +594,28 @@ class DropdownTableWidget extends HTMLElement {
     var groupMap = {};
     var noParentRows = [];
 
+    // First pass: identify which IDs appear as parentIds (these are real group headers)
+    var appearsAsParent = {};
+    for (var fp = 0; fp < this._data.length; fp++) {
+      var fpCell = this._data[fp]["dimensions_0"] || {};
+      if (fpCell.parentId) {
+        appearsAsParent[fpCell.parentId] = true;
+      }
+    }
+
     for (var r3 = 0; r3 < this._data.length; r3++) {
       var c1 = this._data[r3]["dimensions_0"] || {};
       if (!c1.id) continue;
 
-      // Skip nodes that ARE top-level group headers
-      // A top-level group header = isCollapsed:true AND its parentId points to another isCollapsed node
-      // In other words: skip only if it's a "section header" (its children are the main data rows)
-      // We detect section headers as: isCollapsed:true AND all its children also have isCollapsed:true OR no parentId member
-      // Simple rule: skip isCollapsed nodes whose parentId does NOT contain ".&[" (direct children of hierarchy root)
-      if (c1.isCollapsed === true) {
-        // Check if parentId points to a member (has .&[) or just to the hierarchy
-        var hasMemParent = c1.parentId && c1.parentId.indexOf(".&[") !== -1;
-        if (!hasMemParent) {
-          // Direct child of root → this IS a section header, skip as data row
-          continue;
-        }
-        // Otherwise: isCollapsed but has a member parent → show as row with dropdown
+      // Skip rows that have no parentId AND whose own id appears as a parentId
+      // These are the "summary" rows that SAC adds with "Incluir níveis-pai"
+      if (!c1.parentId && appearsAsParent[c1.id]) {
+        continue;
+      }
+
+      // Skip direct children of root (no .&[ in parentId) that appear as group headers
+      if (c1.parentId && c1.parentId.indexOf(".&[") === -1) {
+        continue;
       }
 
       if (c1.parentId) {
