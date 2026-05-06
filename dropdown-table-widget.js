@@ -537,10 +537,11 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // ── Build children map per parentId for hierarchical dropdowns ──
+    // ── Build children map and hasChildren from isCollapsed ──────
+    // isCollapsed:true = this node HAS children (intermediate node)
+    // isCollapsed:undefined/false = leaf node (no children)
     var childrenByParent = {};
-    // Also track which cell IDs have children (are parents)
-    var hasChildren = {}; // hasChildren[dimKey][cellId] = true
+    var hasChildren = {};
 
     for (var cbd = 0; cbd < dimensions.length; cbd++) {
       var cbdk = "dimensions_" + cbd;
@@ -548,20 +549,27 @@ class DropdownTableWidget extends HTMLElement {
       hasChildren[cbdk] = {};
       for (var cbr = 0; cbr < this._data.length; cbr++) {
         var cbCell = this._data[cbr][cbdk];
-        if (cbCell && cbCell.id && cbCell.parentId) {
-          var pid = cbCell.parentId;
-          if (!childrenByParent[cbdk][pid]) {
-            childrenByParent[cbdk][pid] = [];
+        if (cbCell && cbCell.id) {
+          // Mark as having children if isCollapsed is true
+          if (cbCell.isCollapsed === true) {
+            hasChildren[cbdk][cbCell.id] = true;
           }
-          var alreadyIn = false;
-          for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
-            if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
+          // Build parent-child map
+          if (cbCell.parentId) {
+            var pid = cbCell.parentId;
+            if (!childrenByParent[cbdk][pid]) {
+              childrenByParent[cbdk][pid] = [];
+            }
+            var alreadyIn = false;
+            for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
+              if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
+            }
+            if (!alreadyIn) {
+              childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
+            }
+            // Also mark parentId as having children
+            hasChildren[cbdk][pid] = true;
           }
-          if (!alreadyIn) {
-            childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
-          }
-          // Mark the parent as having children
-          hasChildren[cbdk][pid] = true;
         }
       }
     }
