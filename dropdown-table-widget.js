@@ -527,7 +527,17 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // ── Build grouped structure: parent → children ───────────────
+    // ── Build grouped structure ───────────────────────────────────
+    // Root groups = cells whose parentId points to a root node (parentId contains "<root>" or has no parent itself)
+    // Identify root node IDs first
+    var rootNodeIds = {};
+    for (var rni = 0; rni < this._data.length; rni++) {
+      var rnCell = this._data[rni]["dimensions_0"] || {};
+      if (rnCell.id && rnCell.isCollapsed === true) {
+        rootNodeIds[rnCell.id] = true;
+      }
+    }
+
     var groups = [];
     var groupMap = {};
     var noParentRows = [];
@@ -535,9 +545,10 @@ class DropdownTableWidget extends HTMLElement {
     for (var r2 = 0; r2 < this._data.length; r2++) {
       var c0 = this._data[r2]["dimensions_0"] || {};
       if (!c0.id) continue;
-      if (c0.isCollapsed === true) continue;
+      if (rootNodeIds[c0.id]) continue; // skip root nodes themselves
 
-      if (c0.parentId) {
+      if (c0.parentId && rootNodeIds[c0.parentId]) {
+        // Direct child of root → group header
         var gpid = c0.parentId;
         if (groupMap[gpid] === undefined) {
           var pMatch = gpid.match(/\.&\[([^\]]+)\]$/);
@@ -546,6 +557,36 @@ class DropdownTableWidget extends HTMLElement {
           groups.push({ parentLabel: pLabel, parentId: gpid, rows: [] });
         }
         groups[groupMap[gpid]].rows.push(r2);
+      } else if (c0.parentId) {
+        // Non-root child — find its root ancestor group
+        var ancestorId = c0.parentId;
+        var maxDepth = 10;
+        while (ancestorId && maxDepth > 0) {
+          maxDepth--;
+          if (rootNodeIds[ancestorId]) break;
+          // Find the row with this id to get its parentId
+          var found = false;
+          for (var ar = 0; ar < this._data.length; ar++) {
+            var arCell = this._data[ar]["dimensions_0"] || {};
+            if (arCell.id === ancestorId) {
+              ancestorId = arCell.parentId || "";
+              found = true;
+              break;
+            }
+          }
+          if (!found) break;
+        }
+        if (ancestorId && rootNodeIds[ancestorId]) {
+          if (groupMap[ancestorId] === undefined) {
+            var pMatch2 = ancestorId.match(/\.&\[([^\]]+)\]$/);
+            var pLabel2 = pMatch2 ? pMatch2[1] : ancestorId;
+            groupMap[ancestorId] = groups.length;
+            groups.push({ parentLabel: pLabel2, parentId: ancestorId, rows: [] });
+          }
+          groups[groupMap[ancestorId]].rows.push(r2);
+        } else {
+          noParentRows.push(r2);
+        }
       } else {
         noParentRows.push(r2);
       }
