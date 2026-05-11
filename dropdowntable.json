@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.9.7",
+  "version": "2.10.0",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-o/QqiT96btmxsCZdgyhLn0q/GDYITjJ5Fpb7p/JqBj4="
+      "integrity": "sha256-ffvJD9Dq8t/wkGa7TT2Gf9bdkGsO6u01oFf0up3kfiw="
     },
     {
       "kind": "styling",
@@ -149,6 +149,18 @@
   "events": {
     "onDropdownChanged": {
       "description": "Fired when a dropdown value is selected. Read selectedCellData for {row, dimensionId, memberId, memberLabel}."
+    },
+    "onAddMemberRequested": {
+      "description": "Fired when user confirms 'Adicionar membro'. Detail: {dimensionId, dimensionName, newMemberId, newMemberDescription, parentId, rowIndex, contextMemberId, contextMemberLabel}. Connect to: PlanningModel_X.createMembers(dimensionName, [{id: newMemberId, description: newMemberDescription}])"
+    },
+    "onDeleteMemberRequested": {
+      "description": "Fired when user clicks 'Excluir membro'. Detail: {action:'excludeMember', dimensionId, dimensionName, memberId, memberLabel, rowIndex}. Connect to: PlanningModel_X.deleteMembers(dimensionName, [memberId])"
+    },
+    "onFilterMemberRequested": {
+      "description": "Fired when user clicks 'Filtrar membro' or 'Filtrar'. Detail: {action:'filterMember'|'filter', dimensionId, dimensionName, memberId, memberLabel, rowIndex}."
+    },
+    "onExcludeRowRequested": {
+      "description": "Fired when user clicks 'Excluir' (row exclusion). Detail: {action:'exclude', dimensionId, dimensionName, memberId, memberLabel, rowIndex}."
     }
   },
   "dataBindings": {

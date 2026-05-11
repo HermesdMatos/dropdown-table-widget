@@ -1,3 +1,11 @@
+// dropdown-table-widget.js — v2.10.0
+// Changelog:
+//   v2.10.0 — Context menu (right-click) on dimensions_0 cells
+//             Modal "Adicionar membro" with ID + Description fields
+//             Events: onAddMemberRequested, onDeleteMemberRequested,
+//                     onFilterMemberRequested, onExcludeRowRequested
+//             SAC integration: designer connects events to PlanningModel script
+
 var TMPL = document.createElement("template");
 TMPL.innerHTML = `
 <style>
@@ -100,6 +108,117 @@ TMPL.innerHTML = `
 
   .dt-empty { padding: 32px; text-align: center; color: #999; font-size: 13px; }
   .dt-empty.hidden { display: none; }
+
+  /* ── Context Menu ─────────────────────────────────────────────── */
+  .dt-ctx-menu {
+    position: fixed;
+    background: #1e2530;
+    border: 1px solid #3a4250;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    z-index: 999999;
+    min-width: 200px;
+    padding: 4px 0;
+    font-size: 13px;
+  }
+  .dt-ctx-menu.hidden { display: none; }
+  .dt-ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    color: #e8eaf0;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .dt-ctx-item:hover { background: #1a73e8; color: #fff; }
+  .dt-ctx-item svg { flex-shrink: 0; opacity: 0.85; }
+  .dt-ctx-separator { height: 1px; background: #3a4250; margin: 4px 0; }
+
+  /* ── Add Member Modal ─────────────────────────────────────────── */
+  .dt-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 9999998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dt-modal-backdrop.hidden { display: none; }
+  .dt-modal {
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+    width: 420px;
+    max-width: 95vw;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+  }
+  .dt-modal-header {
+    background: #1a73e8;
+    color: #fff;
+    padding: 14px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dt-modal-body { padding: 20px; }
+  .dt-modal-info {
+    background: #e8f0fe;
+    border-left: 3px solid #1a73e8;
+    padding: 9px 13px;
+    font-size: 12px;
+    color: #1a3a6e;
+    border-radius: 3px;
+    margin-bottom: 16px;
+  }
+  .dt-modal-field { margin-bottom: 14px; }
+  .dt-modal-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 5px;
+  }
+  .dt-modal-field input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .dt-modal-field input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+  .dt-modal-field input.error { border-color: #e53935; }
+  .dt-modal-error { font-size: 11px; color: #e53935; margin-top: 4px; display: none; }
+  .dt-modal-error.visible { display: block; }
+  .dt-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .dt-btn {
+    padding: 8px 18px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    outline: none;
+  }
+  .dt-btn-cancel { background: #f1f3f4; color: #444; }
+  .dt-btn-cancel:hover { background: #e2e5e9; }
+  .dt-btn-confirm { background: #1a73e8; color: #fff; }
+  .dt-btn-confirm:hover { background: #1557b0; }
+  .dt-btn-confirm:disabled { background: #b0c8f5; cursor: not-allowed; }
 </style>
 <div class="dt-wrapper" id="dt-wrapper">
   <table id="dt-table">
@@ -108,6 +227,61 @@ TMPL.innerHTML = `
   </table>
   <div class="dt-empty" id="dt-empty">Nenhum dado disponível</div>
   <div class="dt-dropdown-list hidden" id="dt-dropdown"></div>
+</div>
+
+<!-- Context Menu -->
+<div class="dt-ctx-menu hidden" id="dt-ctx-menu">
+  <div class="dt-ctx-item" id="ctx-add-member">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    Adicionar membro
+  </div>
+  <div class="dt-ctx-separator"></div>
+  <div class="dt-ctx-item" id="ctx-filter-member">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    Filtrar membro
+  </div>
+  <div class="dt-ctx-item" id="ctx-filter">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    Filtrar
+  </div>
+  <div class="dt-ctx-separator"></div>
+  <div class="dt-ctx-item" id="ctx-exclude-member">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    Excluir membro
+  </div>
+  <div class="dt-ctx-item" id="ctx-exclude">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    Excluir
+  </div>
+</div>
+
+<!-- Add Member Modal -->
+<div class="dt-modal-backdrop hidden" id="dt-modal-backdrop">
+  <div class="dt-modal" id="dt-modal">
+    <div class="dt-modal-header">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="white" stroke-width="1.5"/><path d="M5 8h6M8 5v6" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Adicionar membro
+    </div>
+    <div class="dt-modal-body">
+      <div class="dt-modal-info">
+        O novo membro será criado permanentemente na dimensão do modelo de planejamento.
+      </div>
+      <div class="dt-modal-field">
+        <label for="dt-input-id">ID do membro <span style="color:#e53935">*</span></label>
+        <input id="dt-input-id" type="text" placeholder="Ex: CONTA_001" autocomplete="off" />
+        <div class="dt-modal-error" id="dt-error-id">ID do membro é obrigatório.</div>
+      </div>
+      <div class="dt-modal-field">
+        <label for="dt-input-desc">Descrição <span style="color:#e53935">*</span></label>
+        <input id="dt-input-desc" type="text" placeholder="Ex: Nova conta de despesa" autocomplete="off" />
+        <div class="dt-modal-error" id="dt-error-desc">Descrição é obrigatória.</div>
+      </div>
+    </div>
+    <div class="dt-modal-footer">
+      <button class="dt-btn dt-btn-cancel" id="dt-modal-cancel">Cancelar</button>
+      <button class="dt-btn dt-btn-confirm" id="dt-modal-confirm">Criar</button>
+    </div>
+  </div>
 </div>
 `;
 
@@ -140,11 +314,24 @@ class DropdownTableWidget extends HTMLElement {
     this._editableCellColor = "#fffbe6";
     this._showUnit         = "none";
 
-    this._onDocClick = this._closeDropdown.bind(this);
+    // Context menu state
+    this._ctxTarget = null; // {rowIndex, dimensionId, memberId, memberLabel, dimensionName}
+
+    this._onDocClick    = this._closeDropdown.bind(this);
+    this._onDocCtxClose = this._closeCtxMenu.bind(this);
   }
 
-  connectedCallback() { document.addEventListener("click", this._onDocClick); }
-  disconnectedCallback() { document.removeEventListener("click", this._onDocClick); }
+  connectedCallback() {
+    document.addEventListener("click", this._onDocClick);
+    document.addEventListener("click", this._onDocCtxClose);
+    this._bindContextMenu();
+    this._bindModal();
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener("click", this._onDocClick);
+    document.removeEventListener("click", this._onDocCtxClose);
+  }
 
   // ─── SAC Lifecycle ────────────────────────────────────────────
   onCustomWidgetReady() { this._loadBinding(); }
@@ -165,7 +352,10 @@ class DropdownTableWidget extends HTMLElement {
     this._loadBinding();
   }
   onCustomWidgetResize(w, h) { this.style.width = w + "px"; this.style.height = h + "px"; }
-  onCustomWidgetDestroy() { document.removeEventListener("click", this._onDocClick); }
+  onCustomWidgetDestroy() {
+    document.removeEventListener("click", this._onDocClick);
+    document.removeEventListener("click", this._onDocCtxClose);
+  }
 
   // ─── Binding ──────────────────────────────────────────────────
   _loadBinding() {
@@ -190,7 +380,6 @@ class DropdownTableWidget extends HTMLElement {
       var dimValues = dims ? dims.values : [];
       for (var di = 0; di < dimValues.length; di++) {
         var dv = dimValues[di];
-        // Try parentId extraction first (most reliable in SAC)
         var firstRow = dataBinding.data[0];
         var firstCell = firstRow ? firstRow["dimensions_" + di] : null;
         var dimLabel = "";
@@ -198,12 +387,10 @@ class DropdownTableWidget extends HTMLElement {
           var m = firstCell.parentId.match(/^\[([^\]]+)\]/);
           if (m) { dimLabel = m[1].replace(/_/g, " "); }
         }
-        // Fallback: extract from cell id directly
         if (!dimLabel && firstCell && firstCell.id) {
           var m4 = firstCell.id.match(/^\[([^\]]+)\]/);
           if (m4) { dimLabel = m4[1].replace(/_/g, " "); }
         }
-        // Fallback: use cell label if it's the root node label (dimension name)
         if (!dimLabel && firstCell && firstCell.label && firstCell.isCollapsed) {
           dimLabel = firstCell.label;
         }
@@ -217,8 +404,7 @@ class DropdownTableWidget extends HTMLElement {
         dimLabels.push(dimLabel);
       }
 
-      // ── Measure labels — follow PlanifyIT pattern ──
-      // PlanifyIT uses: dataBinding.metadata.mainStructureMembers (object or array)
+      // ── Measure labels ──
       var measMeta = meta.mainStructureMembers || (meta.feeds && meta.feeds.measures) || null;
       var measValues = [];
       if (measMeta) {
@@ -227,7 +413,6 @@ class DropdownTableWidget extends HTMLElement {
         } else if (measMeta.values) {
           measValues = measMeta.values;
         } else if (typeof measMeta === "object") {
-          // Object format like PlanifyIT: { "measures_0": {label, id}, ... }
           var mkeys = Object.keys(measMeta);
           for (var mk = 0; mk < mkeys.length; mk++) {
             measValues.push(measMeta[mkeys[mk]]);
@@ -248,16 +433,13 @@ class DropdownTableWidget extends HTMLElement {
         mesLabels.push(mesLabel);
       }
 
-      // ── Store processed metadata ──
       this._metadata = meta;
       this._metadata._dimLabels = dimLabels;
       this._metadata._mesLabels = mesLabels;
       this._metadata._measCount = mesLabels.length;
       this._data = dataBinding.data;
 
-      // Process childrenBinding if available
       this._processChildrenBinding();
-
       this._render();
     } catch(e) { console.error("DropdownTable _processDataBinding:", e); }
   }
@@ -297,10 +479,7 @@ class DropdownTableWidget extends HTMLElement {
   // ─── Properties ───────────────────────────────────────────────
   get dropdownOptions() { return JSON.stringify(this._dropdownOptions || {}); }
   set styleConfig(v) {
-    console.log("DropdownTable: styleConfig received", v);
-    try {
-      this.applyStyleConfig(v);
-    } catch(e) { console.error("styleConfig set error:", e); }
+    try { this.applyStyleConfig(v); } catch(e) { console.error("styleConfig set error:", e); }
   }
 
   applyStyleConfig(v) {
@@ -372,9 +551,6 @@ class DropdownTableWidget extends HTMLElement {
   getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
   getActiveFilters() { return JSON.stringify(this._activeFilters); }
 
-  // setDropdownOptions — define opções manualmente por coluna
-  // Aceita array: [{dimensionKey: "dimensions_1", options: ["Mensal","Bimestral",...]}]
-  // ou com objetos: [{dimensionKey: "dimensions_1", options: [{value:"id1", label:"Mensal"},...]}]
   setDropdownOptions(v) {
     try {
       var cfg = JSON.parse(v);
@@ -397,13 +573,9 @@ class DropdownTableWidget extends HTMLElement {
   }
   getDropdownOptions() { return JSON.stringify(this._dropdownOptions); }
 
-  // setMeasureLabels — define nomes das medidas manualmente
-  // Ex: dropdowntable_1.setMeasureLabels('["Custo","Quantidade"]')
   setMeasureLabels(v) {
-    try {
-      this._measureLabels = JSON.parse(v);
-      this._render();
-    } catch(e) { console.error("setMeasureLabels error:", e); }
+    try { this._measureLabels = JSON.parse(v); this._render(); }
+    catch(e) { console.error("setMeasureLabels error:", e); }
   }
   getMeasureLabels() { return JSON.stringify(this._measureLabels || []); }
 
@@ -413,13 +585,230 @@ class DropdownTableWidget extends HTMLElement {
     this._render();
   }
 
+  // ─── Context Menu wiring ──────────────────────────────────────
+  _bindContextMenu() {
+    var self = this;
+    var menu = this.shadowRoot.getElementById("dt-ctx-menu");
+
+    this.shadowRoot.getElementById("ctx-add-member").addEventListener("mousedown", function(e) {
+      e.stopPropagation();
+      self._closeCtxMenu();
+      self._openAddMemberModal();
+    });
+
+    this.shadowRoot.getElementById("ctx-filter-member").addEventListener("mousedown", function(e) {
+      e.stopPropagation();
+      self._closeCtxMenu();
+      if (self._ctxTarget) {
+        self.dispatchEvent(new CustomEvent("onFilterMemberRequested", {
+          bubbles: true, composed: true,
+          detail: {
+            action: "filterMember",
+            rowIndex:      self._ctxTarget.rowIndex,
+            dimensionId:   self._ctxTarget.dimensionId,
+            dimensionName: self._ctxTarget.dimensionName,
+            memberId:      self._ctxTarget.memberId,
+            memberLabel:   self._ctxTarget.memberLabel
+          }
+        }));
+      }
+    });
+
+    this.shadowRoot.getElementById("ctx-filter").addEventListener("mousedown", function(e) {
+      e.stopPropagation();
+      self._closeCtxMenu();
+      if (self._ctxTarget) {
+        self.dispatchEvent(new CustomEvent("onFilterMemberRequested", {
+          bubbles: true, composed: true,
+          detail: {
+            action: "filter",
+            rowIndex:      self._ctxTarget.rowIndex,
+            dimensionId:   self._ctxTarget.dimensionId,
+            dimensionName: self._ctxTarget.dimensionName,
+            memberId:      self._ctxTarget.memberId,
+            memberLabel:   self._ctxTarget.memberLabel
+          }
+        }));
+      }
+    });
+
+    this.shadowRoot.getElementById("ctx-exclude-member").addEventListener("mousedown", function(e) {
+      e.stopPropagation();
+      self._closeCtxMenu();
+      if (self._ctxTarget) {
+        self.dispatchEvent(new CustomEvent("onDeleteMemberRequested", {
+          bubbles: true, composed: true,
+          detail: {
+            action: "excludeMember",
+            rowIndex:      self._ctxTarget.rowIndex,
+            dimensionId:   self._ctxTarget.dimensionId,
+            dimensionName: self._ctxTarget.dimensionName,
+            memberId:      self._ctxTarget.memberId,
+            memberLabel:   self._ctxTarget.memberLabel
+          }
+        }));
+      }
+    });
+
+    this.shadowRoot.getElementById("ctx-exclude").addEventListener("mousedown", function(e) {
+      e.stopPropagation();
+      self._closeCtxMenu();
+      if (self._ctxTarget) {
+        self.dispatchEvent(new CustomEvent("onExcludeRowRequested", {
+          bubbles: true, composed: true,
+          detail: {
+            action: "exclude",
+            rowIndex:      self._ctxTarget.rowIndex,
+            dimensionId:   self._ctxTarget.dimensionId,
+            dimensionName: self._ctxTarget.dimensionName,
+            memberId:      self._ctxTarget.memberId,
+            memberLabel:   self._ctxTarget.memberLabel
+          }
+        }));
+      }
+    });
+  }
+
+  _openCtxMenu(e, rowIndex, dimensionId, memberId, memberLabel, dimensionName) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    this._ctxTarget = { rowIndex: rowIndex, dimensionId: dimensionId, memberId: memberId, memberLabel: memberLabel, dimensionName: dimensionName };
+
+    var menu = this.shadowRoot.getElementById("dt-ctx-menu");
+    menu.classList.remove("hidden");
+
+    // Position — keep menu inside viewport
+    var mw = 210, mh = 170;
+    var x = e.clientX, y = e.clientY;
+    if (x + mw > window.innerWidth)  { x = window.innerWidth  - mw - 8; }
+    if (y + mh > window.innerHeight) { y = window.innerHeight - mh - 8; }
+    menu.style.left = x + "px";
+    menu.style.top  = y + "px";
+  }
+
+  _closeCtxMenu() {
+    var menu = this.shadowRoot.getElementById("dt-ctx-menu");
+    if (menu) { menu.classList.add("hidden"); }
+    // _ctxTarget is kept until next open so modal can read it
+  }
+
+  // ─── Add Member Modal wiring ───────────────────────────────────
+  _bindModal() {
+    var self = this;
+    var backdrop = this.shadowRoot.getElementById("dt-modal-backdrop");
+    var inputId   = this.shadowRoot.getElementById("dt-input-id");
+    var inputDesc = this.shadowRoot.getElementById("dt-input-desc");
+    var errorId   = this.shadowRoot.getElementById("dt-error-id");
+    var errorDesc = this.shadowRoot.getElementById("dt-error-desc");
+    var btnCancel  = this.shadowRoot.getElementById("dt-modal-cancel");
+    var btnConfirm = this.shadowRoot.getElementById("dt-modal-confirm");
+
+    btnCancel.addEventListener("click", function() { self._closeModal(); });
+
+    // Close on backdrop click (outside modal box)
+    backdrop.addEventListener("click", function(e) {
+      if (e.target === backdrop) { self._closeModal(); }
+    });
+
+    // Real-time validation clear
+    inputId.addEventListener("input", function() {
+      if (inputId.value !== "") {
+        inputId.classList.remove("error");
+        errorId.classList.remove("visible");
+      }
+    });
+    inputDesc.addEventListener("input", function() {
+      if (inputDesc.value !== "") {
+        inputDesc.classList.remove("error");
+        errorDesc.classList.remove("visible");
+      }
+    });
+
+    btnConfirm.addEventListener("click", function() {
+      var idVal   = inputId.value.trim();
+      var descVal = inputDesc.value.trim();
+      var valid   = true;
+
+      // SAC rule: no null / no ! — use === ""
+      if (idVal === "") {
+        inputId.classList.add("error");
+        errorId.classList.add("visible");
+        valid = false;
+      }
+      if (descVal === "") {
+        inputDesc.classList.add("error");
+        errorDesc.classList.add("visible");
+        valid = false;
+      }
+      if (!valid) { return; }
+
+      var target = self._ctxTarget || {};
+
+      // Determine parentId: use memberId of selected row as parent (hierarchy context)
+      var parentId = target.memberId || "";
+
+      var payload = {
+        dimensionId:   target.dimensionId   || "dimensions_0",
+        dimensionName: target.dimensionName || "",
+        newMemberId:   idVal,
+        newMemberDescription: descVal,
+        parentId:      parentId,
+        rowIndex:      target.rowIndex !== undefined ? target.rowIndex : -1,
+        contextMemberId:    target.memberId    || "",
+        contextMemberLabel: target.memberLabel || ""
+      };
+
+      self._closeModal();
+
+      // Fire event — SAC script connects this to PlanningModel.createMembers(...)
+      self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
+        bubbles: true, composed: true,
+        detail: payload
+      }));
+    });
+
+    // Enter key submits
+    inputDesc.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") { btnConfirm.click(); }
+    });
+    inputId.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") { inputDesc.focus(); }
+    });
+  }
+
+  _openAddMemberModal() {
+    var backdrop = this.shadowRoot.getElementById("dt-modal-backdrop");
+    var inputId   = this.shadowRoot.getElementById("dt-input-id");
+    var inputDesc = this.shadowRoot.getElementById("dt-input-desc");
+    var errorId   = this.shadowRoot.getElementById("dt-error-id");
+    var errorDesc = this.shadowRoot.getElementById("dt-error-desc");
+
+    // Reset fields
+    inputId.value   = "";
+    inputDesc.value = "";
+    inputId.classList.remove("error");
+    inputDesc.classList.remove("error");
+    errorId.classList.remove("visible");
+    errorDesc.classList.remove("visible");
+
+    backdrop.classList.remove("hidden");
+    setTimeout(function() { inputId.focus(); }, 50);
+  }
+
+  _closeModal() {
+    var backdrop = this.shadowRoot.getElementById("dt-modal-backdrop");
+    backdrop.classList.add("hidden");
+  }
+
+  // ─── Dynamic Styles ───────────────────────────────────────────
   _applyDynamicStyles() {
     var wrapper = this.shadowRoot.getElementById("dt-wrapper");
     if (wrapper) {
-      wrapper.style.fontFamily   = this._fontFamily;
-      wrapper.style.fontSize     = this._fontSize;
-      wrapper.style.fontWeight   = this._fontWeight;
-      wrapper.style.fontStyle    = this._fontStyle;
+      wrapper.style.fontFamily    = this._fontFamily;
+      wrapper.style.fontSize      = this._fontSize;
+      wrapper.style.fontWeight    = this._fontWeight;
+      wrapper.style.fontStyle     = this._fontStyle;
       wrapper.style.textDecoration = this._textDecoration;
     }
   }
@@ -442,7 +831,6 @@ class DropdownTableWidget extends HTMLElement {
 
     var dimensions = this._metadata.feeds.dimensions.values;
     var measFeed   = this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures;
-    // SAC measures.values can be array of strings ["measures_0","measures_1"] or array of objects
     var measValues = measFeed ? measFeed.values : [];
     var measures   = [];
     for (var mvi = 0; mvi < measValues.length; mvi++) {
@@ -454,11 +842,9 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // Use pre-processed labels from _processDataBinding
     var dimLabels = this._metadata._dimLabels || [];
     var mesLabels = this._metadata._mesLabels || [];
 
-    // Fallback counts
     if (dimLabels.length === 0) {
       for (var dfl = 0; dfl < dimensions.length; dfl++) { dimLabels.push("Dim " + dfl); }
     }
@@ -468,7 +854,7 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // ── Header ───────────────────────────────────────────────────
+    // ── Header ──────────────────────────────────────────────────
     for (var i = 0; i < dimLabels.length; i++) {
       var th = document.createElement("th");
       th.textContent = dimLabels[i];
@@ -483,8 +869,7 @@ class DropdownTableWidget extends HTMLElement {
       headerRow.appendChild(thm);
     }
 
-    // ── Fetch dropdown options from dimension members (not from data rows) ──
-    // This avoids row multiplication when dropdown dimensions are in the binding
+    // ── Dropdown options from binding ────────────────────────────
     var dimOptions = {};
     for (var d = 0; d < dimensions.length; d++) {
       dimOptions["dimensions_" + d] = [];
@@ -499,7 +884,6 @@ class DropdownTableWidget extends HTMLElement {
         if (members && members.length > 0) {
           for (var mx = 0; mx < members.length; mx++) {
             var mem = members[mx];
-            // Skip root node (no parent or id contains root marker)
             if (mem && mem.id && mem.parentId) {
               dimOptions[dk].push({ value: mem.id, label: mem.description || mem.id });
             }
@@ -507,7 +891,6 @@ class DropdownTableWidget extends HTMLElement {
         }
       }
     } catch(e) {
-      // Fallback: collect from data rows excluding root
       var dimRootIds = {};
       for (var dr = 0; dr < dimensions.length; dr++) {
         dimRootIds["dimensions_" + dr] = null;
@@ -537,10 +920,9 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // ── Build children map and hasChildren ───────────────────────
+    // ── Children map ─────────────────────────────────────────────
     var childrenByParent = {};
     var hasChildren = {};
-
     for (var cbd = 0; cbd < dimensions.length; cbd++) {
       var cbdk = "dimensions_" + cbd;
       childrenByParent[cbdk] = {};
@@ -549,9 +931,7 @@ class DropdownTableWidget extends HTMLElement {
         var cbCell = this._data[cbr][cbdk];
         if (cbCell && cbCell.id && cbCell.parentId) {
           var pid = cbCell.parentId;
-          if (!childrenByParent[cbdk][pid]) {
-            childrenByParent[cbdk][pid] = [];
-          }
+          if (!childrenByParent[cbdk][pid]) { childrenByParent[cbdk][pid] = []; }
           var alreadyIn = false;
           for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
             if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
@@ -559,25 +939,18 @@ class DropdownTableWidget extends HTMLElement {
           if (!alreadyIn) {
             childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
           }
-          // Mark parent as having children
           hasChildren[cbdk][pid] = true;
         }
       }
     }
 
-    // ── Build render list following data order ───────────────────
-    // Structure: rows with parent:none = section headers (skip as data rows)
-    // rows with parent = level 1 group headers (if they have children) or leaf rows
-    // rows with grandparent = sub-group children
-
-    // Map id → row index for quick lookup
+    // ── Build render list ────────────────────────────────────────
     var idToRow = {};
     for (var im = 0; im < this._data.length; im++) {
       var imCell = this._data[im]["dimensions_0"] || {};
       if (imCell.id) { idToRow[imCell.id] = im; }
     }
 
-    // Build render sequence: [{type: 'header'|'subheader'|'row', label, rowIndex}]
     var renderList = [];
     var rendered = {};
 
@@ -585,22 +958,17 @@ class DropdownTableWidget extends HTMLElement {
       var rlCell = this._data[rl]["dimensions_0"] || {};
       if (!rlCell.id || rendered[rlCell.id]) continue;
 
-      var pid = rlCell.parentId ? rlCell.parentId.replace(/.*\.&\[([^\]]+)\]$/, "$1") : null;
       var hasPidDot = rlCell.parentId && rlCell.parentId.indexOf(".&[") !== -1;
 
       if (!rlCell.parentId || !hasPidDot) {
-        // Root node → section header
-        renderList.push({ type: "header", label: rlCell.label || pid || "", rowIndex: rl });
+        renderList.push({ type: "header", label: rlCell.label || "", rowIndex: rl });
         rendered[rlCell.id] = true;
       } else {
-        // Has parent — check if it has children (appears as parentId of others)
         var hasKids = childrenByParent["dimensions_0"] && childrenByParent["dimensions_0"][rlCell.id] && childrenByParent["dimensions_0"][rlCell.id].length > 0;
         if (hasKids) {
-          // Sub-header row
           renderList.push({ type: "subheader", label: rlCell.label || "", rowIndex: rl });
           rendered[rlCell.id] = true;
         } else {
-          // Leaf row
           renderList.push({ type: "row", rowIndex: rl });
           rendered[rlCell.id] = true;
         }
@@ -616,11 +984,8 @@ class DropdownTableWidget extends HTMLElement {
       tr.dataset.rowIndex = ri;
       tr.style.height = self2._rowHeight + "px";
 
-      // Check if this row is a parent node (isCollapsed:true on dimensions_0)
       var firstDimCell = rowData["dimensions_0"] || {};
       var isParentRow = firstDimCell.isCollapsed === true;
-
-      // Apply parent row styling
       if (isParentRow) {
         tr.style.background = "#e8f0fe";
         tr.style.fontWeight = "600";
@@ -639,8 +1004,6 @@ class DropdownTableWidget extends HTMLElement {
         var cLbl = cData.label || cData.id || "";
         var cId  = cData.id || "";
 
-        // dimensions_0 (Descrição da Conta) never shows dropdown — always plain text
-        // Other dimensions show dropdown based on hasChildren
         var isDrop = di2 !== 0 && (
           self2._dropdownDimensions.length === 0
           || self2._dropdownDimensions.indexOf(dk2) !== -1
@@ -651,7 +1014,6 @@ class DropdownTableWidget extends HTMLElement {
           self2._childrenFromBinding[dk2] &&
           self2._childrenFromBinding[dk2][cId] &&
           self2._childrenFromBinding[dk2][cId].length > 0;
-        // Has children if: in hasChildren map OR in childrenByParent OR in childrenFromBinding
         var cellHasChildren = hasChildren[dk2][cId] ||
           (childrenByParent[dk2] && childrenByParent[dk2][cId] && childrenByParent[dk2][cId].length > 0) ||
           hasChildrenInBinding;
@@ -670,14 +1032,29 @@ class DropdownTableWidget extends HTMLElement {
         if (isDrop) {
           self2._buildDropdownCell(td, ri, dk2, cLbl, cId, opts);
         } else {
+          // dimensions_0 — plain cell WITH right-click context menu
           var sp = document.createElement("span");
           sp.className = "cell-plain";
           sp.textContent = cLbl;
+          sp.style.cursor = "context-menu";
+          sp.title = "Clique direito para opções";
+
+          // Capture values at construction time via closure
+          (function(spanEl, rowIdx, dimKey, mId, mLabel, dimName) {
+            spanEl.addEventListener("contextmenu", function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              self2._closeDropdown();
+              self2._openCtxMenu(e, rowIdx, dimKey, mId, mLabel, dimName);
+            });
+          })(sp, ri, dk2, cId, cLbl, dim2.description || dim2.id || dk2);
+
           td.appendChild(sp);
         }
         tr.appendChild(td);
       }
 
+      // Measure cells
       for (var mi2 = 0; mi2 < measures.length; mi2++) {
         var mk2  = "measures_" + mi2;
         var tdm  = document.createElement("td");
@@ -750,7 +1127,6 @@ class DropdownTableWidget extends HTMLElement {
       tbody.appendChild(tr);
     };
 
-    // Render using renderList (follows data order)
     for (var ri2 = 0; ri2 < renderList.length; ri2++) {
       var item = renderList[ri2];
       if (item.type === "header") {
@@ -818,13 +1194,10 @@ class DropdownTableWidget extends HTMLElement {
     list.innerHTML = "";
     list.classList.remove("hidden");
 
-    // Filter out root node — label same as dimension name or value contains "root"
     var filteredOptions = [];
     for (var fi = 0; fi < options.length; fi++) {
       var opt = options[fi];
-      var lbl = (opt.label || "").toLowerCase();
       var val = (opt.value || "").toLowerCase();
-      // Skip if value contains root marker or label equals dimension feed name
       if (val.indexOf("root") !== -1 || val.indexOf("].&[root]") !== -1) { continue; }
       filteredOptions.push(opt);
     }
@@ -843,8 +1216,6 @@ class DropdownTableWidget extends HTMLElement {
       })(filteredOptions[i]);
     }
 
-    // Position relative to the wrapper element (not fixed to window)
-    // This works correctly inside SAC iframes
     var wrapper = this.shadowRoot.getElementById("dt-wrapper");
     var wrapperRect = wrapper.getBoundingClientRect();
     var cellRect = cellEl.getBoundingClientRect();
@@ -853,13 +1224,11 @@ class DropdownTableWidget extends HTMLElement {
     var left  = cellRect.left - wrapperRect.left + wrapper.scrollLeft;
     var top   = cellRect.bottom - wrapperRect.top + wrapper.scrollTop;
 
-    // Flip up if near bottom
     var listH = Math.min(filteredOptions.length * 36 + 8, 220);
     if (cellRect.bottom + listH > window.innerHeight - 8) {
       top = cellRect.top - wrapperRect.top + wrapper.scrollTop - listH - 2;
     }
 
-    // Change dropdown to absolute positioning inside wrapper
     list.style.position = "absolute";
     list.style.left     = left + "px";
     list.style.top      = top  + "px";
@@ -887,12 +1256,10 @@ class DropdownTableWidget extends HTMLElement {
       memberLabel: memberLabel
     };
 
-    // Store selection locally for visual update
     if (!this._localSelections) { this._localSelections = {}; }
     if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
     this._localSelections[rowIndex][dimensionId] = { id: memberId, label: memberLabel };
 
-    // Update just the cell value span — no full re-render needed
     var cellWrapper = this._activeCell;
     if (cellWrapper) {
       var valSpan = cellWrapper.querySelector(".cell-value");
@@ -900,11 +1267,9 @@ class DropdownTableWidget extends HTMLElement {
         valSpan.textContent = memberLabel;
         valSpan.className = "cell-value";
       }
-      // Update the click handler with new currentId for next open
       cellWrapper._currentId = memberId;
     }
 
-    // Write-back to SAC planning model in background
     try {
       var binding    = this.myDataBinding;
       var rowData    = this._data[rowIndex];
@@ -922,10 +1287,7 @@ class DropdownTableWidget extends HTMLElement {
           cellAddress[dimensions[dimIdx].id] = memberId;
         }
         binding.setValueState(cellAddress, function(err) {
-          if (!err) {
-            // Don't delete local selection — let the binding refresh show the new value
-            self._loadBinding();
-          }
+          if (!err) { self._loadBinding(); }
         });
       }
     } catch(e) {
