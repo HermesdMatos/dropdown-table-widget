@@ -1,13 +1,9 @@
-// dropdown-table-widget.js — v2.10.1
+// dropdown-table-widget.js — v2.10.2
 // Changelog:
-//   v2.10.1 — Fix context menu position (colado ao cursor)
-//             Fix payload: dimensionRealId usa metadata.id real da dimensão
-//             Modal: campo Hierarquia (parentId) adicionado como input livre
-//   v2.10.0 — Context menu (right-click) on dimensions_0 cells
-//             Modal "Adicionar membro" with ID + Description fields
-//             Events: onAddMemberRequested, onDeleteMemberRequested,
-//                     onFilterMemberRequested, onExcludeRowRequested
-//             SAC integration: designer connects events to PlanningModel script
+//   v2.10.2 — Adiciona propriedade lastAddMemberRequest declarada no JSON
+//             Corrige payload: usa ArrayUtils.create pattern compatível com SAC
+//   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
+//   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
 var TMPL = document.createElement("template");
 TMPL.innerHTML = `
@@ -310,6 +306,7 @@ class DropdownTableWidget extends HTMLElement {
     this._localSelections = {};
     this._localMeasures = {};
     this._measureLabels = [];
+    this._lastAddMemberRequest = {};
 
     // Style properties
     this._rowHeight        = 36;
@@ -539,6 +536,9 @@ class DropdownTableWidget extends HTMLElement {
   }
   get selectedCellData() { return JSON.stringify(this._selectedCellData); }
   set selectedCellData(v) { try { this._selectedCellData = JSON.parse(v); } catch(e) {} }
+
+  get lastAddMemberRequest() { return JSON.stringify(this._lastAddMemberRequest || {}); }
+  set lastAddMemberRequest(v) { try { this._lastAddMemberRequest = JSON.parse(v); } catch(e) {} }
 
   set headerColor(v) { this.style.setProperty("--header-color", v); }
   set headerTextColor(v) { this.style.setProperty("--header-text-color", v); }
@@ -774,6 +774,7 @@ class DropdownTableWidget extends HTMLElement {
         contextMemberLabel:   target.memberLabel || ""
       };
 
+      self._lastAddMemberRequest = payload;
       self._closeModal();
 
       self.dispatchEvent(new CustomEvent("onAddMemberRequested", {

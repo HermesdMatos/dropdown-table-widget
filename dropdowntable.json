@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.1",
+  "version": "2.10.2",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-pSglG9Fn+Ho8QS64nHQm2a+7xUqgy5j9f0B7XT7JFXE="
+      "integrity": "sha256-Q9CXUyRyV07EJfoxkZ4V8HKMqoniohKguJm8xgh0jCc="
     },
     {
       "kind": "styling",
@@ -36,6 +36,11 @@
       "type": "string",
       "description": "JSON array of dimension feed IDs to render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
       "default": "[]"
+    },
+    "lastAddMemberRequest": {
+      "type": "string",
+      "description": "JSON string do último pedido de criação de membro {dimensionRealId, newMemberId, newMemberDescription, parentId, ...}",
+      "default": "{}"
     },
     "selectedCellData": {
       "type": "string",
@@ -102,6 +107,12 @@
     }
   },
   "methods": {
+    "getLastAddMemberRequest": {
+      "returnType": "string",
+      "description": "Retorna o último payload de criação de membro como JSON string. Use no script do evento onAddMemberRequested.",
+      "parameters": [],
+      "body": "return this.lastAddMemberRequest || '{}';"
+    },
     "setDropdownOptions": {
       "description": "Define dropdown options per column. Pass array: [{dimensionKey:'dimensions_1', options:['Mensal','Bimestral',...]}]",
       "parameters": [
