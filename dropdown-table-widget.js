@@ -1,5 +1,8 @@
-// dropdown-table-widget.js — v2.10.0
+// dropdown-table-widget.js — v2.10.1
 // Changelog:
+//   v2.10.1 — Fix context menu position (colado ao cursor)
+//             Fix payload: dimensionRealId usa metadata.id real da dimensão
+//             Modal: campo Hierarquia (parentId) adicionado como input livre
 //   v2.10.0 — Context menu (right-click) on dimensions_0 cells
 //             Modal "Adicionar membro" with ID + Description fields
 //             Events: onAddMemberRequested, onDeleteMemberRequested,
@@ -275,6 +278,11 @@ TMPL.innerHTML = `
         <label for="dt-input-desc">Descrição <span style="color:#e53935">*</span></label>
         <input id="dt-input-desc" type="text" placeholder="Ex: Nova conta de despesa" autocomplete="off" />
         <div class="dt-modal-error" id="dt-error-desc">Descrição é obrigatória.</div>
+      </div>
+      <div class="dt-modal-field">
+        <label for="dt-input-parent">Hierarquia (parentId)</label>
+        <input id="dt-input-parent" type="text" placeholder="Ex: MULTAS_CONTRATUAIS" autocomplete="off" />
+        <div style="font-size:11px;color:#888;margin-top:3px;">ID do nó pai na hierarquia. Deixe vazio para raiz.</div>
       </div>
     </div>
     <div class="dt-modal-footer">
@@ -669,20 +677,27 @@ class DropdownTableWidget extends HTMLElement {
     });
   }
 
-  _openCtxMenu(e, rowIndex, dimensionId, memberId, memberLabel, dimensionName) {
+  _openCtxMenu(e, rowIndex, dimensionId, memberId, memberLabel, dimensionRealId) {
     e.preventDefault();
     e.stopPropagation();
 
-    this._ctxTarget = { rowIndex: rowIndex, dimensionId: dimensionId, memberId: memberId, memberLabel: memberLabel, dimensionName: dimensionName };
+    this._ctxTarget = {
+      rowIndex:       rowIndex,
+      dimensionId:    dimensionId,      // feed key: "dimensions_0"
+      dimensionRealId: dimensionRealId, // SAC model ID: "DESCRICAO_DA_CONTA"
+      dimensionName:  dimensionRealId,  // alias for display
+      memberId:       memberId,
+      memberLabel:    memberLabel
+    };
 
     var menu = this.shadowRoot.getElementById("dt-ctx-menu");
     menu.classList.remove("hidden");
 
-    // Position — keep menu inside viewport
-    var mw = 210, mh = 170;
+    // Position colado ao cursor — sem deslocamento extra
+    var mw = 210, mh = 200;
     var x = e.clientX, y = e.clientY;
-    if (x + mw > window.innerWidth)  { x = window.innerWidth  - mw - 8; }
-    if (y + mh > window.innerHeight) { y = window.innerHeight - mh - 8; }
+    if (x + mw > window.innerWidth)  { x = window.innerWidth  - mw - 4; }
+    if (y + mh > window.innerHeight) { y = window.innerHeight - mh - 4; }
     menu.style.left = x + "px";
     menu.style.top  = y + "px";
   }
@@ -697,21 +712,20 @@ class DropdownTableWidget extends HTMLElement {
   _bindModal() {
     var self = this;
     var backdrop = this.shadowRoot.getElementById("dt-modal-backdrop");
-    var inputId   = this.shadowRoot.getElementById("dt-input-id");
-    var inputDesc = this.shadowRoot.getElementById("dt-input-desc");
-    var errorId   = this.shadowRoot.getElementById("dt-error-id");
-    var errorDesc = this.shadowRoot.getElementById("dt-error-desc");
-    var btnCancel  = this.shadowRoot.getElementById("dt-modal-cancel");
-    var btnConfirm = this.shadowRoot.getElementById("dt-modal-confirm");
+    var inputId     = this.shadowRoot.getElementById("dt-input-id");
+    var inputDesc   = this.shadowRoot.getElementById("dt-input-desc");
+    var inputParent = this.shadowRoot.getElementById("dt-input-parent");
+    var errorId     = this.shadowRoot.getElementById("dt-error-id");
+    var errorDesc   = this.shadowRoot.getElementById("dt-error-desc");
+    var btnCancel   = this.shadowRoot.getElementById("dt-modal-cancel");
+    var btnConfirm  = this.shadowRoot.getElementById("dt-modal-confirm");
 
     btnCancel.addEventListener("click", function() { self._closeModal(); });
 
-    // Close on backdrop click (outside modal box)
     backdrop.addEventListener("click", function(e) {
       if (e.target === backdrop) { self._closeModal(); }
     });
 
-    // Real-time validation clear
     inputId.addEventListener("input", function() {
       if (inputId.value !== "") {
         inputId.classList.remove("error");
@@ -726,11 +740,11 @@ class DropdownTableWidget extends HTMLElement {
     });
 
     btnConfirm.addEventListener("click", function() {
-      var idVal   = inputId.value.trim();
-      var descVal = inputDesc.value.trim();
-      var valid   = true;
+      var idVal     = inputId.value.trim();
+      var descVal   = inputDesc.value.trim();
+      var parentVal = inputParent.value.trim();
+      var valid     = true;
 
-      // SAC rule: no null / no ! — use === ""
       if (idVal === "") {
         inputId.classList.add("error");
         errorId.classList.add("visible");
@@ -745,31 +759,33 @@ class DropdownTableWidget extends HTMLElement {
 
       var target = self._ctxTarget || {};
 
-      // Determine parentId: use memberId of selected row as parent (hierarchy context)
-      var parentId = target.memberId || "";
+      // Resolve the real SAC dimension ID from metadata (not the feed key "dimensions_0")
+      var realDimId = target.dimensionRealId || target.dimensionId || "dimensions_0";
 
       var payload = {
-        dimensionId:   target.dimensionId   || "dimensions_0",
-        dimensionName: target.dimensionName || "",
-        newMemberId:   idVal,
+        dimensionId:          target.dimensionId   || "dimensions_0",  // feed key: "dimensions_0"
+        dimensionRealId:      realDimId,                                // SAC model id: "DESCRICAO_DA_CONTA"
+        dimensionName:        target.dimensionName  || "",              // label for display
+        newMemberId:          idVal,
         newMemberDescription: descVal,
-        parentId:      parentId,
-        rowIndex:      target.rowIndex !== undefined ? target.rowIndex : -1,
-        contextMemberId:    target.memberId    || "",
-        contextMemberLabel: target.memberLabel || ""
+        parentId:             parentVal,                                // manual hierarchy input
+        rowIndex:             target.rowIndex !== undefined ? target.rowIndex : -1,
+        contextMemberId:      target.memberId    || "",
+        contextMemberLabel:   target.memberLabel || ""
       };
 
       self._closeModal();
 
-      // Fire event — SAC script connects this to PlanningModel.createMembers(...)
       self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
         bubbles: true, composed: true,
         detail: payload
       }));
     });
 
-    // Enter key submits
     inputDesc.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") { inputParent.focus(); }
+    });
+    inputParent.addEventListener("keydown", function(e) {
       if (e.key === "Enter") { btnConfirm.click(); }
     });
     inputId.addEventListener("keydown", function(e) {
@@ -778,15 +794,30 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   _openAddMemberModal() {
-    var backdrop = this.shadowRoot.getElementById("dt-modal-backdrop");
-    var inputId   = this.shadowRoot.getElementById("dt-input-id");
-    var inputDesc = this.shadowRoot.getElementById("dt-input-desc");
-    var errorId   = this.shadowRoot.getElementById("dt-error-id");
-    var errorDesc = this.shadowRoot.getElementById("dt-error-desc");
+    var backdrop    = this.shadowRoot.getElementById("dt-modal-backdrop");
+    var inputId     = this.shadowRoot.getElementById("dt-input-id");
+    var inputDesc   = this.shadowRoot.getElementById("dt-input-desc");
+    var inputParent = this.shadowRoot.getElementById("dt-input-parent");
+    var errorId     = this.shadowRoot.getElementById("dt-error-id");
+    var errorDesc   = this.shadowRoot.getElementById("dt-error-desc");
 
-    // Reset fields
     inputId.value   = "";
     inputDesc.value = "";
+    inputParent.value = "";
+
+    // Pre-fill parentId hint from context row's group header (if available)
+    if (this._ctxTarget && this._ctxTarget.rowIndex !== undefined && this._data) {
+      try {
+        var rowData  = this._data[this._ctxTarget.rowIndex];
+        var cell     = rowData ? rowData["dimensions_0"] : null;
+        // parentId format: "[DIM].&[PARENT_ID]" — extract the PARENT_ID part
+        if (cell && cell.parentId) {
+          var match = cell.parentId.match(/\.&\[([^\]]+)\]$/);
+          if (match) { inputParent.value = match[1]; }
+        }
+      } catch(ex) { /* silently skip */ }
+    }
+
     inputId.classList.remove("error");
     inputDesc.classList.remove("error");
     errorId.classList.remove("visible");
@@ -1040,14 +1071,14 @@ class DropdownTableWidget extends HTMLElement {
           sp.title = "Clique direito para opções";
 
           // Capture values at construction time via closure
-          (function(spanEl, rowIdx, dimKey, mId, mLabel, dimName) {
+          (function(spanEl, rowIdx, dimKey, mId, mLabel, dimRealId) {
             spanEl.addEventListener("contextmenu", function(e) {
               e.preventDefault();
               e.stopPropagation();
               self2._closeDropdown();
-              self2._openCtxMenu(e, rowIdx, dimKey, mId, mLabel, dimName);
+              self2._openCtxMenu(e, rowIdx, dimKey, mId, mLabel, dimRealId);
             });
-          })(sp, ri, dk2, cId, cLbl, dim2.description || dim2.id || dk2);
+          })(sp, ri, dk2, cId, cLbl, dim2.id || dk2);
 
           td.appendChild(sp);
         }
