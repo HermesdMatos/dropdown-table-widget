@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.2
+// dropdown-table-widget.js — v2.10.3
 // Changelog:
-//   v2.10.2 — Adiciona propriedade lastAddMemberRequest declarada no JSON
-//             Corrige payload: usa ArrayUtils.create pattern compatível com SAC
+//   v2.10.3 — Fix: payload salvo ANTES de fechar modal, método getLastAddMemberRequest()
+//             adicionado diretamente na classe (mesmo padrão de getDropdownOptions)
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -556,6 +556,7 @@ class DropdownTableWidget extends HTMLElement {
   // ─── Methods ──────────────────────────────────────────────────
   setDropdownDimensions(v) { this.dropdownDimensions = v; }
   getDropdownDimensions() { return this.dropdownDimensions; }
+  getLastAddMemberRequest() { return JSON.stringify(this._lastAddMemberRequest || {}); }
   getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
   getActiveFilters() { return JSON.stringify(this._activeFilters); }
 
@@ -775,6 +776,8 @@ class DropdownTableWidget extends HTMLElement {
       };
 
       self._lastAddMemberRequest = payload;
+
+      // Fecha modal só depois de salvar o payload
       self._closeModal();
 
       self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
