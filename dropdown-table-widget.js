@@ -1,7 +1,8 @@
-// dropdown-table-widget.js — v2.10.7
+// dropdown-table-widget.js — v2.10.8
 // Changelog:
-//   v2.10.7 — Substitui métodos getNewMember* por propriedades string declaradas no JSON
-//             (newMemberId, newMemberDescription, newMemberParentId) — compatível com SAC
+//   v2.10.8 — Fix definitivo: usa propertiesChanged para sincronizar selectedCellData
+//             com payload completo antes de disparar onAddMemberRequested.
+//             Script SAC lê via getSelectedCellData() que já funciona comprovadamente.
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -790,13 +791,21 @@ class DropdownTableWidget extends HTMLElement {
       self._newMemberId          = idVal;
       self._newMemberDescription = descVal;
       self._newMemberParentId    = parentVal;
+      self._selectedCellData     = payload;
 
-      // Salva cada campo como atributo no elemento host
+      // Salva atributos no elemento host
       self.setAttribute("data-new-member-id",     idVal);
       self.setAttribute("data-new-member-desc",   descVal);
       self.setAttribute("data-new-member-parent", parentVal);
       self.setAttribute("data-new-member-dim",    realDimId);
       self.setAttribute("data-last-add-member",   JSON.stringify(payload));
+
+      // Notifica o SAC da mudança de propriedade — garante que selectedCellData
+      // está atualizado antes do script do evento executar
+      self.dispatchEvent(new CustomEvent("propertiesChanged", {
+        bubbles: true, composed: true,
+        detail: { properties: { selectedCellData: JSON.stringify(payload) } }
+      }));
 
       // Fecha modal
       self._closeModal();
