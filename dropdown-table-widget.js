@@ -565,89 +565,45 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
-    // ── Build grouped structure ───────────────────────────────────
-    // Root-level members = those whose parentId does NOT contain ".&["
-    // (they are direct children of the hierarchy root, not of another member)
-    // e.g. parentId="[DESCRICAO_DA_CONTA].[Hierarquia_DESC_CONTA].&[ASSESSORIAS]" → has .&[ → NOT root
-    // e.g. parentId="[DESCRICAO_DA_CONTA].[Hierarquia_DESC_CONTA].&[EXPEDIENTE]" → has .&[ → NOT root
-    // Root group headers come from isCollapsed:true nodes that appear in data
+    // ── Build render list following data order ───────────────────
+    // Structure: rows with parent:none = section headers (skip as data rows)
+    // rows with parent = level 1 group headers (if they have children) or leaf rows
+    // rows with grandparent = sub-group children
 
-    // Collect group headers: isCollapsed nodes whose parentId has .&[ (intermediate collapsed nodes)
-    // AND flat group headers: nodes that ARE parents of others but not in the data themselves
-    var groupHeaders = {}; // parentId string → label
-    var rowParentIds = {}; // collect all parentIds seen in data
-
-    for (var r2 = 0; r2 < this._data.length; r2++) {
-      var c0 = this._data[r2]["dimensions_0"] || {};
-      if (!c0.id) continue;
-      if (c0.parentId) {
-        // Extract the member part from parentId: ".&[LABEL]" → "LABEL"
-        var pMatch0 = c0.parentId.match(/\.&\[([^\]]+)\]$/);
-        if (pMatch0) {
-          rowParentIds[c0.parentId] = pMatch0[1];
-        }
-      }
+    // Map id → row index for quick lookup
+    var idToRow = {};
+    for (var im = 0; im < this._data.length; im++) {
+      var imCell = this._data[im]["dimensions_0"] || {};
+      if (imCell.id) { idToRow[imCell.id] = im; }
     }
 
-    // Group rows by their immediate parentId's member label
-    var groups = [];
-    var groupMap = {};
-    var noParentRows = [];
+    // Build render sequence: [{type: 'header'|'subheader'|'row', label, rowIndex}]
+    var renderList = [];
+    var rendered = {};
 
-    // First pass: identify which IDs appear as parentIds (these are real group headers)
-    var appearsAsParent = {};
-    for (var fp = 0; fp < this._data.length; fp++) {
-      var fpCell = this._data[fp]["dimensions_0"] || {};
-      if (fpCell.parentId && fpCell.parentId.indexOf(".&[") !== -1) {
-        appearsAsParent[fpCell.parentId] = true;
-      }
-    }
+    for (var rl = 0; rl < this._data.length; rl++) {
+      var rlCell = this._data[rl]["dimensions_0"] || {};
+      if (!rlCell.id || rendered[rlCell.id]) continue;
 
-    for (var r3 = 0; r3 < this._data.length; r3++) {
-      var c1 = this._data[r3]["dimensions_0"] || {};
-      if (!c1.id) continue;
+      var pid = rlCell.parentId ? rlCell.parentId.replace(/.*\.&\[([^\]]+)\]$/, "$1") : null;
+      var hasPidDot = rlCell.parentId && rlCell.parentId.indexOf(".&[") !== -1;
 
-      // Skip rows that have no parentId — summary rows from "Incluir níveis-pai"
-      if (!c1.parentId) continue;
-
-      // Skip direct children of root (parentId has no .&[)
-      if (c1.parentId.indexOf(".&[") === -1) continue;
-
-      // Skip rows whose OWN ID appears as a parentId of other rows
-      // These will appear as group headers instead
-      if (appearsAsParent[c1.id]) continue;
-
-      var pMatch1 = c1.parentId.match(/\.&\[([^\]]+)\]$/);
-      if (pMatch1) {
-        var gpid = c1.parentId;
-        var pLabel = pMatch1[1];
-        if (groupMap[gpid] === undefined) {
-          groupMap[gpid] = groups.length;
-          groups.push({ parentLabel: pLabel, parentId: gpid, rows: [] });
-        }
-        groups[groupMap[gpid]].rows.push(r3);
+      if (!rlCell.parentId || !hasPidDot) {
+        // Root node → section header
+        renderList.push({ type: "header", label: rlCell.label || pid || "", rowIndex: rl });
+        rendered[rlCell.id] = true;
       } else {
-        noParentRows.push(r3);
-      }
-    }
-
-    // Second pass: add rows that ARE parents themselves as group headers with their children
-    for (var r4 = 0; r4 < this._data.length; r4++) {
-      var c2p = this._data[r4]["dimensions_0"] || {};
-      if (!c2p.id || !c2p.parentId) continue;
-      if (c2p.parentId.indexOf(".&[") === -1) continue;
-
-      // This row appears as a parent — it should be a sub-group header
-      if (appearsAsParent[c2p.id]) {
-        var gpid2 = c2p.parentId;
-        if (groupMap[gpid2] === undefined) {
-          var pMatch2 = gpid2.match(/\.&\[([^\]]+)\]$/);
-          var pLabel2 = pMatch2 ? pMatch2[1] : gpid2;
-          groupMap[gpid2] = groups.length;
-          groups.push({ parentLabel: pLabel2, parentId: gpid2, rows: [] });
+        // Has parent — check if it has children (appears as parentId of others)
+        var hasKids = childrenByParent["dimensions_0"] && childrenByParent["dimensions_0"][rlCell.id] && childrenByParent["dimensions_0"][rlCell.id].length > 0;
+        if (hasKids) {
+          // Sub-header row
+          renderList.push({ type: "subheader", label: rlCell.label || "", rowIndex: rl });
+          rendered[rlCell.id] = true;
+        } else {
+          // Leaf row
+          renderList.push({ type: "row", rowIndex: rl });
+          rendered[rlCell.id] = true;
         }
-        // Add this as a "sub-header row" inside the parent group
-        groups[groupMap[gpid2]].rows.push({ isSubHeader: true, label: c2p.label || c2p.id, id: c2p.id, rowIndex: r4 });
       }
     }
 
@@ -794,45 +750,27 @@ class DropdownTableWidget extends HTMLElement {
       tbody.appendChild(tr);
     };
 
-    // Flat rows (no grouping)
-    for (var fn = 0; fn < noParentRows.length; fn++) {
-      renderRow(noParentRows[fn]);
-    }
-
-    // Grouped rows with header
-    for (var gi = 0; gi < groups.length; gi++) {
-      var group = groups[gi];
-
-      var trGroup = document.createElement("tr");
-      trGroup.className = "dt-group-header";
-      var tdGroup = document.createElement("td");
-      tdGroup.colSpan = totalCols;
-      tdGroup.style.cssText = "font-weight:700;background:#f0f4ff;color:#1a3a6e;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;letter-spacing:0.5px;";
-      tdGroup.textContent = group.parentLabel;
-      trGroup.appendChild(tdGroup);
-      tbody.appendChild(trGroup);
-
-      for (var gr = 0; gr < group.rows.length; gr++) {
-        var grItem = group.rows[gr];
-        if (grItem && grItem.isSubHeader) {
-          // Render as a sub-group header row
-          var trSub = document.createElement("tr");
-          var tdSub = document.createElement("td");
-          tdSub.colSpan = totalCols;
-          tdSub.style.cssText = "font-weight:600;background:#e8f0fe;color:#1a3a6e;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;";
-          tdSub.textContent = grItem.label;
-          trSub.appendChild(tdSub);
-          tbody.appendChild(trSub);
-          // Now render children of this sub-header
-          for (var sr = 0; sr < self2._data.length; sr++) {
-            var srCell = self2._data[sr]["dimensions_0"] || {};
-            if (srCell.parentId === grItem.id) {
-              renderRow(sr);
-            }
-          }
-        } else {
-          renderRow(grItem);
-        }
+    // Render using renderList (follows data order)
+    for (var ri2 = 0; ri2 < renderList.length; ri2++) {
+      var item = renderList[ri2];
+      if (item.type === "header") {
+        var trH = document.createElement("tr");
+        var tdH = document.createElement("td");
+        tdH.colSpan = totalCols;
+        tdH.style.cssText = "font-weight:700;background:#f0f4ff;color:#1a3a6e;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;letter-spacing:0.5px;";
+        tdH.textContent = item.label;
+        trH.appendChild(tdH);
+        tbody.appendChild(trH);
+      } else if (item.type === "subheader") {
+        var trSH = document.createElement("tr");
+        var tdSH = document.createElement("td");
+        tdSH.colSpan = totalCols;
+        tdSH.style.cssText = "font-weight:600;background:#e8f0fe;color:#1a3a6e;padding:0 24px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;";
+        tdSH.textContent = item.label;
+        trSH.appendChild(tdSH);
+        tbody.appendChild(trSH);
+      } else {
+        renderRow(item.rowIndex);
       }
     }
   }
