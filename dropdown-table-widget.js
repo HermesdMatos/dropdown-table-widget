@@ -795,7 +795,8 @@ class DropdownTableWidget extends HTMLElement {
 
     wrapper.addEventListener("click", function(e) {
       e.stopPropagation();
-      self._openDropdown(wrapper, rowIndex, dimensionId, currentId, options);
+      var effectiveId = wrapper._currentId !== undefined ? wrapper._currentId : currentId;
+      self._openDropdown(wrapper, rowIndex, dimensionId, effectiveId, options);
     });
     wrapper.addEventListener("keydown", function(e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); wrapper.click(); }
@@ -891,8 +892,17 @@ class DropdownTableWidget extends HTMLElement {
     if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
     this._localSelections[rowIndex][dimensionId] = { id: memberId, label: memberLabel };
 
-    // Re-render immediately to show selected value
-    this._render();
+    // Update just the cell value span — no full re-render needed
+    var cellWrapper = this._activeCell;
+    if (cellWrapper) {
+      var valSpan = cellWrapper.querySelector(".cell-value");
+      if (valSpan) {
+        valSpan.textContent = memberLabel;
+        valSpan.className = "cell-value";
+      }
+      // Update the click handler with new currentId for next open
+      cellWrapper._currentId = memberId;
+    }
 
     // Write-back to SAC planning model in background
     try {
@@ -913,10 +923,7 @@ class DropdownTableWidget extends HTMLElement {
         }
         binding.setValueState(cellAddress, function(err) {
           if (!err) {
-            // Clear local selection after binding confirms save
-            if (self._localSelections && self._localSelections[rowIndex]) {
-              delete self._localSelections[rowIndex][dimensionId];
-            }
+            // Don't delete local selection — let the binding refresh show the new value
             self._loadBinding();
           }
         });
