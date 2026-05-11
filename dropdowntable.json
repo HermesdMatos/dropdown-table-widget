@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.8",
+  "version": "2.10.9",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-hZ5KjRV3KHLv2wzetdTSXJmQOo5TH1xzmSBmFO44Zqk="
+      "integrity": "sha256-B4/HXJFA44kUAFtd5o26KPnxnNGa7w/XPqhgDhtud6w="
     },
     {
       "kind": "styling",
@@ -127,6 +127,24 @@
       "description": "Retorna o último payload de criação de membro como JSON string.",
       "parameters": [],
       "body": "return this.lastAddMemberRequest || '{}';"
+    },
+    "getNewMemberId": {
+      "returnType": "string",
+      "description": "Retorna o ID do novo membro digitado no modal.",
+      "parameters": [],
+      "body": "return this.newMemberId || '';"
+    },
+    "getNewMemberDescription": {
+      "returnType": "string",
+      "description": "Retorna a descrição do novo membro digitada no modal.",
+      "parameters": [],
+      "body": "return this.newMemberDescription || '';"
+    },
+    "getNewMemberParentId": {
+      "returnType": "string",
+      "description": "Retorna o parentId (hierarquia) digitado no modal.",
+      "parameters": [],
+      "body": "return this.newMemberParentId || '';"
     },
     "setDropdownOptions": {
       "description": "Define dropdown options per column. Pass array: [{dimensionKey:'dimensions_1', options:['Mensal','Bimestral',...]}]",

@@ -1,8 +1,8 @@
-// dropdown-table-widget.js — v2.10.8
+// dropdown-table-widget.js — v2.10.9
 // Changelog:
-//   v2.10.8 — Fix definitivo: usa propertiesChanged para sincronizar selectedCellData
-//             com payload completo antes de disparar onAddMemberRequested.
-//             Script SAC lê via getSelectedCellData() que já funciona comprovadamente.
+//   v2.10.9 — propertiesChanged dispara com newMemberId/Description/ParentId
+//             evento onAddMemberRequested via Promise.resolve() microtask
+//             métodos getNewMemberId/Description/ParentId com body correto no JSON
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -800,21 +800,29 @@ class DropdownTableWidget extends HTMLElement {
       self.setAttribute("data-new-member-dim",    realDimId);
       self.setAttribute("data-last-add-member",   JSON.stringify(payload));
 
-      // Notifica o SAC da mudança de propriedade — garante que selectedCellData
-      // está atualizado antes do script do evento executar
+      // Notifica SAC de TODOS os campos de uma vez via propertiesChanged
       self.dispatchEvent(new CustomEvent("propertiesChanged", {
         bubbles: true, composed: true,
-        detail: { properties: { selectedCellData: JSON.stringify(payload) } }
+        detail: {
+          properties: {
+            selectedCellData:     JSON.stringify(payload),
+            lastAddMemberRequest: JSON.stringify(payload),
+            newMemberId:          idVal,
+            newMemberDescription: descVal,
+            newMemberParentId:    parentVal
+          }
+        }
       }));
 
-      // Fecha modal
       self._closeModal();
 
-      // Dispara evento — script SAC lê os atributos via getAttribute
-      self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
-        bubbles: true, composed: true,
-        detail: payload
-      }));
+      // Microtask garante que SAC processou propertiesChanged antes do evento
+      Promise.resolve().then(function() {
+        self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
+          bubbles: true, composed: true,
+          detail: payload
+        }));
+      });
     });
 
     inputDesc.addEventListener("keydown", function(e) {
