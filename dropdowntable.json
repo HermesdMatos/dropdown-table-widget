@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.4",
+  "version": "2.10.5",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-5ibX4sfysV1rJW4rBA+H8+e3at+hEXdHhQv9jr+2JrY="
+      "integrity": "sha256-3EGL7MgX92MYXHz5rtRzrjmquGTHoRoZH0t9BtfeeHI="
     },
     {
       "kind": "styling",
@@ -109,9 +109,33 @@
   "methods": {
     "getLastAddMemberRequest": {
       "returnType": "string",
-      "description": "Retorna o último payload de criação de membro como JSON string. Use no script do evento onAddMemberRequested.",
+      "description": "Retorna o último payload de criação de membro como JSON string.",
       "parameters": [],
-      "body": "return this.lastAddMemberRequest || '{}';"
+      "body": "return this.getLastAddMemberRequest();"
+    },
+    "getNewMemberId": {
+      "returnType": "string",
+      "description": "Retorna o ID do novo membro digitado no modal.",
+      "parameters": [],
+      "body": "return this.getNewMemberId();"
+    },
+    "getNewMemberDescription": {
+      "returnType": "string",
+      "description": "Retorna a descrição do novo membro digitada no modal.",
+      "parameters": [],
+      "body": "return this.getNewMemberDescription();"
+    },
+    "getNewMemberParentId": {
+      "returnType": "string",
+      "description": "Retorna o parentId (hierarquia) digitado no modal.",
+      "parameters": [],
+      "body": "return this.getNewMemberParentId();"
+    },
+    "getNewMemberDimensionId": {
+      "returnType": "string",
+      "description": "Retorna o ID real da dimensão SAC do contexto do clique.",
+      "parameters": [],
+      "body": "return this.getNewMemberDimensionId();"
     },
     "setDropdownOptions": {
       "description": "Define dropdown options per column. Pass array: [{dimensionKey:'dimensions_1', options:['Mensal','Bimestral',...]}]",

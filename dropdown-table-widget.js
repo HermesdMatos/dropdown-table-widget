@@ -1,7 +1,8 @@
-// dropdown-table-widget.js — v2.10.4
+// dropdown-table-widget.js — v2.10.5
 // Changelog:
-//   v2.10.4 — Fix: setTimeout(50ms) antes de disparar onAddMemberRequested
-//             garante que _lastAddMemberRequest está gravado quando SAC executa o script
+//   v2.10.5 — Fix definitivo: salva payload como atributos HTML no elemento host
+//             antes de disparar o evento. Script SAC lê via getNewMemberId(),
+//             getNewMemberDescription(), getNewMemberParentId(), getNewMemberDimensionId()
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -557,6 +558,10 @@ class DropdownTableWidget extends HTMLElement {
   setDropdownDimensions(v) { this.dropdownDimensions = v; }
   getDropdownDimensions() { return this.dropdownDimensions; }
   getLastAddMemberRequest() { return JSON.stringify(this._lastAddMemberRequest || {}); }
+  getNewMemberId()          { return this.getAttribute("data-new-member-id")     || ""; }
+  getNewMemberDescription() { return this.getAttribute("data-new-member-desc")   || ""; }
+  getNewMemberParentId()    { return this.getAttribute("data-new-member-parent") || ""; }
+  getNewMemberDimensionId() { return this.getAttribute("data-new-member-dim")    || ""; }
   getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
   getActiveFilters() { return JSON.stringify(this._activeFilters); }
 
@@ -777,17 +782,21 @@ class DropdownTableWidget extends HTMLElement {
 
       self._lastAddMemberRequest = payload;
 
-      // Fecha modal só depois de salvar o payload
+      // Salva cada campo como atributo no elemento host
+      // O SAC lê atributos HTML diretamente via DOM antes do script executar
+      self.setAttribute("data-new-member-id",   idVal);
+      self.setAttribute("data-new-member-desc", descVal);
+      self.setAttribute("data-new-member-parent", parentVal);
+      self.setAttribute("data-new-member-dim",  realDimId);
+
+      // Fecha modal
       self._closeModal();
 
-      // Delay mínimo garante que _lastAddMemberRequest está gravado
-      // antes do script SAC executar no handler do evento
-      setTimeout(function() {
-        self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
-          bubbles: true, composed: true,
-          detail: payload
-        }));
-      }, 50);
+      // Dispara evento — script SAC lê os atributos via getAttribute
+      self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
+        bubbles: true, composed: true,
+        detail: payload
+      }));
     });
 
     inputDesc.addEventListener("keydown", function(e) {
