@@ -598,7 +598,7 @@ class DropdownTableWidget extends HTMLElement {
     var appearsAsParent = {};
     for (var fp = 0; fp < this._data.length; fp++) {
       var fpCell = this._data[fp]["dimensions_0"] || {};
-      if (fpCell.parentId) {
+      if (fpCell.parentId && fpCell.parentId.indexOf(".&[") !== -1) {
         appearsAsParent[fpCell.parentId] = true;
       }
     }
@@ -607,32 +607,47 @@ class DropdownTableWidget extends HTMLElement {
       var c1 = this._data[r3]["dimensions_0"] || {};
       if (!c1.id) continue;
 
-      // Skip rows that have no parentId AND whose own id appears as a parentId
-      // These are the "summary" rows that SAC adds with "Incluir níveis-pai"
-      if (!c1.parentId && appearsAsParent[c1.id]) {
-        continue;
-      }
+      // Skip rows that have no parentId — summary rows from "Incluir níveis-pai"
+      if (!c1.parentId) continue;
 
-      // Skip direct children of root (no .&[ in parentId) that appear as group headers
-      if (c1.parentId && c1.parentId.indexOf(".&[") === -1) {
-        continue;
-      }
+      // Skip direct children of root (parentId has no .&[)
+      if (c1.parentId.indexOf(".&[") === -1) continue;
 
-      if (c1.parentId) {
-        var pMatch1 = c1.parentId.match(/\.&\[([^\]]+)\]$/);
-        if (pMatch1) {
-          var gpid = c1.parentId;
-          var pLabel = pMatch1[1];
-          if (groupMap[gpid] === undefined) {
-            groupMap[gpid] = groups.length;
-            groups.push({ parentLabel: pLabel, parentId: gpid, rows: [] });
-          }
-          groups[groupMap[gpid]].rows.push(r3);
-        } else {
-          noParentRows.push(r3);
+      // Skip rows whose OWN ID appears as a parentId of other rows
+      // These will appear as group headers instead
+      if (appearsAsParent[c1.id]) continue;
+
+      var pMatch1 = c1.parentId.match(/\.&\[([^\]]+)\]$/);
+      if (pMatch1) {
+        var gpid = c1.parentId;
+        var pLabel = pMatch1[1];
+        if (groupMap[gpid] === undefined) {
+          groupMap[gpid] = groups.length;
+          groups.push({ parentLabel: pLabel, parentId: gpid, rows: [] });
         }
+        groups[groupMap[gpid]].rows.push(r3);
       } else {
         noParentRows.push(r3);
+      }
+    }
+
+    // Second pass: add rows that ARE parents themselves as group headers with their children
+    for (var r4 = 0; r4 < this._data.length; r4++) {
+      var c2p = this._data[r4]["dimensions_0"] || {};
+      if (!c2p.id || !c2p.parentId) continue;
+      if (c2p.parentId.indexOf(".&[") === -1) continue;
+
+      // This row appears as a parent — it should be a sub-group header
+      if (appearsAsParent[c2p.id]) {
+        var gpid2 = c2p.parentId;
+        if (groupMap[gpid2] === undefined) {
+          var pMatch2 = gpid2.match(/\.&\[([^\]]+)\]$/);
+          var pLabel2 = pMatch2 ? pMatch2[1] : gpid2;
+          groupMap[gpid2] = groups.length;
+          groups.push({ parentLabel: pLabel2, parentId: gpid2, rows: [] });
+        }
+        // Add this as a "sub-header row" inside the parent group
+        groups[groupMap[gpid2]].rows.push({ isSubHeader: true, label: c2p.label || c2p.id, id: c2p.id, rowIndex: r4 });
       }
     }
 
@@ -798,7 +813,26 @@ class DropdownTableWidget extends HTMLElement {
       tbody.appendChild(trGroup);
 
       for (var gr = 0; gr < group.rows.length; gr++) {
-        renderRow(group.rows[gr]);
+        var grItem = group.rows[gr];
+        if (grItem && grItem.isSubHeader) {
+          // Render as a sub-group header row
+          var trSub = document.createElement("tr");
+          var tdSub = document.createElement("td");
+          tdSub.colSpan = totalCols;
+          tdSub.style.cssText = "font-weight:600;background:#e8f0fe;color:#1a3a6e;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;";
+          tdSub.textContent = grItem.label;
+          trSub.appendChild(tdSub);
+          tbody.appendChild(trSub);
+          // Now render children of this sub-header
+          for (var sr = 0; sr < self2._data.length; sr++) {
+            var srCell = self2._data[sr]["dimensions_0"] || {};
+            if (srCell.parentId === grItem.id) {
+              renderRow(sr);
+            }
+          }
+        } else {
+          renderRow(grItem);
+        }
       }
     }
   }
