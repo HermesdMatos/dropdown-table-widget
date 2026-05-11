@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.3
+// dropdown-table-widget.js — v2.10.4
 // Changelog:
-//   v2.10.3 — Fix: payload salvo ANTES de fechar modal, método getLastAddMemberRequest()
-//             adicionado diretamente na classe (mesmo padrão de getDropdownOptions)
+//   v2.10.4 — Fix: setTimeout(50ms) antes de disparar onAddMemberRequested
+//             garante que _lastAddMemberRequest está gravado quando SAC executa o script
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -780,10 +780,14 @@ class DropdownTableWidget extends HTMLElement {
       // Fecha modal só depois de salvar o payload
       self._closeModal();
 
-      self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
-        bubbles: true, composed: true,
-        detail: payload
-      }));
+      // Delay mínimo garante que _lastAddMemberRequest está gravado
+      // antes do script SAC executar no handler do evento
+      setTimeout(function() {
+        self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
+          bubbles: true, composed: true,
+          detail: payload
+        }));
+      }, 50);
     });
 
     inputDesc.addEventListener("keydown", function(e) {
