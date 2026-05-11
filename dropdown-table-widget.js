@@ -1,8 +1,6 @@
-// dropdown-table-widget.js — v2.10.5
+// dropdown-table-widget.js — v2.10.6
 // Changelog:
-//   v2.10.5 — Fix definitivo: salva payload como atributos HTML no elemento host
-//             antes de disparar o evento. Script SAC lê via getNewMemberId(),
-//             getNewMemberDescription(), getNewMemberParentId(), getNewMemberDimensionId()
+//   v2.10.6 — Fix: body dos métodos no JSON usa getAttribute direto (evita recursão via Proxy SAC)
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -783,11 +781,11 @@ class DropdownTableWidget extends HTMLElement {
       self._lastAddMemberRequest = payload;
 
       // Salva cada campo como atributo no elemento host
-      // O SAC lê atributos HTML diretamente via DOM antes do script executar
-      self.setAttribute("data-new-member-id",   idVal);
-      self.setAttribute("data-new-member-desc", descVal);
+      self.setAttribute("data-new-member-id",     idVal);
+      self.setAttribute("data-new-member-desc",   descVal);
       self.setAttribute("data-new-member-parent", parentVal);
-      self.setAttribute("data-new-member-dim",  realDimId);
+      self.setAttribute("data-new-member-dim",    realDimId);
+      self.setAttribute("data-last-add-member",   JSON.stringify(payload));
 
       // Fecha modal
       self._closeModal();

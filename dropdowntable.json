@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.5",
+  "version": "2.10.6",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-3EGL7MgX92MYXHz5rtRzrjmquGTHoRoZH0t9BtfeeHI="
+      "integrity": "sha256-TtkB9rRiuFJg8Q0PvLBTA0ocZvdAvoCtzlxSsB7A/Vg="
     },
     {
       "kind": "styling",
@@ -111,31 +111,31 @@
       "returnType": "string",
       "description": "Retorna o último payload de criação de membro como JSON string.",
       "parameters": [],
-      "body": "return this.getLastAddMemberRequest();"
+      "body": "return this.getAttribute('data-last-add-member') || '{}';"
     },
     "getNewMemberId": {
       "returnType": "string",
       "description": "Retorna o ID do novo membro digitado no modal.",
       "parameters": [],
-      "body": "return this.getNewMemberId();"
+      "body": "return this.getAttribute('data-new-member-id') || '';"
     },
     "getNewMemberDescription": {
       "returnType": "string",
       "description": "Retorna a descrição do novo membro digitada no modal.",
       "parameters": [],
-      "body": "return this.getNewMemberDescription();"
+      "body": "return this.getAttribute('data-new-member-desc') || '';"
     },
     "getNewMemberParentId": {
       "returnType": "string",
       "description": "Retorna o parentId (hierarquia) digitado no modal.",
       "parameters": [],
-      "body": "return this.getNewMemberParentId();"
+      "body": "return this.getAttribute('data-new-member-parent') || '';"
     },
     "getNewMemberDimensionId": {
       "returnType": "string",
       "description": "Retorna o ID real da dimensão SAC do contexto do clique.",
       "parameters": [],
-      "body": "return this.getNewMemberDimensionId();"
+      "body": "return this.getAttribute('data-new-member-dim') || '';"
     },
     "setDropdownOptions": {
       "description": "Define dropdown options per column. Pass array: [{dimensionKey:'dimensions_1', options:['Mensal','Bimestral',...]}]",
