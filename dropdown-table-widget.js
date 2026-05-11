@@ -1,6 +1,7 @@
-// dropdown-table-widget.js — v2.10.6
+// dropdown-table-widget.js — v2.10.7
 // Changelog:
-//   v2.10.6 — Fix: body dos métodos no JSON usa getAttribute direto (evita recursão via Proxy SAC)
+//   v2.10.7 — Substitui métodos getNewMember* por propriedades string declaradas no JSON
+//             (newMemberId, newMemberDescription, newMemberParentId) — compatível com SAC
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -539,6 +540,13 @@ class DropdownTableWidget extends HTMLElement {
   get lastAddMemberRequest() { return JSON.stringify(this._lastAddMemberRequest || {}); }
   set lastAddMemberRequest(v) { try { this._lastAddMemberRequest = JSON.parse(v); } catch(e) {} }
 
+  get newMemberId()          { return this._newMemberId          || ""; }
+  set newMemberId(v)          { this._newMemberId          = v || ""; }
+  get newMemberDescription() { return this._newMemberDescription || ""; }
+  set newMemberDescription(v) { this._newMemberDescription = v || ""; }
+  get newMemberParentId()    { return this._newMemberParentId    || ""; }
+  set newMemberParentId(v)    { this._newMemberParentId    = v || ""; }
+
   set headerColor(v) { this.style.setProperty("--header-color", v); }
   set headerTextColor(v) { this.style.setProperty("--header-text-color", v); }
   set selectedRowColor(v) { this.style.setProperty("--selected-row-color", v); }
@@ -779,6 +787,9 @@ class DropdownTableWidget extends HTMLElement {
       };
 
       self._lastAddMemberRequest = payload;
+      self._newMemberId          = idVal;
+      self._newMemberDescription = descVal;
+      self._newMemberParentId    = parentVal;
 
       // Salva cada campo como atributo no elemento host
       self.setAttribute("data-new-member-id",     idVal);
