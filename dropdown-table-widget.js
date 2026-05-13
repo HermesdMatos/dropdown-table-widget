@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.10
+// dropdown-table-widget.js — v2.10.11
 // Changelog:
-//   v2.10.10 — Fix posicionamento menu de contexto: position:absolute dentro do
-//              dt-wrapper, usa getBoundingClientRect da célula clicada
+//   v2.10.11 — Excluir membro: salva deleteMemberId/DimensionId via propertiesChanged
+//              métodos getDeleteMemberId() e getDeleteMemberDimensionId() expostos
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -307,6 +307,8 @@ class DropdownTableWidget extends HTMLElement {
     this._localMeasures = {};
     this._measureLabels = [];
     this._lastAddMemberRequest = {};
+    this._deleteMemberId          = "";
+    this._deleteMemberDimensionId = "";
 
     // Style properties
     this._rowHeight        = 36;
@@ -547,6 +549,11 @@ class DropdownTableWidget extends HTMLElement {
   get newMemberParentId()    { return this._newMemberParentId    || ""; }
   set newMemberParentId(v)    { this._newMemberParentId    = v || ""; }
 
+  get deleteMemberId()          { return this._deleteMemberId          || ""; }
+  set deleteMemberId(v)          { this._deleteMemberId          = v || ""; }
+  get deleteMemberDimensionId() { return this._deleteMemberDimensionId || ""; }
+  set deleteMemberDimensionId(v) { this._deleteMemberDimensionId = v || ""; }
+
   set headerColor(v) { this.style.setProperty("--header-color", v); }
   set headerTextColor(v) { this.style.setProperty("--header-text-color", v); }
   set selectedRowColor(v) { this.style.setProperty("--selected-row-color", v); }
@@ -563,7 +570,9 @@ class DropdownTableWidget extends HTMLElement {
   // ─── Methods ──────────────────────────────────────────────────
   setDropdownDimensions(v) { this.dropdownDimensions = v; }
   getDropdownDimensions() { return this.dropdownDimensions; }
-  getLastAddMemberRequest() { return JSON.stringify(this._lastAddMemberRequest || {}); }
+  getLastAddMemberRequest()    { return JSON.stringify(this._lastAddMemberRequest || {}); }
+  getDeleteMemberId()          { return this._deleteMemberId          || ""; }
+  getDeleteMemberDimensionId() { return this._deleteMemberDimensionId || ""; }
   getNewMemberId()          { return this.getAttribute("data-new-member-id")     || ""; }
   getNewMemberDescription() { return this.getAttribute("data-new-member-desc")   || ""; }
   getNewMemberParentId()    { return this.getAttribute("data-new-member-parent") || ""; }
@@ -656,17 +665,34 @@ class DropdownTableWidget extends HTMLElement {
       e.stopPropagation();
       self._closeCtxMenu();
       if (self._ctxTarget) {
-        self.dispatchEvent(new CustomEvent("onDeleteMemberRequested", {
+        var target = self._ctxTarget;
+        self._deleteMemberId          = target.memberId    || "";
+        self._deleteMemberDimensionId = target.dimensionRealId || target.dimensionId || "";
+
+        self.dispatchEvent(new CustomEvent("propertiesChanged", {
           bubbles: true, composed: true,
           detail: {
-            action: "excludeMember",
-            rowIndex:      self._ctxTarget.rowIndex,
-            dimensionId:   self._ctxTarget.dimensionId,
-            dimensionName: self._ctxTarget.dimensionName,
-            memberId:      self._ctxTarget.memberId,
-            memberLabel:   self._ctxTarget.memberLabel
+            properties: {
+              deleteMemberId:          self._deleteMemberId,
+              deleteMemberDimensionId: self._deleteMemberDimensionId
+            }
           }
         }));
+
+        Promise.resolve().then(function() {
+          self.dispatchEvent(new CustomEvent("onDeleteMemberRequested", {
+            bubbles: true, composed: true,
+            detail: {
+              action:          "excludeMember",
+              rowIndex:        target.rowIndex,
+              dimensionId:     target.dimensionId,
+              dimensionRealId: target.dimensionRealId,
+              dimensionName:   target.dimensionName,
+              memberId:        target.memberId,
+              memberLabel:     target.memberLabel
+            }
+          }));
+        });
       }
     });
 
