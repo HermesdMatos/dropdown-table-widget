@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.15
+// dropdown-table-widget.js — v2.10.16
 // Changelog:
-//   v2.10.15 — Fix dimensionRealId: lê de _metadata.dimensions[dimensionId].id
-//              (estrutura correta confirmada via console)
+//   v2.10.16 — Adiciona setDimensionFilter(dimensionId, memberIds) e
+//              removeDimensionFilter(dimensionId) públicos para script SAC
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -616,6 +616,26 @@ class DropdownTableWidget extends HTMLElement {
     catch(e) { console.error("setMeasureLabels error:", e); }
   }
   getMeasureLabels() { return JSON.stringify(this._measureLabels || []); }
+
+  // Permite que o script SAC aplique filtro de dimensão diretamente no binding
+  // Ex: dropdowntable_1.setDimensionFilter("Date", "2024.01")
+  // ou: dropdowntable_1.setDimensionFilter("Date", ["2024.01","2024.02"])
+  setDimensionFilter(dimensionId, memberIds) {
+    try {
+      var binding = this.myDataBinding;
+      if (!binding) { return; }
+      var ids = Array.isArray(memberIds) ? memberIds : [memberIds];
+      binding.setDimensionFilter(dimensionId, ids);
+    } catch(e) { console.error("setDimensionFilter error:", e); }
+  }
+
+  removeDimensionFilter(dimensionId) {
+    try {
+      var binding = this.myDataBinding;
+      if (!binding) { return; }
+      binding.removeDimensionFilter(dimensionId);
+    } catch(e) { console.error("removeDimensionFilter error:", e); }
+  }
 
   clearAllFilters() {
     this._activeFilters = {};

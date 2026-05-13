@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.15",
+  "version": "2.10.16",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-GEO+7n35Bvr1wut/qhk2SQxIch5KY0D5gnjz0UT6MTU="
+      "integrity": "sha256-GxAY4F1a0Wg10CJTRHJKzXSDQoDv5kVsqjmInrTcGEQ="
     },
     {
       "kind": "styling",
@@ -211,6 +211,21 @@
       "description": "Get all active dropdown filters as JSON string",
       "parameters": [],
       "body": "return this.selectedCellData || '{}';"
+    },
+    "setDimensionFilter": {
+      "description": "Aplica filtro de dimensão no binding. Ex: setDimensionFilter(\"Date\", \"2024.01\") ou setDimensionFilter(\"Date\", [\"2024.01\",\"2024.02\"])",
+      "parameters": [
+        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC (ex: Date, CLIENTE)" },
+        { "name": "memberIds",   "type": "string", "description": "ID do membro ou array JSON de IDs" }
+      ],
+      "body": "this.myDataBinding.setDimensionFilter(dimensionId, Array.isArray(memberIds) ? memberIds : [memberIds]);"
+    },
+    "removeDimensionFilter": {
+      "description": "Remove filtro de dimensão do binding.",
+      "parameters": [
+        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
+      ],
+      "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
     },
     "clearAllFilters": {
       "description": "Clear all active dropdown filters",
