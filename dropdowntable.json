@@ -218,14 +218,14 @@
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC (ex: Date, CLIENTE)" },
         { "name": "memberIds",   "type": "string", "description": "ID do membro ou array JSON de IDs" }
       ],
-      "body": "this.setDimensionFilter(dimensionId, memberIds);"
+      "body": "this.myDataBinding.setDimensionFilter(dimensionId, [memberIds]);"
     },
     "removeDimensionFilter": {
       "description": "Remove filtro de dimensão do binding.",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
       ],
-      "body": "this.removeDimensionFilter(dimensionId);"
+      "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
     },
     "clearAllFilters": {
       "description": "Clear all active dropdown filters",
