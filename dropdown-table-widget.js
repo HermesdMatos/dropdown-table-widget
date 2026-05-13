@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.14
+// dropdown-table-widget.js — v2.10.15
 // Changelog:
-//   v2.10.14 — Fix _openCtxMenu: resolve dimensionRealId do metadata SAC
-//              (DESCRICAO_DA_CONTA) em vez de usar feed key (dimensions_0)
+//   v2.10.15 — Fix dimensionRealId: lê de _metadata.dimensions[dimensionId].id
+//              (estrutura correta confirmada via console)
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -681,14 +681,14 @@ class DropdownTableWidget extends HTMLElement {
         var match = rawId.match(/\.&\[([^\]]+)\]$/);
         if (match) { cleanId = match[1]; }
 
-        // Extrai ID real da dimensão do metadata (ex: DESCRICAO_DA_CONTA)
+        // Extrai ID real da dimensão do metadata
         var dimRealId = target.dimensionRealId || "";
         if (!dimRealId || dimRealId.indexOf("dimensions_") !== -1) {
           try {
-            var dimIdx = parseInt((target.dimensionId || "dimensions_0").replace("dimensions_", ""), 10);
-            var dims = self._metadata.feeds.dimensions.values;
-            if (dims && dims[dimIdx]) { dimRealId = dims[dimIdx].id || dimRealId; }
-          } catch(ex) {}
+            var dimMeta2 = self._metadata && self._metadata.dimensions
+              ? self._metadata.dimensions[target.dimensionId] : null;
+            if (dimMeta2 && dimMeta2.id) { dimRealId = dimMeta2.id; }
+          } catch(ex2) {}
         }
 
         self._deleteMemberId          = cleanId;
@@ -748,11 +748,10 @@ class DropdownTableWidget extends HTMLElement {
     var resolvedDimId = dimensionRealId || "";
     if (!resolvedDimId || resolvedDimId.indexOf("dimensions_") !== -1) {
       try {
-        var dimIdx = parseInt((dimensionId || "dimensions_0").replace("dimensions_", ""), 10);
-        var dims = this._metadata && this._metadata.feeds && this._metadata.feeds.dimensions
-          ? this._metadata.feeds.dimensions.values : [];
-        if (dims && dims[dimIdx] && dims[dimIdx].id) {
-          resolvedDimId = dims[dimIdx].id;
+        var dimMeta = this._metadata && this._metadata.dimensions
+          ? this._metadata.dimensions[dimensionId] : null;
+        if (dimMeta && dimMeta.id) {
+          resolvedDimId = dimMeta.id;
         }
       } catch(ex) {}
     }
