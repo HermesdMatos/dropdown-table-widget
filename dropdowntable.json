@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.16",
+  "version": "2.10.17",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-4hj4454C3ShFWKytFgtLH6O21Xcp1CrpG9ZjUPUigCA="
+      "integrity": "sha256-GxAY4F1a0Wg10CJTRHJKzXSDQoDv5kVsqjmInrTcGEQ="
     },
     {
       "kind": "styling",
@@ -65,6 +65,16 @@
     "newMemberParentId": {
       "type": "string",
       "description": "ParentId (hierarquia) digitado no modal Adicionar membro",
+      "default": ""
+    },
+    "dimensionFilterId": {
+      "type": "string",
+      "description": "ID da dimensão a filtrar — preenchido por setDimensionFilter",
+      "default": ""
+    },
+    "dimensionFilterMembers": {
+      "type": "string",
+      "description": "IDs dos membros a filtrar — preenchido por setDimensionFilter",
       "default": ""
     },
     "selectedCellData": {
@@ -213,18 +223,34 @@
       "body": "return this.selectedCellData || '{}';"
     },
     "setDimensionFilter": {
-      "description": "Aplica filtro de dimensão. Formato: 'dimensionId|memberId' (ex: 'Date|2024.01')",
+      "description": "Aplica filtro de dimensão no binding. Ex: setDimensionFilter(\"Date\", \"2024.01\") ou setDimensionFilter(\"Date\", [\"2024.01\",\"2024.02\"])",
       "parameters": [
-        { "name": "filterArgs", "type": "string", "description": "dimensionId|memberId separados por pipe" }
+        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC (ex: Date, CLIENTE)" },
+        { "name": "memberIds",   "type": "string", "description": "ID do membro ou array JSON de IDs" }
       ],
-      "body": "this._dimFilterSet = filterArgs;"
+      "body": "this.myDataBinding.setDimensionFilter(dimensionId, Array.isArray(memberIds) ? memberIds : [memberIds]);"
     },
     "removeDimensionFilter": {
       "description": "Remove filtro de dimensão do binding.",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
       ],
-      "body": "this._dimFilterRemove = dimensionId;"
+      "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
+    },
+    "setDimensionFilter": {
+      "description": "Aplica filtro de dimensão no binding. Ex: setDimensionFilter(\"Date\", \"2024.01\")",
+      "parameters": [
+        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" },
+        { "name": "memberIds",   "type": "string", "description": "ID do membro ou múltiplos separados por vírgula" }
+      ],
+      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = memberIds;"
+    },
+    "removeDimensionFilter": {
+      "description": "Remove filtro de dimensão do binding.",
+      "parameters": [
+        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
+      ],
+      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = '';"
     },
     "clearAllFilters": {
       "description": "Clear all active dropdown filters",

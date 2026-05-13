@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.16
+// dropdown-table-widget.js — v2.10.17
 // Changelog:
-//   v2.10.16 — Adiciona setDimensionFilter e removeDimensionFilter para script SAC
-//              (internos: _doSetDimensionFilter/_doRemoveDimensionFilter)
+//   v2.10.17 — setDimensionFilter/removeDimensionFilter via propriedades declaradas
+//              dimensionFilterId + dimensionFilterMembers aplicam filtro automaticamente
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -549,6 +549,24 @@ class DropdownTableWidget extends HTMLElement {
   get newMemberParentId()    { return this._newMemberParentId    || ""; }
   set newMemberParentId(v)    { this._newMemberParentId    = v || ""; }
 
+  get dimensionFilterId()          { return this._dimensionFilterId || ""; }
+  set dimensionFilterId(v)          { this._dimensionFilterId = v || ""; this._applyExternalFilter(); }
+  get dimensionFilterMembers()     { return this._dimensionFilterMembers || ""; }
+  set dimensionFilterMembers(v)    { this._dimensionFilterMembers = v || ""; this._applyExternalFilter(); }
+
+  _applyExternalFilter() {
+    try {
+      var binding = this.myDataBinding;
+      if (!binding || !this._dimensionFilterId) { return; }
+      if (this._dimensionFilterMembers === "") {
+        binding.removeDimensionFilter(this._dimensionFilterId);
+      } else {
+        var ids = this._dimensionFilterMembers.split(",").map(function(s) { return s.trim(); });
+        binding.setDimensionFilter(this._dimensionFilterId, ids);
+      }
+    } catch(e) { console.error("_applyExternalFilter error:", e); }
+  }
+
   get deleteMemberId()          { return this._deleteMemberId          || ""; }
   set deleteMemberId(v)          { this._deleteMemberId          = v || ""; }
   get deleteMemberDimensionId() { return this._deleteMemberDimensionId || ""; }
@@ -617,21 +635,23 @@ class DropdownTableWidget extends HTMLElement {
   }
   getMeasureLabels() { return JSON.stringify(this._measureLabels || []); }
 
-  // SAC body only accepts "this.property = value" — use JS setters as bridge
-  set _dimFilterSet(v) {
+  // Permite que o script SAC aplique filtro de dimensão diretamente no binding
+  // Ex: dropdowntable_1.setDimensionFilter("Date", "2024.01")
+  // ou: dropdowntable_1.setDimensionFilter("Date", ["2024.01","2024.02"])
+  setDimensionFilter(dimensionId, memberIds) {
     try {
-      var sep = v.indexOf('|');
-      var dimId = v.substring(0, sep);
-      var memberId = v.substring(sep + 1);
-      if (!this.myDataBinding || !dimId) { return; }
-      this.myDataBinding.setDimensionFilter(dimId, [memberId]);
+      var binding = this.myDataBinding;
+      if (!binding) { return; }
+      var ids = Array.isArray(memberIds) ? memberIds : [memberIds];
+      binding.setDimensionFilter(dimensionId, ids);
     } catch(e) { console.error("setDimensionFilter error:", e); }
   }
 
-  set _dimFilterRemove(v) {
+  removeDimensionFilter(dimensionId) {
     try {
-      if (!this.myDataBinding) { return; }
-      this.myDataBinding.removeDimensionFilter(v);
+      var binding = this.myDataBinding;
+      if (!binding) { return; }
+      binding.removeDimensionFilter(dimensionId);
     } catch(e) { console.error("removeDimensionFilter error:", e); }
   }
 
