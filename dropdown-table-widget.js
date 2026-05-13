@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.12
+// dropdown-table-widget.js — v2.10.13
 // Changelog:
-//   v2.10.12 — Adiciona getDeleteMemberIdClean() que extrai ID limpo do formato
-//              [DIM].[HIER].&[ID] retornado pelo SAC dataBinding
+//   v2.10.13 — Fix ctx-exclude-member: variável target não estava definida
+//              Fix dimensionRealId: extrai ID real do metadata em vez de usar feed key
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -675,8 +675,24 @@ class DropdownTableWidget extends HTMLElement {
       self._closeCtxMenu();
       if (self._ctxTarget) {
         var target = self._ctxTarget;
-        self._deleteMemberId          = target.memberId    || "";
-        self._deleteMemberDimensionId = target.dimensionRealId || target.dimensionId || "";
+        var rawId = target.memberId || "";
+        // Extrai ID limpo do formato [DIM].[HIER].&[ID]
+        var cleanId = rawId;
+        var match = rawId.match(/\.&\[([^\]]+)\]$/);
+        if (match) { cleanId = match[1]; }
+
+        // Extrai ID real da dimensão do metadata (ex: DESCRICAO_DA_CONTA)
+        var dimRealId = target.dimensionRealId || "";
+        if (!dimRealId || dimRealId.indexOf("dimensions_") !== -1) {
+          try {
+            var dimIdx = parseInt((target.dimensionId || "dimensions_0").replace("dimensions_", ""), 10);
+            var dims = self._metadata.feeds.dimensions.values;
+            if (dims && dims[dimIdx]) { dimRealId = dims[dimIdx].id || dimRealId; }
+          } catch(ex) {}
+        }
+
+        self._deleteMemberId          = cleanId;
+        self._deleteMemberDimensionId = dimRealId;
 
         self.dispatchEvent(new CustomEvent("propertiesChanged", {
           bubbles: true, composed: true,
@@ -697,7 +713,7 @@ class DropdownTableWidget extends HTMLElement {
               dimensionId:     target.dimensionId,
               dimensionRealId: target.dimensionRealId,
               dimensionName:   target.dimensionName,
-              memberId:        target.memberId,
+              memberId:        cleanId,
               memberLabel:     target.memberLabel
             }
           }));
