@@ -4,7 +4,10 @@
       "PowerShell(\"sha256-\" + [Convert]::ToBase64String\\([System.Security.Cryptography.SHA256]::Create\\(\\).ComputeHash\\(\\(Invoke-WebRequest \"https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js\"\\).RawContentStream\\)\\))",
       "PowerShell(git add dropdown-table-widget.js dropdowntable.json)",
       "PowerShell(git push origin main)",
-      "PowerShell(git add dropdowntable.json)"
+      "PowerShell(git add dropdowntable.json)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('dropdowntable.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

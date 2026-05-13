@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.17
+// dropdown-table-widget.js — v2.10.18
 // Changelog:
-//   v2.10.17 — setDimensionFilter/removeDimensionFilter via propriedades declaradas
+//   v2.10.18 — setDimensionFilter/removeDimensionFilter via propriedades declaradas
 //              dimensionFilterId + dimensionFilterMembers aplicam filtro automaticamente
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
