@@ -1,8 +1,7 @@
-// dropdown-table-widget.js — v2.10.9
+// dropdown-table-widget.js — v2.10.10
 // Changelog:
-//   v2.10.9 — propertiesChanged dispara com newMemberId/Description/ParentId
-//             evento onAddMemberRequested via Promise.resolve() microtask
-//             métodos getNewMemberId/Description/ParentId com body correto no JSON
+//   v2.10.10 — Fix posicionamento menu de contexto: position:absolute dentro do
+//              dt-wrapper, usa getBoundingClientRect da célula clicada
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -111,7 +110,7 @@ TMPL.innerHTML = `
 
   /* ── Context Menu ─────────────────────────────────────────────── */
   .dt-ctx-menu {
-    position: fixed;
+    position: absolute;
     background: #1e2530;
     border: 1px solid #3a4250;
     border-radius: 4px;
@@ -227,31 +226,31 @@ TMPL.innerHTML = `
   </table>
   <div class="dt-empty" id="dt-empty">Nenhum dado disponível</div>
   <div class="dt-dropdown-list hidden" id="dt-dropdown"></div>
-</div>
 
-<!-- Context Menu -->
-<div class="dt-ctx-menu hidden" id="dt-ctx-menu">
-  <div class="dt-ctx-item" id="ctx-add-member">
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    Adicionar membro
-  </div>
-  <div class="dt-ctx-separator"></div>
-  <div class="dt-ctx-item" id="ctx-filter-member">
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    Filtrar membro
-  </div>
-  <div class="dt-ctx-item" id="ctx-filter">
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    Filtrar
-  </div>
-  <div class="dt-ctx-separator"></div>
-  <div class="dt-ctx-item" id="ctx-exclude-member">
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    Excluir membro
-  </div>
-  <div class="dt-ctx-item" id="ctx-exclude">
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    Excluir
+  <!-- Context Menu — dentro do wrapper para position:absolute funcionar corretamente -->
+  <div class="dt-ctx-menu hidden" id="dt-ctx-menu">
+    <div class="dt-ctx-item" id="ctx-add-member">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Adicionar membro
+    </div>
+    <div class="dt-ctx-separator"></div>
+    <div class="dt-ctx-item" id="ctx-filter-member">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Filtrar membro
+    </div>
+    <div class="dt-ctx-item" id="ctx-filter">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Filtrar
+    </div>
+    <div class="dt-ctx-separator"></div>
+    <div class="dt-ctx-item" id="ctx-exclude-member">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Excluir membro
+    </div>
+    <div class="dt-ctx-item" id="ctx-exclude">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Excluir
+    </div>
   </div>
 </div>
 
@@ -690,29 +689,54 @@ class DropdownTableWidget extends HTMLElement {
     });
   }
 
-  _openCtxMenu(e, rowIndex, dimensionId, memberId, memberLabel, dimensionRealId) {
+  _openCtxMenu(e, rowIndex, dimensionId, memberId, memberLabel, dimensionRealId, cellEl) {
     e.preventDefault();
     e.stopPropagation();
 
     this._ctxTarget = {
-      rowIndex:       rowIndex,
-      dimensionId:    dimensionId,      // feed key: "dimensions_0"
-      dimensionRealId: dimensionRealId, // SAC model ID: "DESCRICAO_DA_CONTA"
-      dimensionName:  dimensionRealId,  // alias for display
-      memberId:       memberId,
-      memberLabel:    memberLabel
+      rowIndex:        rowIndex,
+      dimensionId:     dimensionId,
+      dimensionRealId: dimensionRealId,
+      dimensionName:   dimensionRealId,
+      memberId:        memberId,
+      memberLabel:     memberLabel
     };
 
     var menu = this.shadowRoot.getElementById("dt-ctx-menu");
     menu.classList.remove("hidden");
+    menu.style.left = "-9999px";
+    menu.style.top  = "-9999px";
 
-    // Position colado ao cursor — sem deslocamento extra
-    var mw = 210, mh = 200;
-    var x = e.clientX, y = e.clientY;
-    if (x + mw > window.innerWidth)  { x = window.innerWidth  - mw - 4; }
-    if (y + mh > window.innerHeight) { y = window.innerHeight - mh - 4; }
-    menu.style.left = x + "px";
-    menu.style.top  = y + "px";
+    // Posiciona relativo à célula dentro do Shadow DOM
+    var wrapper  = this.shadowRoot.getElementById("dt-wrapper");
+    var wRect    = wrapper.getBoundingClientRect();
+    var cellRect = cellEl ? cellEl.getBoundingClientRect() : null;
+
+    var mw = menu.offsetWidth  || 210;
+    var mh = menu.offsetHeight || 200;
+
+    var x, y;
+    if (cellRect) {
+      // Posiciona abaixo da célula clicada, alinhado à esquerda dela
+      x = cellRect.left  - wRect.left + wrapper.scrollLeft;
+      y = cellRect.bottom - wRect.top  + wrapper.scrollTop;
+
+      // Se não cabe abaixo, abre acima
+      if (cellRect.bottom + mh > window.innerHeight) {
+        y = cellRect.top - wRect.top + wrapper.scrollTop - mh;
+      }
+      // Se não cabe à direita, alinha pela direita da célula
+      if (cellRect.left + mw > window.innerWidth) {
+        x = cellRect.right - wRect.left + wrapper.scrollLeft - mw;
+      }
+    } else {
+      x = e.clientX - wRect.left + wrapper.scrollLeft;
+      y = e.clientY - wRect.top  + wrapper.scrollTop;
+    }
+
+    menu.style.position = "absolute";
+    menu.style.left = Math.max(0, x) + "px";
+    menu.style.top  = Math.max(0, y) + "px";
   }
 
   _closeCtxMenu() {
@@ -1119,7 +1143,7 @@ class DropdownTableWidget extends HTMLElement {
               e.preventDefault();
               e.stopPropagation();
               self2._closeDropdown();
-              self2._openCtxMenu(e, rowIdx, dimKey, mId, mLabel, dimRealId);
+              self2._openCtxMenu(e, rowIdx, dimKey, mId, mLabel, dimRealId, spanEl);
             });
           })(sp, ri, dk2, cId, cLbl, dim2.id || dk2);
 
