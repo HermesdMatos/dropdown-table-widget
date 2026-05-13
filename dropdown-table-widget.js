@@ -617,20 +617,21 @@ class DropdownTableWidget extends HTMLElement {
   }
   getMeasureLabels() { return JSON.stringify(this._measureLabels || []); }
 
-  _doSetDimensionFilter(dimensionId, memberIds) {
+  // SAC body only accepts "this.property = value" — use JS setters as bridge
+  set _dimFilterSet(v) {
     try {
-      var binding = this.myDataBinding;
-      if (!binding) { return; }
-      var ids = Array.isArray(memberIds) ? memberIds : [memberIds];
-      binding.setDimensionFilter(dimensionId, ids);
+      var sep = v.indexOf('|');
+      var dimId = v.substring(0, sep);
+      var memberId = v.substring(sep + 1);
+      if (!this.myDataBinding || !dimId) { return; }
+      this.myDataBinding.setDimensionFilter(dimId, [memberId]);
     } catch(e) { console.error("setDimensionFilter error:", e); }
   }
 
-  _doRemoveDimensionFilter(dimensionId) {
+  set _dimFilterRemove(v) {
     try {
-      var binding = this.myDataBinding;
-      if (!binding) { return; }
-      binding.removeDimensionFilter(dimensionId);
+      if (!this.myDataBinding) { return; }
+      this.myDataBinding.removeDimensionFilter(v);
     } catch(e) { console.error("removeDimensionFilter error:", e); }
   }
 
