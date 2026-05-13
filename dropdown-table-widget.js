@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.13
+// dropdown-table-widget.js — v2.10.14
 // Changelog:
-//   v2.10.13 — Fix ctx-exclude-member: variável target não estava definida
-//              Fix dimensionRealId: extrai ID real do metadata em vez de usar feed key
+//   v2.10.14 — Fix _openCtxMenu: resolve dimensionRealId do metadata SAC
+//              (DESCRICAO_DA_CONTA) em vez de usar feed key (dimensions_0)
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -744,11 +744,24 @@ class DropdownTableWidget extends HTMLElement {
     e.preventDefault();
     e.stopPropagation();
 
+    // Resolve o ID real da dimensão SAC a partir do metadata
+    var resolvedDimId = dimensionRealId || "";
+    if (!resolvedDimId || resolvedDimId.indexOf("dimensions_") !== -1) {
+      try {
+        var dimIdx = parseInt((dimensionId || "dimensions_0").replace("dimensions_", ""), 10);
+        var dims = this._metadata && this._metadata.feeds && this._metadata.feeds.dimensions
+          ? this._metadata.feeds.dimensions.values : [];
+        if (dims && dims[dimIdx] && dims[dimIdx].id) {
+          resolvedDimId = dims[dimIdx].id;
+        }
+      } catch(ex) {}
+    }
+
     this._ctxTarget = {
       rowIndex:        rowIndex,
       dimensionId:     dimensionId,
-      dimensionRealId: dimensionRealId,
-      dimensionName:   dimensionRealId,
+      dimensionRealId: resolvedDimId,
+      dimensionName:   resolvedDimId,
       memberId:        memberId,
       memberLabel:     memberLabel
     };
