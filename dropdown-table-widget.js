@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.11
+// dropdown-table-widget.js — v2.10.12
 // Changelog:
-//   v2.10.11 — Excluir membro: salva deleteMemberId/DimensionId via propertiesChanged
-//              métodos getDeleteMemberId() e getDeleteMemberDimensionId() expostos
+//   v2.10.12 — Adiciona getDeleteMemberIdClean() que extrai ID limpo do formato
+//              [DIM].[HIER].&[ID] retornado pelo SAC dataBinding
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -572,6 +572,15 @@ class DropdownTableWidget extends HTMLElement {
   getDropdownDimensions() { return this.dropdownDimensions; }
   getLastAddMemberRequest()    { return JSON.stringify(this._lastAddMemberRequest || {}); }
   getDeleteMemberId()          { return this._deleteMemberId          || ""; }
+  getDeleteMemberIdClean() {
+    var raw = this._deleteMemberId || "";
+    if (raw === "") { return ""; }
+    // Extrai ID do formato [DIM].[HIER].&[ID] ou [DIM].&[ID]
+    var match = raw.match(/\.&\[([^\]]+)\]$/);
+    if (match) { return match[1]; }
+    // Fallback: retorna o raw se não tiver o padrão
+    return raw;
+  }
   getDeleteMemberDimensionId() { return this._deleteMemberDimensionId || ""; }
   getNewMemberId()          { return this.getAttribute("data-new-member-id")     || ""; }
   getNewMemberDescription() { return this.getAttribute("data-new-member-desc")   || ""; }

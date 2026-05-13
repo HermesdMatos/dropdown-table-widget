@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.10",
+  "version": "2.10.12",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=3",
-      "integrity": "sha256-h7zpRX+RdtRfw3HiyCXmC23ehugWpB6zmnC1/hT7g5w="
+      "integrity": "sha256-QaYiDDz7Pki5HX33Oz8q4xnhX3sW+LA6cyr59leA1Xw="
     },
     {
       "kind": "styling",
@@ -41,6 +41,16 @@
       "type": "string",
       "description": "JSON string do último pedido de criação de membro",
       "default": "{}"
+    },
+    "deleteMemberId": {
+      "type": "string",
+      "description": "ID do membro a ser excluído — preenchido ao clicar em Excluir membro",
+      "default": ""
+    },
+    "deleteMemberDimensionId": {
+      "type": "string",
+      "description": "ID real da dimensão SAC do membro a ser excluído",
+      "default": ""
     },
     "newMemberId": {
       "type": "string",
@@ -127,6 +137,24 @@
       "description": "Retorna o último payload de criação de membro como JSON string.",
       "parameters": [],
       "body": "return this.lastAddMemberRequest || '{}';"
+    },
+    "getDeleteMemberId": {
+      "returnType": "string",
+      "description": "Retorna o ID completo do membro a ser excluído (formato SAC).",
+      "parameters": [],
+      "body": "return this.deleteMemberId || '';"
+    },
+    "getDeleteMemberIdClean": {
+      "returnType": "string",
+      "description": "Retorna o ID limpo do membro a ser excluído (sem prefixo de dimensão/hierarquia).",
+      "parameters": [],
+      "body": "return this.deleteMemberId || '';"
+    },
+    "getDeleteMemberDimensionId": {
+      "returnType": "string",
+      "description": "Retorna o ID real da dimensão SAC do membro a ser excluído.",
+      "parameters": [],
+      "body": "return this.deleteMemberDimensionId || '';"
     },
     "getNewMemberId": {
       "returnType": "string",
