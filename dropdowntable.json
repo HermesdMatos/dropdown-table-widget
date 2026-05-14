@@ -142,12 +142,6 @@
     }
   },
   "methods": {
-    "getDataSource": {
-      "returnType": "object",
-      "description": "Retorna o data binding do widget para uso com setDimensionFilter, removeDimensionFilter etc.",
-      "parameters": [],
-      "body": "return this.myDataBinding;"
-    },
     "getLastAddMemberRequest": {
       "returnType": "string",
       "description": "Retorna o último payload de criação de membro como JSON string.",
@@ -244,19 +238,19 @@
       "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
     },
     "setDimensionFilter": {
-      "description": "Aplica filtro de dimensão no binding. Ex: setDimensionFilter(\"Date\", \"2024.01\")",
+      "description": "Aplica filtro de dimensão no binding. Ex: setDimensionFilter(\"Date\", \"[Date].[YM].&[202606]\")",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" },
-        { "name": "memberIds",   "type": "string", "description": "ID do membro ou múltiplos separados por vírgula" }
+        { "name": "memberIds",   "type": "string", "description": "ID do membro" }
       ],
-      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = memberIds;"
+      "body": "this.myDataBinding.setDimensionFilter(dimensionId, [memberIds]);"
     },
     "removeDimensionFilter": {
       "description": "Remove filtro de dimensão do binding.",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
       ],
-      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = '';"
+      "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
     },
     "clearAllFilters": {
       "description": "Clear all active dropdown filters",
