@@ -99,6 +99,22 @@
                             </select>
                         </td>
                     </tr>
+                    <tr>
+                        <td>Alinhamento</td>
+                        <td>
+                            <div class="align-btns" id="align_title_group">
+                                <button type="button" class="align-btn active" data-align="left" data-group="title" title="Esquerda">
+                                    <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="6" x2="9" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="10" x2="11" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                </button>
+                                <button type="button" class="align-btn" data-align="center" data-group="title" title="Centro">
+                                    <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="3" y1="6" x2="11" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="10" x2="12" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                </button>
+                                <button type="button" class="align-btn" data-align="right" data-group="title" title="Direita">
+                                    <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="5" y1="6" x2="13" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="3" y1="10" x2="13" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
                 </table>
             </fieldset>
 
@@ -303,6 +319,7 @@
             // Alignment state
             this._headerAlign = "left";
             this._cellAlign   = "left";
+            this._titleAlign  = "left";
 
             this._applyButton = this._shadowRoot.getElementById("apply_styles");
 
@@ -343,7 +360,8 @@
                     });
                     btn.classList.add("active");
                     if (group === "header") { self._headerAlign = align; }
-                    else                    { self._cellAlign   = align; }
+                    else if (group === "cell") { self._cellAlign = align; }
+                    else                    { self._titleAlign  = align; }
                 });
             });
         }
@@ -369,7 +387,8 @@
                             titleColor:        this._titleColorInput.value,
                             titleSize:         this._titleSizeSelect.value,
                             headerAlign:       this._headerAlign,
-                            cellAlign:         this._cellAlign
+                            cellAlign:         this._cellAlign,
+                            titleAlign:        this._titleAlign
                         })
                     }
                 }
@@ -406,6 +425,7 @@
                 if (cfg.colWidth)     { this._colWidthSelect.value = cfg.colWidth; }
                 if (cfg.headerAlign)  { this._setAlignActive("header", cfg.headerAlign); }
                 if (cfg.cellAlign)    { this._setAlignActive("cell",   cfg.cellAlign); }
+                if (cfg.titleAlign)   { this._setAlignActive("title",  cfg.titleAlign); }
             } catch(ex) {}
         }
 
@@ -416,7 +436,8 @@
                 if (b.getAttribute("data-align") === align) { b.classList.add("active"); }
             });
             if (group === "header") { self._headerAlign = align; }
-            else                    { self._cellAlign   = align; }
+            else if (group === "cell") { self._cellAlign = align; }
+            else { self._titleAlign = align; }
         }
     }
 

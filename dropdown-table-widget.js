@@ -1,7 +1,6 @@
-// dropdown-table-widget.js — v2.10.19
+// dropdown-table-widget.js — v2.10.20
 // Changelog:
-//   v2.10.19 — Título da tabela acima do scroll (tableTitle, titleColor, titleSize)
-//              Alinhamento independente cabeçalho/células (headerAlign, cellAlign)
+//   v2.10.20 — Alinhamento do título da tabela (titleAlign)
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -338,6 +337,7 @@ class DropdownTableWidget extends HTMLElement {
     this._titleSize        = "16px";
     this._headerAlign      = "left";
     this._cellAlign        = "left";
+    this._titleAlign       = "left";
 
     // Context menu state
     this._ctxTarget = null; // {rowIndex, dimensionId, memberId, memberLabel, dimensionName}
@@ -527,7 +527,7 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.titleColor  !== undefined) { this._titleColor  = cfg.titleColor; }
       if (cfg.titleSize   !== undefined) { this._titleSize   = cfg.titleSize; }
       if (cfg.headerAlign !== undefined) { this._headerAlign = cfg.headerAlign; }
-      if (cfg.cellAlign   !== undefined) { this._cellAlign   = cfg.cellAlign; }
+      if (cfg.titleAlign  !== undefined) { this._titleAlign  = cfg.titleAlign; }
       this._applyDynamicStyles();
       this._render();
     } catch(e) { console.error("applyStyleConfig error:", e); }
@@ -1046,9 +1046,10 @@ class DropdownTableWidget extends HTMLElement {
     // Renderiza título
     if (titleEl) {
       if (this._tableTitle) {
-        titleEl.textContent  = this._tableTitle;
+        titleEl.textContent    = this._tableTitle;
         titleEl.style.color    = this._titleColor  || "#1a73e8";
         titleEl.style.fontSize = this._titleSize   || "16px";
+        titleEl.style.textAlign = this._titleAlign || "left";
         titleEl.classList.remove("hidden");
       } else {
         titleEl.classList.add("hidden");
