@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.21
+// dropdown-table-widget.js — v2.10.22
 // Changelog:
-//   v2.10.21 — Fix dropdown seleção: extrai ID limpo para match correto quando isNode:true
-//              Label do dropdown mostra valor atual salvo no modelo
+//   v2.10.22 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -662,6 +662,11 @@ class DropdownTableWidget extends HTMLElement {
   // Permite que o script SAC aplique filtro de dimensão diretamente no binding
   // Ex: dropdowntable_1.setDimensionFilter("Date", "2024.01")
   // ou: dropdowntable_1.setDimensionFilter("Date", ["2024.01","2024.02"])
+  // Compatibilidade com padrão SAC: widget.getDataSource().setDimensionFilter(...)
+  getDataSource() {
+    return this.myDataBinding;
+  }
+
   setDimensionFilter(dimensionId, memberIds) {
     try {
       var binding = this.myDataBinding;
