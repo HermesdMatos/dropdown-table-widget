@@ -6,7 +6,7 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.23",
+  "version": "2.10.24",
   "webcomponents": [
     {
       "kind": "main",
@@ -142,6 +142,12 @@
     }
   },
   "methods": {
+    "getDataSource": {
+      "returnType": "object",
+      "description": "Retorna o data binding do widget para uso com setDimensionFilter, removeDimensionFilter etc.",
+      "parameters": [],
+      "body": "return this.myDataBinding;"
+    },
     "getLastAddMemberRequest": {
       "returnType": "string",
       "description": "Retorna o último payload de criação de membro como JSON string.",
