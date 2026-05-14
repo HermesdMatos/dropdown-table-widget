@@ -1,6 +1,7 @@
-// dropdown-table-widget.js — v2.10.20
+// dropdown-table-widget.js — v2.10.21
 // Changelog:
-//   v2.10.20 — Alinhamento do título da tabela (titleAlign)
+//   v2.10.21 — Fix dropdown seleção: extrai ID limpo para match correto quando isNode:true
+//              Label do dropdown mostra valor atual salvo no modelo
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -1241,6 +1242,13 @@ class DropdownTableWidget extends HTMLElement {
         var cLbl = cData.label || cData.id || "";
         var cId  = cData.id || "";
 
+        // Se isNode:true e label existe, já temos o valor correto
+        // Se label está vazio, tenta extrair do ID
+        if (!cLbl && cId) {
+          var idClean = cId.match(/\.&\[([^\]]+)\]$/);
+          if (idClean) { cLbl = idClean[1]; }
+        }
+
         var isDrop = di2 !== 0 && (
           self2._dropdownDimensions.length === 0
           || self2._dropdownDimensions.indexOf(dk2) !== -1
@@ -1432,6 +1440,11 @@ class DropdownTableWidget extends HTMLElement {
     list.innerHTML = "";
     list.classList.remove("hidden");
 
+    // Extrai ID limpo para comparação (ex: "[DIM].[HIER].&[Mensal]" → "Mensal")
+    var cleanCurrentId = currentId;
+    var cleanMatch = currentId ? currentId.match(/\.&\[([^\]]+)\]$/) : null;
+    if (cleanMatch) { cleanCurrentId = cleanMatch[1]; }
+
     var filteredOptions = [];
     for (var fi = 0; fi < options.length; fi++) {
       var opt = options[fi];
@@ -1442,8 +1455,14 @@ class DropdownTableWidget extends HTMLElement {
 
     for (var i = 0; i < filteredOptions.length; i++) {
       (function(opt) {
+        // Extrai ID limpo da opção para comparação
+        var cleanOptId = opt.value;
+        var optMatch = opt.value ? opt.value.match(/\.&\[([^\]]+)\]$/) : null;
+        if (optMatch) { cleanOptId = optMatch[1]; }
+
+        var isSelected = cleanOptId === cleanCurrentId || opt.value === currentId;
         var item = document.createElement("div");
-        item.className = opt.value === currentId ? "dt-dropdown-item selected" : "dt-dropdown-item";
+        item.className = isSelected ? "dt-dropdown-item selected" : "dt-dropdown-item";
         item.textContent = opt.label;
         item.addEventListener("mousedown", function(e) {
           e.preventDefault();
