@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.22
+// dropdown-table-widget.js — v2.10.23
 // Changelog:
-//   v2.10.22 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.23 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1579,3 +1579,4 @@ class DropdownTableWidget extends HTMLElement {
 }
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
+
