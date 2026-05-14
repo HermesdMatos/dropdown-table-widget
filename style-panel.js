@@ -44,8 +44,106 @@
                 font-weight: 600;
             }
             .apply-button:hover { background-color: #1557b0; }
+
+            /* Alignment buttons */
+            .align-group { margin-top: 4px; }
+            .align-label { font-size: 11px; color: #666; margin-bottom: 4px; display: block; }
+            .align-btns {
+                display: grid;
+                grid-template-columns: repeat(3, 32px);
+                gap: 4px;
+            }
+            .align-btn {
+                width: 32px;
+                height: 28px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background: #f8f8f8;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                transition: background 0.15s, border-color 0.15s;
+            }
+            .align-btn:hover { background: #e8f0fe; border-color: #1a73e8; }
+            .align-btn.active { background: #1a73e8; border-color: #1a73e8; }
+            .align-btn.active svg { stroke: #fff; }
+            .align-btn svg { stroke: #555; }
         </style>
         <form id="form">
+            <fieldset>
+                <legend>Título da Tabela</legend>
+                <table>
+                    <tr>
+                        <td>Título</td>
+                        <td><input id="style_table_title" type="text" placeholder="Ex: Despesas 2024"></td>
+                    </tr>
+                    <tr>
+                        <td>Cor do título</td>
+                        <td class="color-row">
+                            <input id="style_title_color" type="text" class="color-input" value="#1a73e8">
+                            <input id="style_title_color_picker" type="color" value="#1a73e8">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Tamanho</td>
+                        <td>
+                            <select id="style_title_size">
+                                <option value="13px">13</option>
+                                <option value="14px">14</option>
+                                <option value="16px" selected>16</option>
+                                <option value="18px">18</option>
+                                <option value="20px">20</option>
+                                <option value="24px">24</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
+
+            <fieldset>
+                <legend>Alinhamento</legend>
+                <table>
+                    <tr>
+                        <td>Cabeçalho</td>
+                        <td>
+                            <div class="align-group">
+                                <div class="align-btns" id="align_header_group">
+                                    <button type="button" class="align-btn active" data-align="left" data-group="header" title="Esquerda">
+                                        <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="6" x2="9" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="10" x2="11" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                    </button>
+                                    <button type="button" class="align-btn" data-align="center" data-group="header" title="Centro">
+                                        <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="3" y1="6" x2="11" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="10" x2="12" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                    </button>
+                                    <button type="button" class="align-btn" data-align="right" data-group="header" title="Direita">
+                                        <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="5" y1="6" x2="13" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="3" y1="10" x2="13" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Células</td>
+                        <td>
+                            <div class="align-group">
+                                <div class="align-btns" id="align_cell_group">
+                                    <button type="button" class="align-btn active" data-align="left" data-group="cell" title="Esquerda">
+                                        <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="6" x2="9" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="10" x2="11" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                    </button>
+                                    <button type="button" class="align-btn" data-align="center" data-group="cell" title="Centro">
+                                        <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="3" y1="6" x2="11" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="10" x2="12" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                    </button>
+                                    <button type="button" class="align-btn" data-align="right" data-group="cell" title="Direita">
+                                        <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><line x1="1" y1="2" x2="13" y2="2" stroke-width="1.5" stroke-linecap="round"/><line x1="5" y1="6" x2="13" y2="6" stroke-width="1.5" stroke-linecap="round"/><line x1="3" y1="10" x2="13" y2="10" stroke-width="1.5" stroke-linecap="round"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
+
             <fieldset>
                 <legend>Table Appearance</legend>
                 <table>
@@ -190,6 +288,8 @@
             this._tableTextColorPicker   = this._shadowRoot.getElementById("style_table_text_color_picker");
             this._editableColorInput     = this._shadowRoot.getElementById("style_editable_color");
             this._editableColorPicker    = this._shadowRoot.getElementById("style_editable_color_picker");
+            this._titleColorInput        = this._shadowRoot.getElementById("style_title_color");
+            this._titleColorPicker       = this._shadowRoot.getElementById("style_title_color_picker");
 
             // Font + table inputs
             this._fontFamilySelect = this._shadowRoot.getElementById("style_font_family");
@@ -197,10 +297,17 @@
             this._fontWeightSelect = this._shadowRoot.getElementById("style_font_weight");
             this._rowHeightSelect  = this._shadowRoot.getElementById("style_row_height");
             this._colWidthSelect   = this._shadowRoot.getElementById("style_col_width");
+            this._tableTitleInput  = this._shadowRoot.getElementById("style_table_title");
+            this._titleSizeSelect  = this._shadowRoot.getElementById("style_title_size");
+
+            // Alignment state
+            this._headerAlign = "left";
+            this._cellAlign   = "left";
 
             this._applyButton = this._shadowRoot.getElementById("apply_styles");
 
             this._connectColorPickers();
+            this._connectAlignButtons();
             this._form.addEventListener("submit", this._submit.bind(this));
             this._applyButton.addEventListener("click", this._submit.bind(this));
         }
@@ -212,7 +319,8 @@
                 [this._selectedRowColorInput,  this._selectedRowColorPicker],
                 [this._hoverRowColorInput,     this._hoverRowColorPicker],
                 [this._tableTextColorInput,    this._tableTextColorPicker],
-                [this._editableColorInput,     this._editableColorPicker]
+                [this._editableColorInput,     this._editableColorPicker],
+                [this._titleColorInput,        this._titleColorPicker]
             ];
             pairs.forEach(function(pair) {
                 var textInput = pair[0];
@@ -222,10 +330,26 @@
             });
         }
 
+        _connectAlignButtons() {
+            var self = this;
+            var allBtns = this._shadowRoot.querySelectorAll(".align-btn");
+            allBtns.forEach(function(btn) {
+                btn.addEventListener("click", function() {
+                    var group = btn.getAttribute("data-group");
+                    var align = btn.getAttribute("data-align");
+                    // Deactivate siblings in same group
+                    self._shadowRoot.querySelectorAll(".align-btn[data-group='" + group + "']").forEach(function(b) {
+                        b.classList.remove("active");
+                    });
+                    btn.classList.add("active");
+                    if (group === "header") { self._headerAlign = align; }
+                    else                    { self._cellAlign   = align; }
+                });
+            });
+        }
+
         _submit(e) {
             e.preventDefault();
-
-            // Dispatch propertiesChanged — SAC syncs these to the main widget automatically
             this.dispatchEvent(new CustomEvent("propertiesChanged", {
                 detail: {
                     properties: {
@@ -240,14 +364,19 @@
                             colWidth:          this._colWidthSelect.value,
                             fontFamily:        this._fontFamilySelect.value,
                             fontSize:          this._fontSizeSelect.value,
-                            fontWeight:        this._fontWeightSelect.value
+                            fontWeight:        this._fontWeightSelect.value,
+                            tableTitle:        this._tableTitleInput.value,
+                            titleColor:        this._titleColorInput.value,
+                            titleSize:         this._titleSizeSelect.value,
+                            headerAlign:       this._headerAlign,
+                            cellAlign:         this._cellAlign
                         })
                     }
                 }
             }));
         }
 
-        // Getters/setters for SAC to populate current values
+        // Getters/setters for SAC
         get headerColor() { return this._headerColorInput.value; }
         set headerColor(v) { if (v) { this._headerColorInput.value = v; this._headerColorPicker.value = v; } }
 
@@ -264,7 +393,31 @@
         set tableTextColor(v) { if (v) { this._tableTextColorInput.value = v; this._tableTextColorPicker.value = v; } }
 
         get styleConfig() { return "{}"; }
-        set styleConfig(v) { /* populated by main widget */ }
+        set styleConfig(v) {
+            try {
+                var cfg = JSON.parse(v);
+                if (cfg.tableTitle)   { this._tableTitleInput.value = cfg.tableTitle; }
+                if (cfg.titleColor)   { this._titleColorInput.value = cfg.titleColor; this._titleColorPicker.value = cfg.titleColor; }
+                if (cfg.titleSize)    { this._titleSizeSelect.value = cfg.titleSize; }
+                if (cfg.fontFamily)   { this._fontFamilySelect.value = cfg.fontFamily; }
+                if (cfg.fontSize)     { this._fontSizeSelect.value = cfg.fontSize; }
+                if (cfg.fontWeight)   { this._fontWeightSelect.value = cfg.fontWeight; }
+                if (cfg.rowHeight)    { this._rowHeightSelect.value = String(cfg.rowHeight); }
+                if (cfg.colWidth)     { this._colWidthSelect.value = cfg.colWidth; }
+                if (cfg.headerAlign)  { this._setAlignActive("header", cfg.headerAlign); }
+                if (cfg.cellAlign)    { this._setAlignActive("cell",   cfg.cellAlign); }
+            } catch(ex) {}
+        }
+
+        _setAlignActive(group, align) {
+            var self = this;
+            self._shadowRoot.querySelectorAll(".align-btn[data-group='" + group + "']").forEach(function(b) {
+                b.classList.remove("active");
+                if (b.getAttribute("data-align") === align) { b.classList.add("active"); }
+            });
+            if (group === "header") { self._headerAlign = align; }
+            else                    { self._cellAlign   = align; }
+        }
     }
 
     customElements.define("dropdowntable-styling", DropdownTableStyling);

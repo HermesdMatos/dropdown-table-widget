@@ -1,7 +1,7 @@
-// dropdown-table-widget.js — v2.10.18
+// dropdown-table-widget.js — v2.10.19
 // Changelog:
-//   v2.10.18 — setDimensionFilter/removeDimensionFilter via propriedades declaradas
-//              dimensionFilterId + dimensionFilterMembers aplicam filtro automaticamente
+//   v2.10.19 — Título da tabela acima do scroll (tableTitle, titleColor, titleSize)
+//              Alinhamento independente cabeçalho/células (headerAlign, cellAlign)
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
@@ -105,8 +105,18 @@ TMPL.innerHTML = `
     font-weight: 600;
   }
 
-  .dt-empty { padding: 32px; text-align: center; color: #999; font-size: 13px; }
-  .dt-empty.hidden { display: none; }
+  .dt-title {
+    padding: 8px 12px 6px 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+  .dt-title.hidden { display: none; }
+
+  .dt-outer { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box; }
+  .dt-wrapper { width: 100%; flex: 1; overflow: auto; box-sizing: border-box; position: relative; }
 
   /* ── Context Menu ─────────────────────────────────────────────── */
   .dt-ctx-menu {
@@ -219,7 +229,9 @@ TMPL.innerHTML = `
   .dt-btn-confirm:hover { background: #1557b0; }
   .dt-btn-confirm:disabled { background: #b0c8f5; cursor: not-allowed; }
 </style>
-<div class="dt-wrapper" id="dt-wrapper">
+<div class="dt-outer" id="dt-outer">
+  <div class="dt-title hidden" id="dt-title"></div>
+  <div class="dt-wrapper" id="dt-wrapper">
   <table id="dt-table">
     <thead><tr id="dt-header"></tr></thead>
     <tbody id="dt-body"></tbody>
@@ -253,6 +265,7 @@ TMPL.innerHTML = `
     </div>
   </div>
 </div>
+</div><!-- /dt-outer -->
 
 <!-- Add Member Modal -->
 <div class="dt-modal-backdrop hidden" id="dt-modal-backdrop">
@@ -320,6 +333,11 @@ class DropdownTableWidget extends HTMLElement {
     this._textDecoration   = "none";
     this._editableCellColor = "#fffbe6";
     this._showUnit         = "none";
+    this._tableTitle       = "";
+    this._titleColor       = "#1a73e8";
+    this._titleSize        = "16px";
+    this._headerAlign      = "left";
+    this._cellAlign        = "left";
 
     // Context menu state
     this._ctxTarget = null; // {rowIndex, dimensionId, memberId, memberLabel, dimensionName}
@@ -505,6 +523,11 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.fontStyle)         { this._fontStyle = cfg.fontStyle; }
       if (cfg.textDecoration)    { this._textDecoration = cfg.textDecoration; }
       if (cfg.showUnit)          { this._showUnit = cfg.showUnit; }
+      if (cfg.tableTitle  !== undefined) { this._tableTitle  = cfg.tableTitle; }
+      if (cfg.titleColor  !== undefined) { this._titleColor  = cfg.titleColor; }
+      if (cfg.titleSize   !== undefined) { this._titleSize   = cfg.titleSize; }
+      if (cfg.headerAlign !== undefined) { this._headerAlign = cfg.headerAlign; }
+      if (cfg.cellAlign   !== undefined) { this._cellAlign   = cfg.cellAlign; }
       this._applyDynamicStyles();
       this._render();
     } catch(e) { console.error("applyStyleConfig error:", e); }
@@ -1018,6 +1041,19 @@ class DropdownTableWidget extends HTMLElement {
     var headerRow = this.shadowRoot.getElementById("dt-header");
     var tbody     = this.shadowRoot.getElementById("dt-body");
     var emptyMsg  = this.shadowRoot.getElementById("dt-empty");
+    var titleEl   = this.shadowRoot.getElementById("dt-title");
+
+    // Renderiza título
+    if (titleEl) {
+      if (this._tableTitle) {
+        titleEl.textContent  = this._tableTitle;
+        titleEl.style.color    = this._titleColor  || "#1a73e8";
+        titleEl.style.fontSize = this._titleSize   || "16px";
+        titleEl.classList.remove("hidden");
+      } else {
+        titleEl.classList.add("hidden");
+      }
+    }
 
     headerRow.innerHTML = "";
     tbody.innerHTML = "";
@@ -1057,14 +1093,15 @@ class DropdownTableWidget extends HTMLElement {
     for (var i = 0; i < dimLabels.length; i++) {
       var th = document.createElement("th");
       th.textContent = dimLabels[i];
-      th.style.minWidth = this._colWidth === "auto" ? "120px" : this._colWidth + "px";
+      th.style.minWidth  = this._colWidth === "auto" ? "120px" : this._colWidth + "px";
+      th.style.textAlign = this._headerAlign || "left";
       headerRow.appendChild(th);
     }
     for (var j = 0; j < mesLabels.length; j++) {
       var thm = document.createElement("th");
       thm.textContent = mesLabels[j];
-      thm.style.textAlign = "right";
-      thm.style.minWidth = this._colWidth === "auto" ? "100px" : this._colWidth + "px";
+      thm.style.textAlign = this._headerAlign || "right";
+      thm.style.minWidth  = this._colWidth === "auto" ? "100px" : this._colWidth + "px";
       headerRow.appendChild(thm);
     }
 
@@ -1235,7 +1272,8 @@ class DropdownTableWidget extends HTMLElement {
           var sp = document.createElement("span");
           sp.className = "cell-plain";
           sp.textContent = cLbl;
-          sp.style.cursor = "context-menu";
+          sp.style.cursor    = "context-menu";
+          sp.style.textAlign = self2._cellAlign || "left";
           sp.title = "Clique direito para opções";
 
           // Capture values at construction time via closure

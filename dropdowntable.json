@@ -6,19 +6,19 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.18",
+  "version": "2.10.19",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
-      "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=5",
-      "integrity": "sha256-7rBVOQKe/SnSgA2pZaHDGgiR3Ns8MzDS831delLWimU="
+      "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget.js?v=6",
+      "integrity": "sha256-J9WpVyQj1lQqe4PB9PGSiORGowsbANo+g4vrupLVqYI="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling",
-      "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js",
-      "integrity": "sha256-EEpBC3UsLTj6AbVMVD8PXTA24SnThE2D53gcwFX2aDs="
+      "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js?v=2",
+      "integrity": "sha256-9M/kqm2sEplPzMRbXZYJhn1aJGCS2x0KuYlwfXDNuTc="
     }
   ],
   "properties": {
