@@ -12,7 +12,7 @@
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-ncQ7vHsZlBV+V+/KpUy9asG+WmPjgYv7+zWrB3pT2Bc="
+      "integrity": "sha256-FoI1UzNA8DRbImEuZNLkA2TX0QulGUv1LAQaW9i4/1k="
     },
     {
       "kind": "styling",
@@ -238,19 +238,19 @@
       "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
     },
     "setDimensionFilter": {
-      "description": "Aplica filtro de dimensão no binding. Ex: setDimensionFilter(\"Date\", \"[Date].[YM].&[202606]\")",
+      "description": "Aplica filtro de dimensão. Ex: setDimensionFilter(\"Date\", \"[Date].[YM].&[202606]\")",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" },
         { "name": "memberIds",   "type": "string", "description": "ID do membro" }
       ],
-      "body": "this.myDataBinding.setDimensionFilter(dimensionId, [memberIds]);"
+      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = memberIds;"
     },
     "removeDimensionFilter": {
       "description": "Remove filtro de dimensão do binding.",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
       ],
-      "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
+      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = '';"
     },
     "clearAllFilters": {
       "description": "Clear all active dropdown filters",

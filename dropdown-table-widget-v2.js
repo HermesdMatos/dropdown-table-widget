@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.23
+// dropdown-table-widget.js — v2.10.24
 // Changelog:
-//   v2.10.23 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.24 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -375,6 +375,11 @@ class DropdownTableWidget extends HTMLElement {
       this._render();
       return;
     }
+    // Detecta mudança de filtro externo via setDimensionFilter()
+    if (changedProperties && ("dimensionFilterId" in changedProperties || "dimensionFilterMembers" in changedProperties)) {
+      this._applyExternalFilter();
+      return;
+    }
     this._loadBinding();
   }
   onCustomWidgetResize(w, h) { this.style.width = w + "px"; this.style.height = h + "px"; }
@@ -580,13 +585,23 @@ class DropdownTableWidget extends HTMLElement {
 
   _applyExternalFilter() {
     try {
+      var dimId   = this._dimensionFilterId;
+      var members = this._dimensionFilterMembers;
+      if (!dimId) { return; }
+
+      // Tenta via myDataBinding (SAC injeta métodos dinamicamente após filtro ser adicionado no binding)
       var binding = this.myDataBinding;
-      if (!binding || !this._dimensionFilterId) { return; }
-      if (this._dimensionFilterMembers === "") {
-        binding.removeDimensionFilter(this._dimensionFilterId);
+      if (!binding) { return; }
+
+      if (members === "" || members === undefined) {
+        if (typeof binding.removeDimensionFilter === "function") {
+          binding.removeDimensionFilter(dimId);
+        }
       } else {
-        var ids = this._dimensionFilterMembers.split(",").map(function(s) { return s.trim(); });
-        binding.setDimensionFilter(this._dimensionFilterId, ids);
+        var ids = typeof members === "string" ? members.split(",").map(function(s){return s.trim();}) : [members];
+        if (typeof binding.setDimensionFilter === "function") {
+          binding.setDimensionFilter(dimId, ids);
+        }
       }
     } catch(e) { console.error("_applyExternalFilter error:", e); }
   }
@@ -672,7 +687,15 @@ class DropdownTableWidget extends HTMLElement {
       var binding = this.myDataBinding;
       if (!binding) { return; }
       var ids = Array.isArray(memberIds) ? memberIds : [memberIds];
-      binding.setDimensionFilter(dimensionId, ids);
+      if (typeof binding.setDimensionFilter === "function") {
+        binding.setDimensionFilter(dimensionId, ids);
+      } else if (typeof binding.addFilter === "function") {
+        binding.addFilter(dimensionId, ids);
+      } else {
+        // Armazena para aplicar quando binding estiver pronto
+        this._dimensionFilterId      = dimensionId;
+        this._dimensionFilterMembers = ids.join(",");
+      }
     } catch(e) { console.error("setDimensionFilter error:", e); }
   }
 
@@ -680,7 +703,11 @@ class DropdownTableWidget extends HTMLElement {
     try {
       var binding = this.myDataBinding;
       if (!binding) { return; }
-      binding.removeDimensionFilter(dimensionId);
+      if (typeof binding.removeDimensionFilter === "function") {
+        binding.removeDimensionFilter(dimensionId);
+      } else if (typeof binding.removeFilter === "function") {
+        binding.removeFilter(dimensionId);
+      }
     } catch(e) { console.error("removeDimensionFilter error:", e); }
   }
 
