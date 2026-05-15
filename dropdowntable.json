@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.25",
+  "version": "2.10.26",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-aD8ycXoFjzDne5WoqIke2/UI5hKoICELaVLQ4dfJMGs="
+      "integrity": "sha256-ksg5jb7Zt/PVCyrvcpllRYQafEZ44E/ry7H0LBVq4ug="
     },
     {
       "kind": "styling",
@@ -284,6 +284,20 @@
         {
           "id": "measures",
           "description": "Measures — numeric columns",
+          "type": "mainStructureMember"
+        }
+      ]
+    },
+    "dataSource": {
+      "feeds": [
+        {
+          "id": "dimensions",
+          "description": "Dimensions (alias for getDataSource() compatibility)",
+          "type": "dimension"
+        },
+        {
+          "id": "measures",
+          "description": "Measures (alias for getDataSource() compatibility)",
           "type": "mainStructureMember"
         }
       ]

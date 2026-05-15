@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.25
+// dropdown-table-widget.js — v2.10.26
 // Changelog:
-//   v2.10.25 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.26 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1265,6 +1265,8 @@ class DropdownTableWidget extends HTMLElement {
 
         var cLbl = cData.label || cData.id || "";
         var cId  = cData.id || "";
+        // ID original do binding (para highlight correto ao abrir dropdown)
+        var bindingId = (rowData[dk2] || {}).id || "";
 
         // Se isNode:true e label existe, já temos o valor correto
         // Se label está vazio, tenta extrair do ID
@@ -1299,7 +1301,7 @@ class DropdownTableWidget extends HTMLElement {
         if (isDrop && (!opts || opts.length === 0)) { isDrop = false; }
 
         if (isDrop) {
-          self2._buildDropdownCell(td, ri, dk2, cLbl, cId, opts);
+          self2._buildDropdownCell(td, ri, dk2, cLbl, bindingId || cId, opts);
         } else {
           // dimensions_0 — plain cell WITH right-click context menu
           var sp = document.createElement("span");
