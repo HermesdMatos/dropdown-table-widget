@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.24",
+  "version": "2.10.25",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-FoI1UzNA8DRbImEuZNLkA2TX0QulGUv1LAQaW9i4/1k="
+      "integrity": "sha256-aD8ycXoFjzDne5WoqIke2/UI5hKoICELaVLQ4dfJMGs="
     },
     {
       "kind": "styling",
@@ -242,15 +242,13 @@
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" },
         { "name": "memberIds",   "type": "string", "description": "ID do membro" }
-      ],
-      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = memberIds;"
+      ]
     },
     "removeDimensionFilter": {
       "description": "Remove filtro de dimensão do binding.",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
-      ],
-      "body": "this.dimensionFilterId = dimensionId; this.dimensionFilterMembers = '';"
+      ]
     },
     "clearAllFilters": {
       "description": "Clear all active dropdown filters",

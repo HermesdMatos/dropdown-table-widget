@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.24
+// dropdown-table-widget.js — v2.10.25
 // Changelog:
-//   v2.10.24 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.25 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -689,12 +689,6 @@ class DropdownTableWidget extends HTMLElement {
       var ids = Array.isArray(memberIds) ? memberIds : [memberIds];
       if (typeof binding.setDimensionFilter === "function") {
         binding.setDimensionFilter(dimensionId, ids);
-      } else if (typeof binding.addFilter === "function") {
-        binding.addFilter(dimensionId, ids);
-      } else {
-        // Armazena para aplicar quando binding estiver pronto
-        this._dimensionFilterId      = dimensionId;
-        this._dimensionFilterMembers = ids.join(",");
       }
     } catch(e) { console.error("setDimensionFilter error:", e); }
   }
@@ -705,8 +699,6 @@ class DropdownTableWidget extends HTMLElement {
       if (!binding) { return; }
       if (typeof binding.removeDimensionFilter === "function") {
         binding.removeDimensionFilter(dimensionId);
-      } else if (typeof binding.removeFilter === "function") {
-        binding.removeFilter(dimensionId);
       }
     } catch(e) { console.error("removeDimensionFilter error:", e); }
   }
