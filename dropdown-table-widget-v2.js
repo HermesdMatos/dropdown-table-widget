@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.27
+// dropdown-table-widget.js — v2.10.28
 // Changelog:
-//   v2.10.27 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.28 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1321,7 +1321,17 @@ class DropdownTableWidget extends HTMLElement {
         var cellHasChildren = hasChildren[dk2][cId] ||
           (childrenByParent[dk2] && childrenByParent[dk2][cId] && childrenByParent[dk2][cId].length > 0) ||
           hasChildrenInBinding;
-        if (isDrop && !cellHasChildren) { isDrop = false; }
+        // Força dropdown quando rowValuesMap tem valor para essa linha/dimensão
+        var hasRowValueMap = false;
+        if (self2._rowValuesMap && dk2 !== "dimensions_0") {
+          var dim0CellCheck = rowData["dimensions_0"] || {};
+          var contaIdCheck  = dim0CellCheck.id || "";
+          if (contaIdCheck !== "" && self2._rowValuesMap[contaIdCheck]) {
+            hasRowValueMap = true;
+          }
+        }
+
+        if (isDrop && !cellHasChildren && !hasRowValueMap) { isDrop = false; }
 
         var opts = [];
         if (self2._dropdownOptions && self2._dropdownOptions[dk2]) {
@@ -1331,7 +1341,7 @@ class DropdownTableWidget extends HTMLElement {
         } else if (childrenByParent[dk2] && childrenByParent[dk2][cId]) {
           opts = childrenByParent[dk2][cId];
         }
-        if (isDrop && (!opts || opts.length === 0)) { isDrop = false; }
+        if (isDrop && (!opts || opts.length === 0) && !hasRowValueMap) { isDrop = false; }
 
         if (isDrop) {
           self2._buildDropdownCell(td, ri, dk2, cLbl, bindingId || cId, opts);
