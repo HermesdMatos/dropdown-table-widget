@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.26
+// dropdown-table-widget.js — v2.10.27
 // Changelog:
-//   v2.10.26 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.27 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -322,6 +322,7 @@ class DropdownTableWidget extends HTMLElement {
     this._lastAddMemberRequest = {};
     this._deleteMemberId          = "";
     this._deleteMemberDimensionId = "";
+    this._rowValuesMap = {};
 
     // Style properties
     this._rowHeight        = 36;
@@ -703,10 +704,13 @@ class DropdownTableWidget extends HTMLElement {
     } catch(e) { console.error("removeDimensionFilter error:", e); }
   }
 
-  clearAllFilters() {
-    this._activeFilters = {};
-    this._applyFilters();
-    this._render();
+  // Recebe mapeamento {contaId: "contaId|periodoId|fonteId|respId"} e aplica nos dropdowns
+  setRowValues(v) {
+    try {
+      var map = JSON.parse(v);
+      this._rowValuesMap = map;
+      this._render();
+    } catch(e) { console.error("setRowValues error:", e); }
   }
 
   // ─── Context Menu wiring ──────────────────────────────────────
@@ -1267,6 +1271,35 @@ class DropdownTableWidget extends HTMLElement {
         var cId  = cData.id || "";
         // ID original do binding (para highlight correto ao abrir dropdown)
         var bindingId = (rowData[dk2] || {}).id || "";
+
+        // Aplica valor do rowValuesMap se disponível
+        if (self2._rowValuesMap && dk2 !== "dimensions_0") {
+          var dim0Cell = rowData["dimensions_0"] || {};
+          var contaId  = dim0Cell.id || "";
+          if (contaId !== "" && self2._rowValuesMap[contaId]) {
+            var parts = self2._rowValuesMap[contaId].split("|");
+            var dimIdx2 = parseInt(dk2.replace("dimensions_", ""), 10);
+            if (dimIdx2 === 1 && parts[1] !== "") {
+              cId  = parts[1];
+              bindingId = parts[1];
+              // Extrai label do ID: "[DIM].[HIER].&[LABEL]" → "LABEL"
+              var lm = parts[1].match(/\.&\[([^\]]+)\]$/);
+              if (lm) { cLbl = lm[1]; }
+            }
+            if (dimIdx2 === 2 && parts[2] !== "") {
+              cId  = parts[2];
+              bindingId = parts[2];
+              var lm2 = parts[2].match(/\.&\[([^\]]+)\]$/);
+              if (lm2) { cLbl = lm2[1]; }
+            }
+            if (dimIdx2 === 3 && parts[3] !== "") {
+              cId  = parts[3];
+              bindingId = parts[3];
+              var lm3 = parts[3].match(/\.&\[([^\]]+)\]$/);
+              if (lm3) { cLbl = lm3[1]; }
+            }
+          }
+        }
 
         // Se isNode:true e label existe, já temos o valor correto
         // Se label está vazio, tenta extrair do ID

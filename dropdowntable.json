@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.26",
+  "version": "2.10.27",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-ksg5jb7Zt/PVCyrvcpllRYQafEZ44E/ry7H0LBVq4ug="
+      "integrity": "sha256-HTvDC8E7PCkhOXHYMVag3jxSf0wNRobKmV7wj+C9UJE="
     },
     {
       "kind": "styling",
@@ -248,6 +248,12 @@
       "description": "Remove filtro de dimensão do binding.",
       "parameters": [
         { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
+      ]
+    },
+    "setRowValues": {
+      "description": "Define valores pré-selecionados por linha. Formato: {contaId: 'contaId|periodoId|fonteId|respId'}",
+      "parameters": [
+        { "name": "v", "type": "string", "description": "JSON string do mapeamento de valores por linha" }
       ]
     },
     "clearAllFilters": {
