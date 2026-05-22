@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.28
+// dropdown-table-widget.js — v2.10.29
 // Changelog:
-//   v2.10.28 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.29 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1381,6 +1381,8 @@ class DropdownTableWidget extends HTMLElement {
             mvVal = String(mv2.formattedValue);
           } else if (mv2.formatted !== undefined && mv2.formatted !== null && String(mv2.formatted) !== "" && mv2.formatted !== "NaN") {
             mvVal = String(mv2.formatted);
+            // Remove sufixos de unidade SAC (ex: "13,00c" → "13,00", "1.593,95BRL" → "1.593,95")
+            mvVal = mvVal.replace(/[a-zA-Z]+$/, "").trim();
           } else if (mv2.raw !== null && mv2.raw !== undefined && String(mv2.raw) !== "NaN" && String(mv2.raw) !== "null") {
             mvVal = String(mv2.raw);
           }
