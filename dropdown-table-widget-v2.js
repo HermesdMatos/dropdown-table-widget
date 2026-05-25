@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.34
+// dropdown-table-widget.js — v2.10.35
 // Changelog:
-//   v2.10.34 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.35 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1449,19 +1449,15 @@ class DropdownTableWidget extends HTMLElement {
             if (!self2._localMeasures[rowIdx]) { self2._localMeasures[rowIdx] = {}; }
             self2._localMeasures[rowIdx][measureKey] = newVal;
 
-            // Monta endereço das dimensões para o script SAC
+            // Monta endereço das dimensões para o script SAC — mantém IDs completos
             var dims3    = self2._metadata.feeds.dimensions.values;
             var addrStr  = "";
             var addrObj  = {};
             for (var x = 0; x < dims3.length; x++) {
               var dc = rowD["dimensions_" + x] || {};
               if (dc.id) {
-                // Extrai ID limpo: "[DIM].[HIER].&[ID]" → "ID"
-                var cleanId = dc.id;
-                var cm = dc.id.match(/\.&\[([^\]]+)\]$/);
-                if (cm) { cleanId = cm[1]; }
-                addrObj[dims3[x].id] = cleanId;
-                addrStr = addrStr + dims3[x].id + "=" + cleanId + ";";
+                addrObj[dims3[x].id] = dc.id;
+                addrStr = addrStr + dims3[x].id + "|~|" + dc.id + "|||";
               }
             }
 
@@ -1472,22 +1468,16 @@ class DropdownTableWidget extends HTMLElement {
               if (cid0 !== "" && self2._rowValuesMap[cid0]) {
                 var parts = self2._rowValuesMap[cid0].split("|");
                 if (dims3[1] && parts[1] !== "") {
-                  var cm1 = parts[1].match(/\.&\[([^\]]+)\]$/);
-                  var cleanPart1 = cm1 ? cm1[1] : parts[1];
-                  addrObj[dims3[1].id] = cleanPart1;
-                  addrStr = addrStr + dims3[1].id + "=" + cleanPart1 + ";";
+                  addrObj[dims3[1].id] = parts[1];
+                  addrStr = addrStr + dims3[1].id + "|~|" + parts[1] + "|||";
                 }
                 if (dims3[2] && parts[2] !== "") {
-                  var cm2 = parts[2].match(/\.&\[([^\]]+)\]$/);
-                  var cleanPart2 = cm2 ? cm2[1] : parts[2];
-                  addrObj[dims3[2].id] = cleanPart2;
-                  addrStr = addrStr + dims3[2].id + "=" + cleanPart2 + ";";
+                  addrObj[dims3[2].id] = parts[2];
+                  addrStr = addrStr + dims3[2].id + "|~|" + parts[2] + "|||";
                 }
                 if (dims3[3] && parts[3] !== "") {
-                  var cm3 = parts[3].match(/\.&\[([^\]]+)\]$/);
-                  var cleanPart3 = cm3 ? cm3[1] : parts[3];
-                  addrObj[dims3[3].id] = cleanPart3;
-                  addrStr = addrStr + dims3[3].id + "=" + cleanPart3 + ";";
+                  addrObj[dims3[3].id] = parts[3];
+                  addrStr = addrStr + dims3[3].id + "|~|" + parts[3] + "|||";
                 }
               }
             }
