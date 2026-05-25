@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.32
+// dropdown-table-widget.js — v2.10.33
 // Changelog:
-//   v2.10.32 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.33 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -606,6 +606,20 @@ class DropdownTableWidget extends HTMLElement {
       }
     } catch(e) { console.error("_applyExternalFilter error:", e); }
   }
+
+  get measureChangeValue()     { return this._measureChangeValue     || ""; }
+  set measureChangeValue(v)     { this._measureChangeValue     = v || ""; }
+  get measureChangeMeasureId() { return this._measureChangeMeasureId || ""; }
+  set measureChangeMeasureId(v) { this._measureChangeMeasureId = v || ""; }
+  get measureChangeRowIndex()  { return this._measureChangeRowIndex  || ""; }
+  set measureChangeRowIndex(v)  { this._measureChangeRowIndex  = v || ""; }
+  get measureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
+  set measureChangeAddrStr(v)   { this._measureChangeAddrStr   = v || ""; }
+
+  getMeasureChangeValue()     { return this._measureChangeValue     || ""; }
+  getMeasureChangeMeasureId() { return this._measureChangeMeasureId || ""; }
+  getMeasureChangeRowIndex()  { return this._measureChangeRowIndex  || ""; }
+  getMeasureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
 
   get deleteMemberId()          { return this._deleteMemberId          || ""; }
   set deleteMemberId(v)          { this._deleteMemberId          = v || ""; }
@@ -1429,31 +1443,67 @@ class DropdownTableWidget extends HTMLElement {
 
         (function(inputEl, rowIdx, measureKey, measureId, rowD) {
           inputEl.addEventListener("change", function() {
-            var newVal = parseFloat(inputEl.value.replace(",", "."));
+            var newVal = parseFloat(inputEl.value.replace(",", ".").replace(/[^0-9.\-]/g, ""));
             if (isNaN(newVal)) { newVal = 0; }
             if (!self2._localMeasures) { self2._localMeasures = {}; }
             if (!self2._localMeasures[rowIdx]) { self2._localMeasures[rowIdx] = {}; }
             self2._localMeasures[rowIdx][measureKey] = newVal;
-            try {
-              var b = self2.myDataBinding;
-              if (b && b.setValueState) {
-                var addr = {};
-                var dims3 = self2._metadata.feeds.dimensions.values;
-                for (var x = 0; x < dims3.length; x++) {
-                  var dc = rowD["dimensions_" + x] || {};
-                  if (dc.id) { addr[dims3[x].id] = dc.id; }
-                }
-                addr[measureId] = newVal;
-                b.setValueState(addr, function(err) {
-                  if (!err) {
-                    if (self2._localMeasures && self2._localMeasures[rowIdx]) {
-                      delete self2._localMeasures[rowIdx][measureKey];
-                    }
-                    self2._loadBinding();
-                  }
-                });
+
+            // Monta endereço das dimensões para o script SAC
+            var dims3    = self2._metadata.feeds.dimensions.values;
+            var addrStr  = "";
+            var addrObj  = {};
+            for (var x = 0; x < dims3.length; x++) {
+              var dc = rowD["dimensions_" + x] || {};
+              if (dc.id) {
+                addrObj[dims3[x].id] = dc.id;
+                addrStr = addrStr + dims3[x].id + "=" + dc.id + ";";
               }
-            } catch(e3) { console.error("Measure write-back:", e3); }
+            }
+
+            // Aplica rowValuesMap se disponível (dimensões pré-selecionadas)
+            if (self2._rowValuesMap) {
+              var dim0c = rowD["dimensions_0"] || {};
+              var cid0  = dim0c.id || "";
+              if (cid0 !== "" && self2._rowValuesMap[cid0]) {
+                var parts = self2._rowValuesMap[cid0].split("|");
+                if (dims3[1] && parts[1] !== "") { addrObj[dims3[1].id] = parts[1]; }
+                if (dims3[2] && parts[2] !== "") { addrObj[dims3[2].id] = parts[2]; }
+                if (dims3[3] && parts[3] !== "") { addrObj[dims3[3].id] = parts[3]; }
+              }
+            }
+
+            // Salva payload para o script SAC
+            self2._measureChangeValue     = String(newVal);
+            self2._measureChangeMeasureId = measureId;
+            self2._measureChangeRowIndex  = String(rowIdx);
+            self2._measureChangeAddrStr   = addrStr;
+
+            // Notifica SAC via propertiesChanged
+            self2.dispatchEvent(new CustomEvent("propertiesChanged", {
+              bubbles: true, composed: true,
+              detail: {
+                properties: {
+                  measureChangeValue:     String(newVal),
+                  measureChangeMeasureId: measureId,
+                  measureChangeRowIndex:  String(rowIdx),
+                  measureChangeAddrStr:   addrStr
+                }
+              }
+            }));
+
+            // Dispara evento onMeasureChanged via microtask
+            Promise.resolve().then(function() {
+              self2.dispatchEvent(new CustomEvent("onMeasureChanged", {
+                bubbles: true, composed: true,
+                detail: {
+                  rowIndex:  rowIdx,
+                  measureId: measureId,
+                  value:     newVal,
+                  address:   addrObj
+                }
+              }));
+            });
           });
         })(input, ri, mk2, measures[mi2].id || mk2, rowData);
 

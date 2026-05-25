@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.32",
+  "version": "2.10.33",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-+F+VEzerDrQ7S2bThHYJHS5ksKXLRr2GIP6Mx9VXT9o="
+      "integrity": "sha256-T7S8XpS+QzeencHY01B6w6PGUu8kdNYb/1F3gq4CY+c="
     },
     {
       "kind": "styling",
@@ -65,6 +65,26 @@
     "newMemberParentId": {
       "type": "string",
       "description": "ParentId (hierarquia) digitado no modal Adicionar membro",
+      "default": ""
+    },
+    "measureChangeValue": {
+      "type": "string",
+      "description": "Valor da medida alterada",
+      "default": ""
+    },
+    "measureChangeMeasureId": {
+      "type": "string",
+      "description": "ID da medida alterada (ex: CUSTO, QUANTIDADE)",
+      "default": ""
+    },
+    "measureChangeRowIndex": {
+      "type": "string",
+      "description": "Índice da linha alterada",
+      "default": ""
+    },
+    "measureChangeAddrStr": {
+      "type": "string",
+      "description": "Endereço das dimensões da linha alterada no formato DIM=ID;...",
       "default": ""
     },
     "dimensionFilterId": {
@@ -142,6 +162,24 @@
     }
   },
   "methods": {
+    "getMeasureChangeValue": {
+      "returnType": "string",
+      "description": "Retorna o valor da medida alterada.",
+      "parameters": [],
+      "body": "return this.measureChangeValue || '';"
+    },
+    "getMeasureChangeMeasureId": {
+      "returnType": "string",
+      "description": "Retorna o ID da medida alterada.",
+      "parameters": [],
+      "body": "return this.measureChangeMeasureId || '';"
+    },
+    "getMeasureChangeAddrStr": {
+      "returnType": "string",
+      "description": "Retorna o endereço das dimensões da linha alterada no formato DIM=ID;...",
+      "parameters": [],
+      "body": "return this.measureChangeAddrStr || '';"
+    },
     "getLastAddMemberRequest": {
       "returnType": "string",
       "description": "Retorna o último payload de criação de membro como JSON string.",
@@ -263,6 +301,9 @@
     }
   },
   "events": {
+    "onMeasureChanged": {
+      "description": "Fired when a measure value is changed. Read via getMeasureChangeValue(), getMeasureChangeMeasureId(), getMeasureChangeAddrStr()."
+    },
     "onDropdownChanged": {
       "description": "Fired when a dropdown value is selected. Read selectedCellData for {row, dimensionId, memberId, memberLabel}."
     },
