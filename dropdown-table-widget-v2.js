@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.30
+// dropdown-table-widget.js — v2.10.31
 // Changelog:
-//   v2.10.30 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.31 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1394,7 +1394,7 @@ class DropdownTableWidget extends HTMLElement {
         var input = document.createElement("input");
         input.type = "text";
         input.value = mvVal;
-        input.style.cssText = "width:100%;height:" + self2._rowHeight + "px;border:none;background:transparent;text-align:" + (self2._cellAlign || "right") + ";padding:0 12px;font-size:13px;color:var(--table-text-color,#333);box-sizing:border-box;outline:none;cursor:pointer;";
+        input.style.cssText = "width:100%;height:" + self2._rowHeight + "px;border:none;background:transparent;text-align:center;padding:0 12px;font-size:13px;color:var(--table-text-color,#333);box-sizing:border-box;outline:none;cursor:pointer;";
 
         input.addEventListener("focus", function(e) {
           e.target.style.background = self2._editableCellColor || "#fffbe6";
@@ -1474,6 +1474,11 @@ class DropdownTableWidget extends HTMLElement {
     var wrapper = document.createElement("div");
     wrapper.className = "cell-dropdown";
     wrapper.tabIndex  = 0;
+    // Aplica alinhamento via justify-content
+    var align = self._cellAlign || "left";
+    if (align === "center") { wrapper.style.justifyContent = "center"; }
+    else if (align === "right") { wrapper.style.justifyContent = "flex-end"; }
+    else { wrapper.style.justifyContent = "flex-start"; }
 
     var valueSpan = document.createElement("span");
     valueSpan.className = currentLabel ? "cell-value" : "cell-value empty";
