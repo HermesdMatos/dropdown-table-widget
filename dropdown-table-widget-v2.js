@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.31
+// dropdown-table-widget.js — v2.10.32
 // Changelog:
-//   v2.10.31 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.32 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1406,6 +1406,26 @@ class DropdownTableWidget extends HTMLElement {
           e.target.style.outline = "none";
           e.target.style.cursor = "pointer";
         });
+        input.addEventListener("keydown", function(e) {
+          if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+            e.preventDefault();
+            var allInputs = Array.from(self2.shadowRoot.querySelectorAll("tbody input, tbody .cell-dropdown"));
+            var idx = allInputs.indexOf(e.target);
+            if (idx === -1) { return; }
+            // Calcula número de colunas
+            var row = e.target.closest("tr");
+            var allCells = row ? Array.from(row.querySelectorAll("input, .cell-dropdown")) : [];
+            var colCount = allCells.length;
+            var nextIdx = idx;
+            if (e.key === "ArrowDown")  { nextIdx = idx + colCount; }
+            if (e.key === "ArrowUp")    { nextIdx = idx - colCount; }
+            if (e.key === "ArrowRight") { nextIdx = idx + 1; }
+            if (e.key === "ArrowLeft")  { nextIdx = idx - 1; }
+            if (nextIdx >= 0 && nextIdx < allInputs.length) {
+              allInputs[nextIdx].focus();
+            }
+          }
+        });
 
         (function(inputEl, rowIdx, measureKey, measureId, rowD) {
           inputEl.addEventListener("change", function() {
@@ -1500,6 +1520,24 @@ class DropdownTableWidget extends HTMLElement {
     wrapper.addEventListener("keydown", function(e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); wrapper.click(); }
       if (e.key === "Escape") self._closeDropdown();
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        var allCells = Array.from(self.shadowRoot.querySelectorAll("tbody input, tbody .cell-dropdown"));
+        var idx = allCells.indexOf(wrapper);
+        if (idx === -1) { return; }
+        var row = wrapper.closest("tr");
+        var rowCells = row ? Array.from(row.querySelectorAll("input, .cell-dropdown")) : [];
+        var colCount = rowCells.length;
+        var nextIdx = idx;
+        if (e.key === "ArrowDown")  { nextIdx = idx + colCount; }
+        if (e.key === "ArrowUp")    { nextIdx = idx - colCount; }
+        if (e.key === "ArrowRight") { nextIdx = idx + 1; }
+        if (e.key === "ArrowLeft")  { nextIdx = idx - 1; }
+        if (nextIdx >= 0 && nextIdx < allCells.length) {
+          self._closeDropdown();
+          allCells[nextIdx].focus();
+        }
+      }
     });
 
     td.appendChild(wrapper);
