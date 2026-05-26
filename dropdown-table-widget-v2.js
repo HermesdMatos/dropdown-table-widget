@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.38
+// dropdown-table-widget.js — v2.10.39
 // Changelog:
-//   v2.10.38 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1115,7 +1115,12 @@ class DropdownTableWidget extends HTMLElement {
     for (var mvi = 0; mvi < measValues.length; mvi++) {
       var mv2 = measValues[mvi];
       if (typeof mv2 === "string") {
-        measures.push({ id: mv2, description: "" });
+        // Tenta resolver o ID real da medida do mainStructureMembers
+        var realMeasId = mv2;
+        if (this._metadata.mainStructureMembers && this._metadata.mainStructureMembers[mv2]) {
+          realMeasId = this._metadata.mainStructureMembers[mv2].id || mv2;
+        }
+        measures.push({ id: realMeasId, description: "", feedKey: mv2 });
       } else {
         measures.push(mv2);
       }
@@ -1748,4 +1753,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.38
+// v2.10.39
