@@ -1,6 +1,6 @@
-// dropdown-table-widget.js — v2.10.36
+// dropdown-table-widget.js — v2.10.37
 // Changelog:
-//   v2.10.36 — Adiciona getDataSource() para compatibilidade com padrão SAC
+//   v2.10.37 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
 //   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
@@ -1456,8 +1456,13 @@ class DropdownTableWidget extends HTMLElement {
             for (var x = 0; x < dims3.length; x++) {
               var dc = rowD["dimensions_" + x] || {};
               if (dc.id) {
-                addrObj[dims3[x].id] = dc.id;
-                addrStr = addrStr + dims3[x].id + "|~|" + dc.id + "|||";
+                // Resolve ID real da dimensão do metadata
+                var dimRealId3 = "dimensions_" + x;
+                if (self2._metadata.dimensions && self2._metadata.dimensions["dimensions_" + x]) {
+                  dimRealId3 = self2._metadata.dimensions["dimensions_" + x].id || dimRealId3;
+                }
+                addrObj[dimRealId3] = dc.id;
+                addrStr = addrStr + dimRealId3 + "|~|" + dc.id + "|||";
               }
             }
 
@@ -1467,18 +1472,12 @@ class DropdownTableWidget extends HTMLElement {
               var cid0  = dim0c.id || "";
               if (cid0 !== "" && self2._rowValuesMap[cid0]) {
                 var parts = self2._rowValuesMap[cid0].split("|");
-                if (dims3[1] && parts[1] !== "") {
-                  addrObj[dims3[1].id] = parts[1];
-                  addrStr = addrStr + dims3[1].id + "|~|" + parts[1] + "|||";
-                }
-                if (dims3[2] && parts[2] !== "") {
-                  addrObj[dims3[2].id] = parts[2];
-                  addrStr = addrStr + dims3[2].id + "|~|" + parts[2] + "|||";
-                }
-                if (dims3[3] && parts[3] !== "") {
-                  addrObj[dims3[3].id] = parts[3];
-                  addrStr = addrStr + dims3[3].id + "|~|" + parts[3] + "|||";
-                }
+                var dimId1 = self2._metadata.dimensions && self2._metadata.dimensions["dimensions_1"] ? self2._metadata.dimensions["dimensions_1"].id : "dimensions_1";
+                var dimId2 = self2._metadata.dimensions && self2._metadata.dimensions["dimensions_2"] ? self2._metadata.dimensions["dimensions_2"].id : "dimensions_2";
+                var dimId3 = self2._metadata.dimensions && self2._metadata.dimensions["dimensions_3"] ? self2._metadata.dimensions["dimensions_3"].id : "dimensions_3";
+                if (parts[1] !== "") { addrObj[dimId1] = parts[1]; addrStr = addrStr + dimId1 + "|~|" + parts[1] + "|||"; }
+                if (parts[2] !== "") { addrObj[dimId2] = parts[2]; addrStr = addrStr + dimId2 + "|~|" + parts[2] + "|||"; }
+                if (parts[3] !== "") { addrObj[dimId3] = parts[3]; addrStr = addrStr + dimId3 + "|~|" + parts[3] + "|||"; }
               }
             }
 
