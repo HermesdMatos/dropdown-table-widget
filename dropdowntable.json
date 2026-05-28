@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.39",
+  "version": "2.10.40",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-7MY15BCeDvq3ZtNdmbY+G8MP0+EwW0QX0YDPKZctwgA="
+      "integrity": "sha256-zy1uLg9WcJvosBdQDftBgjmAcA4MoPb0ecHpb4Z8vA0="
     },
     {
       "kind": "styling",
@@ -225,7 +225,11 @@
     "setDropdownOptions": {
       "description": "Define dropdown options per column. Pass array: [{dimensionKey:'dimensions_1', options:['Mensal','Bimestral',...]}]",
       "parameters": [
-        { "name": "v", "type": "string", "description": "JSON array of {dimensionKey, options[]}" }
+        {
+          "name": "v",
+          "type": "string",
+          "description": "JSON array of {dimensionKey, options[]}"
+        }
       ],
       "body": "this.dropdownOptions = v;"
     },
@@ -238,7 +242,11 @@
     "setDropdownDimensions": {
       "description": "Define which dimension feed IDs render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
       "parameters": [
-        { "name": "val", "type": "string", "description": "JSON array of dimension feed IDs" }
+        {
+          "name": "val",
+          "type": "string",
+          "description": "JSON array of dimension feed IDs"
+        }
       ],
       "body": "this.dropdownDimensions = val;"
     },
@@ -261,37 +269,38 @@
       "body": "return this.selectedCellData || '{}';"
     },
     "setDimensionFilter": {
-      "description": "Aplica filtro de dimensão no binding. Ex: setDimensionFilter(\"Date\", \"2024.01\") ou setDimensionFilter(\"Date\", [\"2024.01\",\"2024.02\"])",
-      "parameters": [
-        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC (ex: Date, CLIENTE)" },
-        { "name": "memberIds",   "type": "string", "description": "ID do membro ou array JSON de IDs" }
-      ],
-      "body": "this.myDataBinding.setDimensionFilter(dimensionId, Array.isArray(memberIds) ? memberIds : [memberIds]);"
-    },
-    "removeDimensionFilter": {
-      "description": "Remove filtro de dimensão do binding.",
-      "parameters": [
-        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
-      ],
-      "body": "this.myDataBinding.removeDimensionFilter(dimensionId);"
-    },
-    "setDimensionFilter": {
       "description": "Aplica filtro de dimensão. Ex: setDimensionFilter(\"Date\", \"[Date].[YM].&[202606]\")",
       "parameters": [
-        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" },
-        { "name": "memberIds",   "type": "string", "description": "ID do membro" }
+        {
+          "name": "dimensionId",
+          "type": "string",
+          "description": "ID da dimensão SAC"
+        },
+        {
+          "name": "memberIds",
+          "type": "string",
+          "description": "ID do membro"
+        }
       ]
     },
     "removeDimensionFilter": {
       "description": "Remove filtro de dimensão do binding.",
       "parameters": [
-        { "name": "dimensionId", "type": "string", "description": "ID da dimensão SAC" }
+        {
+          "name": "dimensionId",
+          "type": "string",
+          "description": "ID da dimensão SAC"
+        }
       ]
     },
     "setRowValues": {
       "description": "Define valores pré-selecionados por linha. Formato: {contaId: 'contaId|periodoId|fonteId|respId'}",
       "parameters": [
-        { "name": "v", "type": "string", "description": "JSON string do mapeamento de valores por linha" }
+        {
+          "name": "v",
+          "type": "string",
+          "description": "JSON string do mapeamento de valores por linha"
+        }
       ]
     },
     "clearAllFilters": {

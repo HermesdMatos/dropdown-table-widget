@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.10.39
+// dropdown-table-widget.js — v2.10.40
 // Changelog:
+//   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
 //   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
@@ -1486,6 +1487,23 @@ class DropdownTableWidget extends HTMLElement {
               }
             }
 
+            // Aplica _localSelections — sobrescreve com seleções manuais do usuário (prioridade máxima)
+            if (self2._localSelections && self2._localSelections[rowIdx]) {
+              var lKeys = ["dimensions_1", "dimensions_2", "dimensions_3"];
+              for (var ls = 0; ls < lKeys.length; ls++) {
+                var ldk = lKeys[ls];
+                var lsel = self2._localSelections[rowIdx][ldk];
+                if (lsel && lsel.id && lsel.id !== "") {
+                  var lDimRealId = ldk;
+                  if (self2._metadata.dimensions && self2._metadata.dimensions[ldk]) {
+                    lDimRealId = self2._metadata.dimensions[ldk].id || ldk;
+                  }
+                  addrObj[lDimRealId] = lsel.id;
+                  addrStr = addrStr + lDimRealId + "|~|" + lsel.id + "|||";
+                }
+              }
+            }
+
             // Salva payload para o script SAC
             self2._measureChangeValue     = String(newVal);
             self2._measureChangeMeasureId = measureId;
@@ -1753,4 +1771,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.39
+// v2.10.40
