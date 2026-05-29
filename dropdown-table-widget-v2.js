@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.44
+// dropdown-table-widget.js — v2.10.45
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -313,6 +313,7 @@ class DropdownTableWidget extends HTMLElement {
     this._dropdownDimensions = [];
     this._dropdownOptions = {};
     this._selectedCellData = {};
+    this._previousCellData = {};
     this._activeFilters = {};
     this._activeCell = null;
     this._metadata = null;
@@ -683,6 +684,7 @@ class DropdownTableWidget extends HTMLElement {
   getNewMemberParentId()    { return this.getAttribute("data-new-member-parent") || ""; }
   getNewMemberDimensionId() { return this.getAttribute("data-new-member-dim")    || ""; }
   getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
+  getPreviousCellData() { return JSON.stringify(this._previousCellData); }
   getActiveFilters() { return JSON.stringify(this._activeFilters); }
 
   setDropdownOptions(v) {
@@ -1725,6 +1727,7 @@ class DropdownTableWidget extends HTMLElement {
   _selectValue(rowIndex, dimensionId, memberId, memberLabel) {
     var self = this;
 
+    this._previousCellData = JSON.parse(JSON.stringify(this._selectedCellData));
     this._selectedCellData = {
       row: rowIndex,
       dimensionId: dimensionId,
@@ -1794,4 +1797,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.44
+// v2.10.45

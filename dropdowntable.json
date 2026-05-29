@@ -309,9 +309,8 @@
       "body": "this.selectedCellData = '{}';"
     },
     "clearMeasureInput": {
-      "description": "Limpa o valor da célula de medida que foi alterada por último. Usar após validação falhar.",
-      "parameters": [],
-      "body": "this.clearMeasureInput();"
+      "description": "Limpa o valor da celula de medida que foi alterada por ultimo.",
+      "parameters": []
     }
   },
   "events": {
