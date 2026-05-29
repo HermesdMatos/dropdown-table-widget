@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.46
+// dropdown-table-widget.js — v2.10.47
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -1773,12 +1773,71 @@ class DropdownTableWidget extends HTMLElement {
       console.error("DropdownTable write-back error:", e);
     }
 
+    // Monta addrStr completo da linha para o SAC usar no onDropdownChanged
+    var dropAddrStr = "";
+    try {
+      var rowData2   = this._data[rowIndex];
+      var dims2      = this._metadata.feeds.dimensions.values;
+      for (var da = 0; da < dims2.length; da++) {
+        var dka  = "dimensions_" + da;
+        var dca  = rowData2[dka] || {};
+        var dcid = dca.id || "";
+        var dimRealIda = dka;
+        if (this._metadata.dimensions && this._metadata.dimensions[dka]) {
+          dimRealIda = this._metadata.dimensions[dka].id || dka;
+        }
+        if (dcid !== "") { dropAddrStr = dropAddrStr + dimRealIda + "|~|" + dcid + "|||"; }
+      }
+      // Sobrescreve a dimensão alterada com o novo valor
+      var dimIdxA = parseInt(dimensionId.replace("dimensions_", ""), 10);
+      if (!isNaN(dimIdxA) && dims2[dimIdxA]) {
+        var dimRealIdNew = dimensionId;
+        if (this._metadata.dimensions && this._metadata.dimensions[dimensionId]) {
+          dimRealIdNew = this._metadata.dimensions[dimensionId].id || dimensionId;
+        }
+        dropAddrStr = dropAddrStr + dimRealIdNew + "|~|" + memberId + "|||";
+      }
+      // Aplica rowValuesMap para dimensões não alteradas
+      if (this._rowValuesMap && rowData2) {
+        var dim0 = rowData2["dimensions_0"] || {};
+        var cid0 = dim0.id || "";
+        if (cid0 !== "" && this._rowValuesMap[cid0]) {
+          var rparts = this._rowValuesMap[cid0].split("|");
+          var rd1 = this._metadata.dimensions && this._metadata.dimensions["dimensions_1"] ? this._metadata.dimensions["dimensions_1"].id : "dimensions_1";
+          var rd2 = this._metadata.dimensions && this._metadata.dimensions["dimensions_2"] ? this._metadata.dimensions["dimensions_2"].id : "dimensions_2";
+          var rd3 = this._metadata.dimensions && this._metadata.dimensions["dimensions_3"] ? this._metadata.dimensions["dimensions_3"].id : "dimensions_3";
+          if (rparts[1] !== "" && dimensionId !== "dimensions_1") { dropAddrStr = dropAddrStr + rd1 + "|~|" + rparts[1] + "|||"; }
+          if (rparts[2] !== "" && dimensionId !== "dimensions_2") { dropAddrStr = dropAddrStr + rd2 + "|~|" + rparts[2] + "|||"; }
+          if (rparts[3] !== "" && dimensionId !== "dimensions_3") { dropAddrStr = dropAddrStr + rd3 + "|~|" + rparts[3] + "|||"; }
+        }
+      }
+      // Aplica _localSelections para dimensões já trocadas manualmente
+      if (this._localSelections && this._localSelections[rowIndex]) {
+        var lks = ["dimensions_1", "dimensions_2", "dimensions_3"];
+        for (var lka = 0; lka < lks.length; lka++) {
+          var ldka = lks[lka];
+          if (ldka === dimensionId) { continue; }
+          var lsela = this._localSelections[rowIndex][ldka];
+          if (lsela && lsela.id && lsela.id !== "") {
+            var lRealId = ldka;
+            if (this._metadata.dimensions && this._metadata.dimensions[ldka]) {
+              lRealId = this._metadata.dimensions[ldka].id || ldka;
+            }
+            dropAddrStr = dropAddrStr + lRealId + "|~|" + lsela.id + "|||";
+          }
+        }
+      }
+    } catch(ex) { console.error("dropAddrStr build error:", ex); }
+
+    this._dropdownChangeAddrStr = dropAddrStr;
+
     // Notifica SAC via propertiesChanged antes do evento
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
       detail: {
         properties: {
-          selectedCellData: JSON.stringify(this._selectedCellData)
+          selectedCellData: JSON.stringify(this._selectedCellData),
+          measureChangeAddrStr: dropAddrStr
         }
       }
     }));
@@ -1809,4 +1868,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.46
+// v2.10.47
