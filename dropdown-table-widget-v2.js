@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.48
+// dropdown-table-widget.js — v2.10.49
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -685,6 +685,40 @@ class DropdownTableWidget extends HTMLElement {
   getNewMemberDimensionId() { return this.getAttribute("data-new-member-dim")    || ""; }
   getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
   getPreviousCellData() { return JSON.stringify(this._previousCellData); }
+  getOldRowAddrStr() {
+    var rowIndex = this._selectedCellData && this._selectedCellData.row !== undefined ? this._selectedCellData.row : -1;
+    var changedDimId = this._selectedCellData ? this._selectedCellData.dimensionId : "";
+    if (rowIndex === -1 || !this._data || !this._metadata) { return ""; }
+    var addrObj = {};
+    var rowData = this._data[rowIndex];
+    if (!rowData) { return ""; }
+    var dim0 = rowData["dimensions_0"] || {};
+    if (dim0.id) {
+      var realId0 = "dimensions_0";
+      if (this._metadata.dimensions && this._metadata.dimensions["dimensions_0"]) {
+        realId0 = this._metadata.dimensions["dimensions_0"].id || realId0;
+      }
+      addrObj[realId0] = dim0.id;
+    }
+    if (this._rowValuesMap) {
+      var cid0 = dim0.id || "";
+      if (cid0 !== "" && this._rowValuesMap[cid0]) {
+        var rparts = this._rowValuesMap[cid0].split("|");
+        var rd1 = this._metadata.dimensions && this._metadata.dimensions["dimensions_1"] ? this._metadata.dimensions["dimensions_1"].id : "dimensions_1";
+        var rd2 = this._metadata.dimensions && this._metadata.dimensions["dimensions_2"] ? this._metadata.dimensions["dimensions_2"].id : "dimensions_2";
+        var rd3 = this._metadata.dimensions && this._metadata.dimensions["dimensions_3"] ? this._metadata.dimensions["dimensions_3"].id : "dimensions_3";
+        if (rparts[1] !== "") { addrObj[rd1] = rparts[1]; }
+        if (rparts[2] !== "") { addrObj[rd2] = rparts[2]; }
+        if (rparts[3] !== "") { addrObj[rd3] = rparts[3]; }
+      }
+    }
+    var oldAddrStr = "";
+    var keys = Object.keys(addrObj);
+    for (var k = 0; k < keys.length; k++) {
+      oldAddrStr = oldAddrStr + keys[k] + "|~|" + addrObj[keys[k]] + "|||";
+    }
+    return oldAddrStr;
+  }
   getActiveFilters() { return JSON.stringify(this._activeFilters); }
 
   setDropdownOptions(v) {
@@ -1875,4 +1909,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.48
+// v2.10.49
