@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.43",
+  "version": "2.10.44",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-iNc0XqshkZDWag5PDWkyHT+5CaaQEqdzBxEZUaDbrRg="
+      "integrity": "sha256-Pggg6tTgusxCymEntAort9b6FUyyMOLBz/gKNhZB6KA="
     },
     {
       "kind": "styling",
@@ -307,6 +307,11 @@
       "description": "Clear all active dropdown filters",
       "parameters": [],
       "body": "this.selectedCellData = '{}';"
+    },
+    "clearMeasureInput": {
+      "description": "Limpa o valor da célula de medida que foi alterada por último. Usar após validação falhar.",
+      "parameters": [],
+      "body": "this.clearMeasureInput();"
     }
   },
   "events": {

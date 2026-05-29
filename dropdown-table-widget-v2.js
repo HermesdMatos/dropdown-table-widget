@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.43
+// dropdown-table-widget.js — v2.10.44
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -625,7 +625,6 @@ class DropdownTableWidget extends HTMLElement {
     var rowIdx = parseInt(this._measureChangeRowIndex || "0", 10);
     var measureKey = "measures_0";
     if (this._measureChangeMeasureId !== "") {
-      var dims3 = this._metadata ? this._metadata.feeds.dimensions.values : [];
       var measFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
       var measValues = measFeed ? measFeed.values : [];
       for (var cx = 0; cx < measValues.length; cx++) {
@@ -637,7 +636,13 @@ class DropdownTableWidget extends HTMLElement {
     if (this._localMeasures && this._localMeasures[rowIdx]) {
       delete this._localMeasures[rowIdx][measureKey];
     }
-    this._render();
+    // Limpa o input diretamente no DOM sem re-renderizar (evita loop)
+    var rows = this.shadowRoot.querySelectorAll("tbody tr[data-row-index='" + rowIdx + "']");
+    for (var ri = 0; ri < rows.length; ri++) {
+      var inputs = rows[ri].querySelectorAll("input");
+      var mIdx = parseInt(measureKey.replace("measures_", ""), 10);
+      if (inputs[mIdx]) { inputs[mIdx].value = ""; }
+    }
   }
 
   get deleteMemberId()          { return this._deleteMemberId          || ""; }
@@ -1789,4 +1794,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.43
+// v2.10.44
