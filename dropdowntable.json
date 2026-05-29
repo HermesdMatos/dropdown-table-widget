@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.49",
+  "version": "2.10.50",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-c99q7JcNS4PaBdrQnOGrmUkUPoJULneJP7USH/x6h98="
+      "integrity": "sha256-nffP9PFL8+aCjvOlUiNG1SXQMmUbsh5+B8+m5B61dNU="
     },
     {
       "kind": "styling",
@@ -341,6 +341,9 @@
     },
     "onExcludeRowRequested": {
       "description": "Fired when user clicks 'Excluir' (row exclusion). Detail: {action:'exclude', dimensionId, dimensionName, memberId, memberLabel, rowIndex}."
+    },
+    "onSaveRequested": {
+      "description": "Fired when user clicks Salvar. Detail: array of {rowIndex, addrStr, measures, address} for changed rows only."
     }
   },
   "dataBindings": {

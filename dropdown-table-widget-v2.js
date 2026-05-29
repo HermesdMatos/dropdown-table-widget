@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.49
+// dropdown-table-widget.js — v2.10.50
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -116,6 +116,28 @@ TMPL.innerHTML = `
   }
   .dt-title.hidden { display: none; }
 
+  .dt-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 6px 12px;
+    flex-shrink: 0;
+  }
+  .dt-toolbar.hidden { display: none; }
+  .dt-save-btn {
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 7px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+  }
+  .dt-save-btn:hover { background: #1557b0; }
+  .dt-save-btn:active { background: #0e4191; }
+
   .dt-outer { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box; }
   .dt-wrapper { width: 100%; flex: 1; overflow: auto; box-sizing: border-box; position: relative; }
 
@@ -232,6 +254,9 @@ TMPL.innerHTML = `
 </style>
 <div class="dt-outer" id="dt-outer">
   <div class="dt-title hidden" id="dt-title"></div>
+  <div class="dt-toolbar hidden" id="dt-toolbar">
+    <button class="dt-save-btn" id="dt-save-btn">Salvar</button>
+  </div>
   <div class="dt-wrapper" id="dt-wrapper">
   <table id="dt-table">
     <thead><tr id="dt-header"></tr></thead>
@@ -343,6 +368,8 @@ class DropdownTableWidget extends HTMLElement {
     this._cellAlign        = "left";
     this._titleAlign       = "left";
 
+    this._showSaveButton = true;
+
     // Context menu state
     this._ctxTarget = null; // {rowIndex, dimensionId, memberId, memberLabel, dimensionName}
 
@@ -355,6 +382,7 @@ class DropdownTableWidget extends HTMLElement {
     document.addEventListener("click", this._onDocCtxClose);
     this._bindContextMenu();
     this._bindModal();
+    this._bindSaveButton();
   }
 
   disconnectedCallback() {
@@ -1126,6 +1154,111 @@ class DropdownTableWidget extends HTMLElement {
     backdrop.classList.add("hidden");
   }
 
+  // ─── Save Button ──────────────────────────────────────────────
+  _bindSaveButton() {
+    var self = this;
+    var btn = this.shadowRoot.getElementById("dt-save-btn");
+    if (!btn) { return; }
+    btn.addEventListener("click", function() {
+      var changedData = self._buildChangedData();
+      self.dispatchEvent(new CustomEvent("propertiesChanged", {
+        bubbles: true, composed: true,
+        detail: { properties: { selectedCellData: JSON.stringify(changedData) } }
+      }));
+      Promise.resolve().then(function() {
+        self.dispatchEvent(new CustomEvent("onSaveRequested", {
+          bubbles: true, composed: true,
+          detail: changedData
+        }));
+      });
+    });
+  }
+
+  _buildChangedData() {
+    var result = [];
+    if (!this._metadata || !this._data) { return result; }
+    var dims = this._metadata.feeds.dimensions.values;
+    var measFeed = this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures;
+    var measValues = measFeed ? measFeed.values : [];
+
+    var changedRows = {};
+    // Coleta linhas com _localSelections
+    if (this._localSelections) {
+      var lkeys = Object.keys(this._localSelections);
+      for (var li = 0; li < lkeys.length; li++) { changedRows[lkeys[li]] = true; }
+    }
+    // Coleta linhas com _localMeasures
+    if (this._localMeasures) {
+      var mkeys = Object.keys(this._localMeasures);
+      for (var mi = 0; mi < mkeys.length; mi++) { changedRows[mkeys[mi]] = true; }
+    }
+
+    var rowIdxList = Object.keys(changedRows);
+    for (var ri = 0; ri < rowIdxList.length; ri++) {
+      var rowIdx = parseInt(rowIdxList[ri], 10);
+      var rowData = this._data[rowIdx];
+      if (!rowData) { continue; }
+
+      var addrObj = {};
+      // dimensions_0 do binding
+      var dim0 = rowData["dimensions_0"] || {};
+      if (dim0.id) {
+        var realId0 = "dimensions_0";
+        if (this._metadata.dimensions && this._metadata.dimensions["dimensions_0"]) {
+          realId0 = this._metadata.dimensions["dimensions_0"].id || realId0;
+        }
+        addrObj[realId0] = dim0.id;
+      }
+      // rowValuesMap
+      if (this._rowValuesMap && dim0.id && this._rowValuesMap[dim0.id]) {
+        var rparts = this._rowValuesMap[dim0.id].split("|");
+        var rd1 = this._metadata.dimensions && this._metadata.dimensions["dimensions_1"] ? this._metadata.dimensions["dimensions_1"].id : "dimensions_1";
+        var rd2 = this._metadata.dimensions && this._metadata.dimensions["dimensions_2"] ? this._metadata.dimensions["dimensions_2"].id : "dimensions_2";
+        var rd3 = this._metadata.dimensions && this._metadata.dimensions["dimensions_3"] ? this._metadata.dimensions["dimensions_3"].id : "dimensions_3";
+        if (rparts[1] !== "") { addrObj[rd1] = rparts[1]; }
+        if (rparts[2] !== "") { addrObj[rd2] = rparts[2]; }
+        if (rparts[3] !== "") { addrObj[rd3] = rparts[3]; }
+      }
+      // localSelections sobrescreve
+      if (this._localSelections && this._localSelections[rowIdx]) {
+        var lks = ["dimensions_1", "dimensions_2", "dimensions_3"];
+        for (var lk = 0; lk < lks.length; lk++) {
+          var lsel = this._localSelections[rowIdx][lks[lk]];
+          if (lsel && lsel.id && lsel.id !== "") {
+            var lRealId = lks[lk];
+            if (this._metadata.dimensions && this._metadata.dimensions[lks[lk]]) {
+              lRealId = this._metadata.dimensions[lks[lk]].id || lRealId;
+            }
+            addrObj[lRealId] = lsel.id;
+          }
+        }
+      }
+
+      // Monta addrStr
+      var addrStr = "";
+      var addrKeys = Object.keys(addrObj);
+      for (var ak = 0; ak < addrKeys.length; ak++) {
+        addrStr = addrStr + addrKeys[ak] + "|~|" + addrObj[addrKeys[ak]] + "|||";
+      }
+
+      // Medidas alteradas
+      var measures = {};
+      if (this._localMeasures && this._localMeasures[rowIdx]) {
+        var mkList = Object.keys(this._localMeasures[rowIdx]);
+        for (var mk2 = 0; mk2 < mkList.length; mk2++) {
+          var mkey = mkList[mk2];
+          var mIdx = parseInt(mkey.replace("measures_", ""), 10);
+          var mv = measValues[mIdx];
+          var mId = mv ? (typeof mv === "string" ? mv : (mv.id || mkey)) : mkey;
+          measures[mId] = this._localMeasures[rowIdx][mkey];
+        }
+      }
+
+      result.push({ rowIndex: rowIdx, addrStr: addrStr, measures: measures, address: addrObj });
+    }
+    return result;
+  }
+
   // ─── Dynamic Styles ───────────────────────────────────────────
   _applyDynamicStyles() {
     var wrapper = this.shadowRoot.getElementById("dt-wrapper");
@@ -1157,6 +1290,13 @@ class DropdownTableWidget extends HTMLElement {
       } else {
         titleEl.classList.add("hidden");
       }
+    }
+
+    // Renderiza toolbar
+    var toolbarEl = this.shadowRoot.getElementById("dt-toolbar");
+    if (toolbarEl) {
+      if (this._showSaveButton) { toolbarEl.classList.remove("hidden"); }
+      else { toolbarEl.classList.add("hidden"); }
     }
 
     headerRow.innerHTML = "";
@@ -1909,4 +2049,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.49
+// v2.10.50
