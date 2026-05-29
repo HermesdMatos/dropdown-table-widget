@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.45
+// dropdown-table-widget.js — v2.10.46
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -1773,9 +1773,21 @@ class DropdownTableWidget extends HTMLElement {
       console.error("DropdownTable write-back error:", e);
     }
 
-    this.dispatchEvent(new CustomEvent("onDropdownChanged", {
-      bubbles: true, composed: true, detail: this._selectedCellData
+    // Notifica SAC via propertiesChanged antes do evento
+    this.dispatchEvent(new CustomEvent("propertiesChanged", {
+      bubbles: true, composed: true,
+      detail: {
+        properties: {
+          selectedCellData: JSON.stringify(this._selectedCellData)
+        }
+      }
     }));
+
+    Promise.resolve().then(function() {
+      self.dispatchEvent(new CustomEvent("onDropdownChanged", {
+        bubbles: true, composed: true, detail: self._selectedCellData
+      }));
+    });
   }
 
   _applyFilters() {
@@ -1797,4 +1809,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.45
+// v2.10.46
