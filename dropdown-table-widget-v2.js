@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.40
+// dropdown-table-widget.js — v2.10.43
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -621,6 +621,24 @@ class DropdownTableWidget extends HTMLElement {
   getMeasureChangeMeasureId() { return this._measureChangeMeasureId || ""; }
   getMeasureChangeRowIndex()  { return this._measureChangeRowIndex  || ""; }
   getMeasureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
+  clearMeasureInput() {
+    var rowIdx = parseInt(this._measureChangeRowIndex || "0", 10);
+    var measureKey = "measures_0";
+    if (this._measureChangeMeasureId !== "") {
+      var dims3 = this._metadata ? this._metadata.feeds.dimensions.values : [];
+      var measFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
+      var measValues = measFeed ? measFeed.values : [];
+      for (var cx = 0; cx < measValues.length; cx++) {
+        var mv = measValues[cx];
+        var mid = (typeof mv === "string") ? mv : (mv.id || mv.feedKey || "measures_" + cx);
+        if (mid === this._measureChangeMeasureId) { measureKey = "measures_" + cx; break; }
+      }
+    }
+    if (this._localMeasures && this._localMeasures[rowIdx]) {
+      delete this._localMeasures[rowIdx][measureKey];
+    }
+    this._render();
+  }
 
   get deleteMemberId()          { return this._deleteMemberId          || ""; }
   set deleteMemberId(v)          { this._deleteMemberId          = v || ""; }
@@ -1771,4 +1789,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.40
+// v2.10.43
