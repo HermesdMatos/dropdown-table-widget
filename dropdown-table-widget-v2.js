@@ -1,4 +1,4 @@
-// dropdown-table-widget.js — v2.10.47
+// dropdown-table-widget.js — v2.10.48
 // Changelog:
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -1773,61 +1773,68 @@ class DropdownTableWidget extends HTMLElement {
       console.error("DropdownTable write-back error:", e);
     }
 
-    // Monta addrStr completo da linha para o SAC usar no onDropdownChanged
-    var dropAddrStr = "";
+    // Monta addrObj completo da linha — usa objeto para evitar duplicatas
+    var dropAddrObj = {};
     try {
-      var rowData2   = this._data[rowIndex];
-      var dims2      = this._metadata.feeds.dimensions.values;
-      for (var da = 0; da < dims2.length; da++) {
-        var dka  = "dimensions_" + da;
-        var dca  = rowData2[dka] || {};
-        var dcid = dca.id || "";
-        var dimRealIda = dka;
-        if (this._metadata.dimensions && this._metadata.dimensions[dka]) {
-          dimRealIda = this._metadata.dimensions[dka].id || dka;
+      var rowData2 = this._data[rowIndex];
+      var dims2    = this._metadata.feeds.dimensions.values;
+
+      // 1. Base: binding (dimensions_0 sempre)
+      var dim0base = rowData2["dimensions_0"] || {};
+      if (dim0base.id) {
+        var realId0 = "dimensions_0";
+        if (this._metadata.dimensions && this._metadata.dimensions["dimensions_0"]) {
+          realId0 = this._metadata.dimensions["dimensions_0"].id || realId0;
         }
-        if (dcid !== "") { dropAddrStr = dropAddrStr + dimRealIda + "|~|" + dcid + "|||"; }
+        dropAddrObj[realId0] = dim0base.id;
       }
-      // Sobrescreve a dimensão alterada com o novo valor
-      var dimIdxA = parseInt(dimensionId.replace("dimensions_", ""), 10);
-      if (!isNaN(dimIdxA) && dims2[dimIdxA]) {
-        var dimRealIdNew = dimensionId;
-        if (this._metadata.dimensions && this._metadata.dimensions[dimensionId]) {
-          dimRealIdNew = this._metadata.dimensions[dimensionId].id || dimensionId;
-        }
-        dropAddrStr = dropAddrStr + dimRealIdNew + "|~|" + memberId + "|||";
-      }
-      // Aplica rowValuesMap para dimensões não alteradas
+
+      // 2. rowValuesMap — valores salvos no modelo
       if (this._rowValuesMap && rowData2) {
-        var dim0 = rowData2["dimensions_0"] || {};
-        var cid0 = dim0.id || "";
-        if (cid0 !== "" && this._rowValuesMap[cid0]) {
-          var rparts = this._rowValuesMap[cid0].split("|");
+        var dim0rv = rowData2["dimensions_0"] || {};
+        var cid0rv = dim0rv.id || "";
+        if (cid0rv !== "" && this._rowValuesMap[cid0rv]) {
+          var rparts = this._rowValuesMap[cid0rv].split("|");
           var rd1 = this._metadata.dimensions && this._metadata.dimensions["dimensions_1"] ? this._metadata.dimensions["dimensions_1"].id : "dimensions_1";
           var rd2 = this._metadata.dimensions && this._metadata.dimensions["dimensions_2"] ? this._metadata.dimensions["dimensions_2"].id : "dimensions_2";
           var rd3 = this._metadata.dimensions && this._metadata.dimensions["dimensions_3"] ? this._metadata.dimensions["dimensions_3"].id : "dimensions_3";
-          if (rparts[1] !== "" && dimensionId !== "dimensions_1") { dropAddrStr = dropAddrStr + rd1 + "|~|" + rparts[1] + "|||"; }
-          if (rparts[2] !== "" && dimensionId !== "dimensions_2") { dropAddrStr = dropAddrStr + rd2 + "|~|" + rparts[2] + "|||"; }
-          if (rparts[3] !== "" && dimensionId !== "dimensions_3") { dropAddrStr = dropAddrStr + rd3 + "|~|" + rparts[3] + "|||"; }
+          if (rparts[1] !== "") { dropAddrObj[rd1] = rparts[1]; }
+          if (rparts[2] !== "") { dropAddrObj[rd2] = rparts[2]; }
+          if (rparts[3] !== "") { dropAddrObj[rd3] = rparts[3]; }
         }
       }
-      // Aplica _localSelections para dimensões já trocadas manualmente
+
+      // 3. _localSelections — seleções manuais anteriores
       if (this._localSelections && this._localSelections[rowIndex]) {
         var lks = ["dimensions_1", "dimensions_2", "dimensions_3"];
         for (var lka = 0; lka < lks.length; lka++) {
-          var ldka = lks[lka];
-          if (ldka === dimensionId) { continue; }
+          var ldka  = lks[lka];
           var lsela = this._localSelections[rowIndex][ldka];
           if (lsela && lsela.id && lsela.id !== "") {
             var lRealId = ldka;
             if (this._metadata.dimensions && this._metadata.dimensions[ldka]) {
               lRealId = this._metadata.dimensions[ldka].id || ldka;
             }
-            dropAddrStr = dropAddrStr + lRealId + "|~|" + lsela.id + "|||";
+            dropAddrObj[lRealId] = lsela.id;
           }
         }
       }
+
+      // 4. Dimensão atual — sobrescreve com o novo valor (prioridade máxima)
+      var dimRealIdNew = dimensionId;
+      if (this._metadata.dimensions && this._metadata.dimensions[dimensionId]) {
+        dimRealIdNew = this._metadata.dimensions[dimensionId].id || dimensionId;
+      }
+      dropAddrObj[dimRealIdNew] = memberId;
+
     } catch(ex) { console.error("dropAddrStr build error:", ex); }
+
+    // Serializa addrObj para addrStr
+    var dropAddrStr = "";
+    var dropKeys = Object.keys(dropAddrObj);
+    for (var dki = 0; dki < dropKeys.length; dki++) {
+      dropAddrStr = dropAddrStr + dropKeys[dki] + "|~|" + dropAddrObj[dropKeys[dki]] + "|||";
+    }
 
     this._dropdownChangeAddrStr = dropAddrStr;
 
@@ -1868,4 +1875,4 @@ class DropdownTableWidget extends HTMLElement {
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.47
+// v2.10.48
