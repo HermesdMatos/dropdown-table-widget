@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.10.51
+// dropdown-table-widget.js — v2.10.52
 // Changelog:
+//   v2.10.52 — Adiciona getChangedValue() para expor o valor alterado/usado na movimentacao
 //   v2.10.51 — Adiciona getNewRowAddrStr() para expor a linha apos alteracao do dropdown
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
@@ -353,6 +354,7 @@ class DropdownTableWidget extends HTMLElement {
     this._rowValuesMap = {};
     this._oldRowAddrStr = "";
     this._newRowAddrStr = "";
+    this._changedValue = "";
 
     // Style properties
     this._rowHeight        = 36;
@@ -650,6 +652,7 @@ class DropdownTableWidget extends HTMLElement {
   set measureChangeAddrStr(v)   { this._measureChangeAddrStr   = v || ""; }
 
   getMeasureChangeValue()     { return this._measureChangeValue     || ""; }
+  getChangedValue()           { return this._changedValue           || ""; }
   getMeasureChangeMeasureId() { return this._measureChangeMeasureId || ""; }
   getMeasureChangeRowIndex()  { return this._measureChangeRowIndex  || ""; }
   getMeasureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
@@ -724,6 +727,34 @@ class DropdownTableWidget extends HTMLElement {
   }
   getNewRowAddrStr() {
     return this._newRowAddrStr || "";
+  }
+  _getRowMeasureValue(rowIndex) {
+    if (rowIndex === -1 || !this._data) { return ""; }
+    var rowData = this._data[rowIndex];
+    if (!rowData) { return ""; }
+
+    var measureKey = "measures_0";
+    if (this._localMeasures && this._localMeasures[rowIndex]) {
+      var localMeasureKeys = Object.keys(this._localMeasures[rowIndex]);
+      if (localMeasureKeys.length > 0) {
+        return String(this._localMeasures[rowIndex][localMeasureKeys[0]]);
+      }
+    }
+
+    var mv = rowData[measureKey] || {};
+    if (mv.raw !== null && mv.raw !== undefined && String(mv.raw) !== "NaN" && String(mv.raw) !== "null") {
+      return String(mv.raw);
+    }
+    if (mv.value !== null && mv.value !== undefined && String(mv.value) !== "NaN" && String(mv.value) !== "null") {
+      return String(mv.value);
+    }
+    if (mv.formattedValue !== undefined && mv.formattedValue !== null && String(mv.formattedValue) !== "") {
+      return String(mv.formattedValue).replace(/[a-zA-Z]+$/, "").trim();
+    }
+    if (mv.formatted !== undefined && mv.formatted !== null && String(mv.formatted) !== "" && String(mv.formatted) !== "NaN") {
+      return String(mv.formatted).replace(/[a-zA-Z]+$/, "").trim();
+    }
+    return "";
   }
   _buildRowAddrStr(rowIndex, overrideSelection, includeLocalSelections) {
     if (rowIndex === -1 || !this._data || !this._metadata) { return ""; }
@@ -1733,6 +1764,7 @@ class DropdownTableWidget extends HTMLElement {
 
             // Salva payload para o script SAC
             self2._measureChangeValue     = String(newVal);
+            self2._changedValue           = String(newVal);
             self2._measureChangeMeasureId = measureId;
             self2._measureChangeRowIndex  = String(rowIdx);
             self2._measureChangeAddrStr   = addrStr;
@@ -1743,6 +1775,7 @@ class DropdownTableWidget extends HTMLElement {
               detail: {
                 properties: {
                   measureChangeValue:     String(newVal),
+                  changedValue:           String(newVal),
                   measureChangeMeasureId: measureId,
                   measureChangeRowIndex:  String(rowIdx),
                   measureChangeAddrStr:   addrStr
@@ -1938,6 +1971,7 @@ class DropdownTableWidget extends HTMLElement {
     };
 
     this._oldRowAddrStr = this._buildRowAddrStr(rowIndex, null, true);
+    this._changedValue = this._getRowMeasureValue(rowIndex);
 
     if (!this._localSelections) { this._localSelections = {}; }
     if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
@@ -2050,6 +2084,7 @@ class DropdownTableWidget extends HTMLElement {
       detail: {
         properties: {
           selectedCellData: JSON.stringify(this._selectedCellData),
+          changedValue: this._changedValue,
           measureChangeAddrStr: dropAddrStr
         }
       }

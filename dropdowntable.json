@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.51",
+  "version": "2.10.52",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-uqmJ0xax8utx+LWrh8OvNIsndOzv+D3AW4Pvq00C5YA="
+      "integrity": "sha256-iSu+PtphQNTw02+OqOfJI0JUG+vG0nuRPXVFT9LGUuo="
     },
     {
       "kind": "styling",
@@ -70,6 +70,11 @@
     "measureChangeValue": {
       "type": "string",
       "description": "Valor da medida alterada",
+      "default": ""
+    },
+    "changedValue": {
+      "type": "string",
+      "description": "Valor alterado/usado na ultima edicao de medida ou dropdown",
       "default": ""
     },
     "measureChangeMeasureId": {
@@ -167,6 +172,11 @@
       "description": "Retorna o valor da medida alterada.",
       "parameters": [],
       "body": "return this.measureChangeValue || '';"
+    },
+    "getChangedValue": {
+      "returnType": "string",
+      "description": "Retorna o valor alterado/usado na ultima edicao de medida ou dropdown.",
+      "parameters": []
     },
     "getMeasureChangeMeasureId": {
       "returnType": "string",
