@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.52",
+  "version": "2.10.53",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-iSu+PtphQNTw02+OqOfJI0JUG+vG0nuRPXVFT9LGUuo="
+      "integrity": "sha256-oQfljbEQ0cYId4ZlhuWBJnrPrylo7Xj90u5JFE7mQY0="
     },
     {
       "kind": "styling",
@@ -76,6 +76,11 @@
       "type": "string",
       "description": "Valor alterado/usado na ultima edicao de medida ou dropdown",
       "default": ""
+    },
+    "pendingChanges": {
+      "type": "string",
+      "description": "JSON string com as alteracoes pendentes para salvar",
+      "default": "[]"
     },
     "measureChangeMeasureId": {
       "type": "string",
@@ -176,6 +181,14 @@
     "getChangedValue": {
       "returnType": "string",
       "description": "Retorna o valor alterado/usado na ultima edicao de medida ou dropdown.",
+      "parameters": []
+    },
+    "getPendingChanges": {
+      "description": "Retorna o buffer de alteracoes pendentes.",
+      "parameters": []
+    },
+    "clearPendingChanges": {
+      "description": "Limpa o buffer de alteracoes pendentes.",
       "parameters": []
     },
     "getMeasureChangeMeasureId": {
