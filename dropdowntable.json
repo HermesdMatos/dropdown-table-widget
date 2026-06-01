@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.50",
+  "version": "2.10.51",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-nffP9PFL8+aCjvOlUiNG1SXQMmUbsh5+B8+m5B61dNU="
+      "integrity": "sha256-uqmJ0xax8utx+LWrh8OvNIsndOzv+D3AW4Pvq00C5YA="
     },
     {
       "kind": "styling",
@@ -320,6 +320,11 @@
     "getOldRowAddrStr": {
       "returnType": "string",
       "description": "Retorna o addrStr da linha antes da ultima troca de dropdown (usando rowValuesMap).",
+      "parameters": []
+    },
+    "getNewRowAddrStr": {
+      "returnType": "string",
+      "description": "Retorna o addrStr da linha apos a ultima troca de dropdown.",
       "parameters": []
     }
   },

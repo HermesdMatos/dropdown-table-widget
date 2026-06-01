@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.10.50
+// dropdown-table-widget.js — v2.10.51
 // Changelog:
+//   v2.10.51 — Adiciona getNewRowAddrStr() para expor a linha apos alteracao do dropdown
 //   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
 //   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
 //              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
@@ -350,6 +351,8 @@ class DropdownTableWidget extends HTMLElement {
     this._deleteMemberId          = "";
     this._deleteMemberDimensionId = "";
     this._rowValuesMap = {};
+    this._oldRowAddrStr = "";
+    this._newRowAddrStr = "";
 
     // Style properties
     this._rowHeight        = 36;
@@ -714,12 +717,19 @@ class DropdownTableWidget extends HTMLElement {
   getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
   getPreviousCellData() { return JSON.stringify(this._previousCellData); }
   getOldRowAddrStr() {
+    if (this._oldRowAddrStr) { return this._oldRowAddrStr; }
     var rowIndex = this._selectedCellData && this._selectedCellData.row !== undefined ? this._selectedCellData.row : -1;
-    var changedDimId = this._selectedCellData ? this._selectedCellData.dimensionId : "";
     if (rowIndex === -1 || !this._data || !this._metadata) { return ""; }
-    var addrObj = {};
+    return this._buildRowAddrStr(rowIndex, null, false);
+  }
+  getNewRowAddrStr() {
+    return this._newRowAddrStr || "";
+  }
+  _buildRowAddrStr(rowIndex, overrideSelection, includeLocalSelections) {
+    if (rowIndex === -1 || !this._data || !this._metadata) { return ""; }
     var rowData = this._data[rowIndex];
     if (!rowData) { return ""; }
+    var addrObj = {};
     var dim0 = rowData["dimensions_0"] || {};
     if (dim0.id) {
       var realId0 = "dimensions_0";
@@ -732,20 +742,38 @@ class DropdownTableWidget extends HTMLElement {
       var cid0 = dim0.id || "";
       if (cid0 !== "" && this._rowValuesMap[cid0]) {
         var rparts = this._rowValuesMap[cid0].split("|");
-        var rd1 = this._metadata.dimensions && this._metadata.dimensions["dimensions_1"] ? this._metadata.dimensions["dimensions_1"].id : "dimensions_1";
-        var rd2 = this._metadata.dimensions && this._metadata.dimensions["dimensions_2"] ? this._metadata.dimensions["dimensions_2"].id : "dimensions_2";
-        var rd3 = this._metadata.dimensions && this._metadata.dimensions["dimensions_3"] ? this._metadata.dimensions["dimensions_3"].id : "dimensions_3";
-        if (rparts[1] !== "") { addrObj[rd1] = rparts[1]; }
-        if (rparts[2] !== "") { addrObj[rd2] = rparts[2]; }
-        if (rparts[3] !== "") { addrObj[rd3] = rparts[3]; }
+        var dimsLen = rparts.length;
+        if (this._metadata.feeds && this._metadata.feeds.dimensions && this._metadata.feeds.dimensions.values) {
+          dimsLen = Math.max(dimsLen, this._metadata.feeds.dimensions.values.length);
+        }
+        for (var rdi = 1; rdi < dimsLen; rdi++) {
+          var rdk = "dimensions_" + rdi;
+          var rRealId = this._metadata.dimensions && this._metadata.dimensions[rdk] ? this._metadata.dimensions[rdk].id : rdk;
+          if (rparts[rdi] !== undefined && rparts[rdi] !== "") { addrObj[rRealId] = rparts[rdi]; }
+        }
       }
     }
-    var oldAddrStr = "";
+    if (includeLocalSelections && this._localSelections && this._localSelections[rowIndex]) {
+      var localKeys = Object.keys(this._localSelections[rowIndex]);
+      for (var lki = 0; lki < localKeys.length; lki++) {
+        var ldk = localKeys[lki];
+        var lsel = this._localSelections[rowIndex][ldk];
+        if (lsel && lsel.id && lsel.id !== "") {
+          var lRealId = this._metadata.dimensions && this._metadata.dimensions[ldk] ? this._metadata.dimensions[ldk].id : ldk;
+          addrObj[lRealId] = lsel.id;
+        }
+      }
+    }
+    if (overrideSelection && overrideSelection.dimensionId) {
+      var oRealId = this._metadata.dimensions && this._metadata.dimensions[overrideSelection.dimensionId] ? this._metadata.dimensions[overrideSelection.dimensionId].id : overrideSelection.dimensionId;
+      addrObj[oRealId] = overrideSelection.memberId || "";
+    }
+    var addrStr = "";
     var keys = Object.keys(addrObj);
     for (var k = 0; k < keys.length; k++) {
-      oldAddrStr = oldAddrStr + keys[k] + "|~|" + addrObj[keys[k]] + "|||";
+      addrStr = addrStr + keys[k] + "|~|" + addrObj[keys[k]] + "|||";
     }
-    return oldAddrStr;
+    return addrStr;
   }
   getActiveFilters() { return JSON.stringify(this._activeFilters); }
 
@@ -1909,9 +1937,12 @@ class DropdownTableWidget extends HTMLElement {
       memberLabel: memberLabel
     };
 
+    this._oldRowAddrStr = this._buildRowAddrStr(rowIndex, null, true);
+
     if (!this._localSelections) { this._localSelections = {}; }
     if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
     this._localSelections[rowIndex][dimensionId] = { id: memberId, label: memberLabel };
+    this._newRowAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: memberId }, true);
 
     var cellWrapper = this._activeCell;
     if (cellWrapper) {
@@ -2011,6 +2042,7 @@ class DropdownTableWidget extends HTMLElement {
     }
 
     this._dropdownChangeAddrStr = dropAddrStr;
+    this._newRowAddrStr = dropAddrStr;
 
     // Notifica SAC via propertiesChanged antes do evento
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
