@@ -666,12 +666,14 @@ class DropdownTableWidget extends HTMLElement {
   get measureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
   set measureChangeAddrStr(v)   { this._measureChangeAddrStr   = v || ""; }
   get pendingChanges() {
-    return JSON.stringify(this._pendingChanges || []);
+    return this._serializePendingChanges(this._pendingChanges);
   }
   set pendingChanges(v) {
-    try {
-      this._pendingChanges = typeof v === "string" ? JSON.parse(v) : (v || []);
-    } catch(e) {
+    if (typeof v === "string") {
+      this._pendingChanges = this._parsePendingChangesString(v);
+    } else if (Array.isArray(v)) {
+      this._pendingChanges = v;
+    } else {
       this._pendingChanges = [];
     }
   }
@@ -681,7 +683,7 @@ class DropdownTableWidget extends HTMLElement {
   getMeasureChangeMeasureId() { return this._measureChangeMeasureId || ""; }
   getMeasureChangeRowIndex()  { return this._measureChangeRowIndex  || ""; }
   getMeasureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
-  getPendingChanges()         { return JSON.stringify(this._pendingChanges || []); }
+  getPendingChanges()         { return this._serializePendingChanges(this._pendingChanges); }
   clearPendingChanges() {
     this._pendingChanges = [];
     this._localData = {};
@@ -690,7 +692,7 @@ class DropdownTableWidget extends HTMLElement {
     this._localSelections = {};
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
-      detail: { properties: { pendingChanges: "[]" } }
+      detail: { properties: { pendingChanges: "" } }
     }));
     this._render();
   }
@@ -834,6 +836,34 @@ class DropdownTableWidget extends HTMLElement {
   _addPendingChange(change) {
     if (!this._pendingChanges) { this._pendingChanges = []; }
     this._pendingChanges.push(change);
+  }
+  _parsePendingChangesString(value) {
+    var result = [];
+    if (!value || typeof value !== "string") { return result; }
+    var records = value.split("###");
+    for (var ri = 0; ri < records.length; ri++) {
+      var record = records[ri];
+      if (!record) { continue; }
+      var parts = record.split("§");
+      if (parts.length < 4) { continue; }
+      result.push({
+        oldAddr: parts[0],
+        newAddr: parts[1],
+        value: parts[2],
+        measureId: parts[3]
+      });
+    }
+    return result;
+  }
+  _serializePendingChanges(changes) {
+    if (!changes || !changes.length) { return ""; }
+    var result = "";
+    for (var i = 0; i < changes.length; i++) {
+      var item = changes[i] || {};
+      if (i > 0) { result += "###"; }
+      result += (item.oldAddr || "") + "§" + (item.newAddr || "") + "§" + (item.value || "") + "§" + (item.measureId || "");
+    }
+    return result;
   }
   _buildRowAddrStr(rowIndex, overrideSelection, includeLocalSelections) {
     if (rowIndex === -1 || !this._data || !this._metadata) { return ""; }
@@ -1298,10 +1328,10 @@ class DropdownTableWidget extends HTMLElement {
     var btn = this.shadowRoot.getElementById("dt-save-btn");
     if (!btn) { return; }
     btn.addEventListener("click", function() {
-      var changedData = self._pendingChanges || [];
+      var changedData = self._buildChangedData();
       self.dispatchEvent(new CustomEvent("propertiesChanged", {
         bubbles: true, composed: true,
-        detail: { properties: { selectedCellData: JSON.stringify(changedData), pendingChanges: JSON.stringify(changedData) } }
+        detail: { properties: { pendingChanges: self._serializePendingChanges(self._pendingChanges) } }
       }));
       Promise.resolve().then(function() {
         self.dispatchEvent(new CustomEvent("onSaveRequested", {
@@ -1885,7 +1915,7 @@ class DropdownTableWidget extends HTMLElement {
                   measureChangeMeasureId: measureId,
                   measureChangeRowIndex:  String(rowIdx),
                   measureChangeAddrStr:   addrStr,
-                  pendingChanges:         JSON.stringify(self2._pendingChanges || [])
+                  pendingChanges:         self2._serializePendingChanges(self2._pendingChanges)
                 }
               }
             }));
@@ -2205,7 +2235,7 @@ class DropdownTableWidget extends HTMLElement {
           measureChangeMeasureId: changedMeasureId,
           measureChangeRowIndex: String(rowIndex),
           measureChangeAddrStr: dropAddrStr,
-          pendingChanges: JSON.stringify(this._pendingChanges || [])
+          pendingChanges: this._serializePendingChanges(this._pendingChanges)
         }
       }
     }));
