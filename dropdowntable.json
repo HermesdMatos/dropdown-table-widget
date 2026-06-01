@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.53",
+  "version": "2.10.54",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-oQfljbEQ0cYId4ZlhuWBJnrPrylo7Xj90u5JFE7mQY0="
+      "integrity": "sha256-PuafB51miXCS/l/iaEqx2JwNOY2KiEkwy/gqxo4KCjo="
     },
     {
       "kind": "styling",
@@ -184,8 +184,10 @@
       "parameters": []
     },
     "getPendingChanges": {
+      "returnType": "string",
       "description": "Retorna o buffer de alteracoes pendentes.",
-      "parameters": []
+      "parameters": [],
+      "body": "return this.pendingChanges || '[]';"
     },
     "clearPendingChanges": {
       "description": "Limpa o buffer de alteracoes pendentes.",

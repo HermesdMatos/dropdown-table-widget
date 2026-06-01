@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.10.53
+// dropdown-table-widget.js — v2.10.54
 // Changelog:
+//   v2.10.54 — Ajusta getPendingChanges() para retornar JSON string no SAC
 //   v2.10.53 — Adiciona buffer _pendingChanges e remove write-back imediato do dropdown
 //   v2.10.52 — Adiciona getChangedValue() para expor o valor alterado/usado na movimentacao
 //   v2.10.51 — Adiciona getNewRowAddrStr() para expor a linha apos alteracao do dropdown
@@ -668,7 +669,7 @@ class DropdownTableWidget extends HTMLElement {
   getMeasureChangeMeasureId() { return this._measureChangeMeasureId || ""; }
   getMeasureChangeRowIndex()  { return this._measureChangeRowIndex  || ""; }
   getMeasureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
-  getPendingChanges()         { return this._pendingChanges || []; }
+  getPendingChanges()         { return JSON.stringify(this._pendingChanges || []); }
   clearPendingChanges() {
     this._pendingChanges = [];
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
@@ -1258,7 +1259,7 @@ class DropdownTableWidget extends HTMLElement {
     var btn = this.shadowRoot.getElementById("dt-save-btn");
     if (!btn) { return; }
     btn.addEventListener("click", function() {
-      var changedData = self.getPendingChanges();
+      var changedData = self._pendingChanges || [];
       self.dispatchEvent(new CustomEvent("propertiesChanged", {
         bubbles: true, composed: true,
         detail: { properties: { selectedCellData: JSON.stringify(changedData), pendingChanges: JSON.stringify(changedData) } }
