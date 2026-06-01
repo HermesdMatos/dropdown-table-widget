@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.10.55",
+  "version": "2.10.56",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-mDaNVpNUG++JGKwtvXS52bVfhsqahS8J6z+9S+7B1cA="
+      "integrity": "sha256-iH74ZSojCxEy/JTEfmIUlnE8hNpe1NKIlcCrS6Gg968="
     },
     {
       "kind": "styling",
@@ -79,8 +79,8 @@
     },
     "pendingChanges": {
       "type": "string",
-      "description": "JSON string com as alteracoes pendentes para salvar",
-      "default": "[]"
+      "description": "String delimitada com alteracoes pendentes: oldAddr§newAddr§value§measureId###... Separador de registros: ###, Separador de campos: §",
+      "default": ""
     },
     "measureChangeMeasureId": {
       "type": "string",
