@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.10.54
+// dropdown-table-widget.js — v2.10.55
 // Changelog:
+//   v2.10.55 — Refatora edicoes para staging local com _localData/_originalData
 //   v2.10.54 — Ajusta getPendingChanges() para retornar JSON string no SAC
 //   v2.10.53 — Adiciona buffer _pendingChanges e remove write-back imediato do dropdown
 //   v2.10.52 — Adiciona getChangedValue() para expor o valor alterado/usado na movimentacao
@@ -141,6 +142,15 @@ TMPL.innerHTML = `
   }
   .dt-save-btn:hover { background: #1557b0; }
   .dt-save-btn:active { background: #0e4191; }
+  .changed-cell {
+    background: #fff3cd !important;
+    border: 1px solid #ffc107 !important;
+  }
+  .changed-cell input,
+  .changed-cell .cell-dropdown,
+  .changed-cell .cell-plain {
+    background: #fff3cd !important;
+  }
 
   .dt-outer { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box; }
   .dt-wrapper { width: 100%; flex: 1; overflow: auto; box-sizing: border-box; position: relative; }
@@ -358,6 +368,8 @@ class DropdownTableWidget extends HTMLElement {
     this._newRowAddrStr = "";
     this._changedValue = "";
     this._pendingChanges = [];
+    this._localData = {};
+    this._originalData = {};
 
     // Style properties
     this._rowHeight        = 36;
@@ -672,10 +684,15 @@ class DropdownTableWidget extends HTMLElement {
   getPendingChanges()         { return JSON.stringify(this._pendingChanges || []); }
   clearPendingChanges() {
     this._pendingChanges = [];
+    this._localData = {};
+    this._originalData = {};
+    this._localMeasures = {};
+    this._localSelections = {};
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
       detail: { properties: { pendingChanges: "[]" } }
     }));
+    this._render();
   }
   clearMeasureInput() {
     var rowIdx = parseInt(this._measureChangeRowIndex || "0", 10);
@@ -784,6 +801,28 @@ class DropdownTableWidget extends HTMLElement {
     var measValues = measFeed ? measFeed.values : [];
     var mv = !isNaN(mIdx) ? measValues[mIdx] : null;
     return mv ? (typeof mv === "string" ? mv : (mv.id || fallback)) : fallback;
+  }
+  _createRowKey(addrStr, measureId) {
+    return (addrStr || "") + "___" + (measureId || "");
+  }
+  _getCurrentLocalValue(addrStr, measureId) {
+    var rowKey = this._createRowKey(addrStr, measureId);
+    if (this._localData && this._localData[rowKey]) {
+      return this._localData[rowKey].value;
+    }
+    if (this._originalData && this._originalData[rowKey] !== undefined) {
+      return this._originalData[rowKey];
+    }
+    return "";
+  }
+  _setLocalCellValue(addrStr, measureId, value) {
+    var rowKey = this._createRowKey(addrStr, measureId);
+    if (!this._localData) { this._localData = {}; }
+    this._localData[rowKey] = {
+      value: value,
+      changed: true
+    };
+    return rowKey;
   }
   _getFirstChangedMeasureKey(rowIndex) {
     if (this._localMeasures && this._localMeasures[rowIndex]) {
@@ -1581,9 +1620,7 @@ class DropdownTableWidget extends HTMLElement {
         var td    = document.createElement("td");
         var cData = rowData[dk2] || {};
 
-        if (self2._localSelections && self2._localSelections[ri] && self2._localSelections[ri][dk2]) {
-          cData = self2._localSelections[ri][dk2];
-        }
+        var localSelection = self2._localSelections && self2._localSelections[ri] ? self2._localSelections[ri][dk2] : null;
 
         var cLbl = cData.label || cData.id || "";
         var cId  = cData.id || "";
@@ -1621,6 +1658,14 @@ class DropdownTableWidget extends HTMLElement {
 
         // Se isNode:true e label existe, já temos o valor correto
         // Se label está vazio, tenta extrair do ID
+        if (localSelection) {
+          cData = localSelection;
+          cLbl = cData.label || cData.id || "";
+          cId = cData.id || "";
+          bindingId = cId;
+          td.classList.add("changed-cell");
+        }
+
         if (!cLbl && cId) {
           var idClean = cId.match(/\.&\[([^\]]+)\]$/);
           if (idClean) { cLbl = idClean[1]; }
@@ -1692,6 +1737,9 @@ class DropdownTableWidget extends HTMLElement {
         var mk2  = "measures_" + mi2;
         var tdm  = document.createElement("td");
         tdm.style.padding = "0";
+        var measureId2 = self2._getMeasureIdByKey(mk2);
+        var visualAddrStr = self2._buildRowAddrStr(ri, null, true);
+        var measureRowKey = self2._createRowKey(visualAddrStr, measureId2);
         var mv2  = rowData[mk2];
         var mvVal = "";
         if (mv2) {
@@ -1705,10 +1753,14 @@ class DropdownTableWidget extends HTMLElement {
             mvVal = String(mv2.raw);
           }
         }
-        if (self2._localMeasures && self2._localMeasures[ri] && self2._localMeasures[ri][mk2] !== undefined) {
-          mvVal = self2._localMeasures[ri][mk2];
+        if (!self2._originalData) { self2._originalData = {}; }
+        if (self2._originalData[measureRowKey] === undefined) {
+          self2._originalData[measureRowKey] = mvVal;
         }
-
+        if (self2._localData && self2._localData[measureRowKey]) {
+          mvVal = self2._localData[measureRowKey].value;
+          tdm.classList.add("changed-cell");
+        }
         var input = document.createElement("input");
         input.type = "text";
         input.value = mvVal;
@@ -1803,6 +1855,10 @@ class DropdownTableWidget extends HTMLElement {
               }
             }
 
+            addrStr = self2._buildRowAddrStr(rowIdx, null, true);
+            self2._setLocalCellValue(addrStr, measureId, rawInputValue);
+            if (inputEl.parentElement) { inputEl.parentElement.classList.add("changed-cell"); }
+
             // Salva payload para o script SAC
             self2._measureChangeValue     = String(newVal);
             self2._changedValue           = rawInputValue;
@@ -1812,6 +1868,7 @@ class DropdownTableWidget extends HTMLElement {
             self2._oldRowAddrStr          = addrStr;
             self2._newRowAddrStr          = addrStr;
             self2._addPendingChange({
+              type: "measure",
               oldAddr: addrStr,
               newAddr: addrStr,
               value: rawInputValue,
@@ -2038,6 +2095,7 @@ class DropdownTableWidget extends HTMLElement {
         valSpan.className = "cell-value";
       }
       cellWrapper._currentId = memberId;
+      cellWrapper.classList.add("changed-cell");
     }
 
     // Monta addrObj completo da linha — usa objeto para evitar duplicatas
@@ -2105,16 +2163,36 @@ class DropdownTableWidget extends HTMLElement {
 
     this._dropdownChangeAddrStr = dropAddrStr;
     this._newRowAddrStr = dropAddrStr;
+    var pendingMeasureKeys = [];
+    var pendingMeasFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
+    var pendingMeasValues = pendingMeasFeed ? pendingMeasFeed.values : [];
+    if (pendingMeasValues.length > 0) {
+      for (var pm = 0; pm < pendingMeasValues.length; pm++) { pendingMeasureKeys.push("measures_" + pm); }
+    } else {
+      pendingMeasureKeys.push(changedMeasureKey);
+    }
+    for (var pmk = 0; pmk < pendingMeasureKeys.length; pmk++) {
+      var pendingMeasureKey = pendingMeasureKeys[pmk];
+      var pendingMeasureId = this._getMeasureIdByKey(pendingMeasureKey);
+      var currentValue = this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId);
+      if (currentValue === "") { currentValue = this._getRowMeasureValue(rowIndex); }
+      this._setLocalCellValue(this._newRowAddrStr, pendingMeasureId, currentValue);
+      this._addPendingChange({
+        type: "dropdown",
+        oldAddr: this._oldRowAddrStr,
+        newAddr: this._newRowAddrStr,
+        value: currentValue,
+        measureId: pendingMeasureId
+      });
+      if (pmk === 0) {
+        this._changedValue = currentValue;
+        changedMeasureId = pendingMeasureId;
+      }
+    }
     this._measureChangeValue = String(this._changedValue || "");
     this._measureChangeMeasureId = changedMeasureId;
     this._measureChangeRowIndex = String(rowIndex);
     this._measureChangeAddrStr = dropAddrStr;
-    this._addPendingChange({
-      oldAddr: this._oldRowAddrStr,
-      newAddr: this._newRowAddrStr,
-      value: this._changedValue,
-      measureId: changedMeasureId
-    });
 
     // Notifica SAC via propertiesChanged antes do evento
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
