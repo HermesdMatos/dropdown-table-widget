@@ -361,6 +361,7 @@ class DropdownTableWidget extends HTMLElement {
     this._data = null;
     this._localSelections = {};
     this._localMeasures = {};
+    this._memberTechnicalMap = {};
     this._measureLabels = [];
     this._lastAddMemberRequest = {};
     this._deleteMemberId          = "";
@@ -536,10 +537,27 @@ class DropdownTableWidget extends HTMLElement {
 
       var dims = this._metadata.feeds.dimensions.values;
       this._childrenFromBinding = {};
+      
+      if (!this._memberTechnicalMap) {
+        this._memberTechnicalMap = {};
+      }
 
       for (var di = 0; di < dims.length; di++) {
         var dk = "dimensions_" + di;
         this._childrenFromBinding[dk] = {};
+        
+        // Extract dimension name for cache key
+        var dimObj = dims[di];
+        var dimName = "";
+        if (typeof dimObj === "object" && dimObj.description) {
+          dimName = dimObj.description;
+        } else if (typeof dimObj === "string") {
+          dimName = dimObj;
+        }
+        if (dimName && !this._memberTechnicalMap[dimName]) {
+          this._memberTechnicalMap[dimName] = {};
+        }
+        
         for (var r = 0; r < cb.data.length; r++) {
           var cell = cb.data[r][dk];
           if (cell && cell.id && cell.parentId) {
@@ -563,6 +581,12 @@ class DropdownTableWidget extends HTMLElement {
               if (!technicalId) {
                 technicalId = cell.id || "";
               }
+              
+              // Populate technical ID map: description -> technicalId
+              if (dimName && cell.label) {
+                this._memberTechnicalMap[dimName][cell.label] = technicalId;
+              }
+              
               this._childrenFromBinding[dk][pid].push({
                 value: cell.id,
                 label: cell.label || cell.id,
@@ -1425,18 +1449,22 @@ class DropdownTableWidget extends HTMLElement {
     var changedRows = {};
     // Coleta linhas com _localSelections
     if (this._localSelections) {
-      var lkeys = Object.keys(this._localSelections);
-      for (var li = 0; li < lkeys.length; li++) { changedRows[lkeys[li]] = true; }
+      for (var lkey in this._localSelections) {
+        if (!this._localSelections.hasOwnProperty(lkey)) { continue; }
+        changedRows[lkey] = true;
+      }
     }
     // Coleta linhas com _localMeasures
     if (this._localMeasures) {
-      var mkeys = Object.keys(this._localMeasures);
-      for (var mi = 0; mi < mkeys.length; mi++) { changedRows[mkeys[mi]] = true; }
+      for (var mkey in this._localMeasures) {
+        if (!this._localMeasures.hasOwnProperty(mkey)) { continue; }
+        changedRows[mkey] = true;
+      }
     }
 
-    var rowIdxList = Object.keys(changedRows);
-    for (var ri = 0; ri < rowIdxList.length; ri++) {
-      var rowIdx = parseInt(rowIdxList[ri], 10);
+    for (var rkey in changedRows) {
+      if (!changedRows.hasOwnProperty(rkey)) { continue; }
+      var rowIdx = parseInt(rkey, 10);
       var rowData = this._data[rowIdx];
       if (!rowData) { continue; }
 
@@ -1477,21 +1505,20 @@ class DropdownTableWidget extends HTMLElement {
 
       // Monta addrStr
       var addrStr = "";
-      var addrKeys = Object.keys(addrObj);
-      for (var ak = 0; ak < addrKeys.length; ak++) {
-        addrStr = addrStr + addrKeys[ak] + "|~|" + addrObj[addrKeys[ak]] + "|||";
+      for (var ak in addrObj) {
+        if (!addrObj.hasOwnProperty(ak)) { continue; }
+        addrStr = addrStr + ak + "|~|" + addrObj[ak] + "|||";
       }
 
       // Medidas alteradas
       var measures = {};
       if (this._localMeasures && this._localMeasures[rowIdx]) {
-        var mkList = Object.keys(this._localMeasures[rowIdx]);
-        for (var mk2 = 0; mk2 < mkList.length; mk2++) {
-          var mkey = mkList[mk2];
-          var mIdx = parseInt(mkey.replace("measures_", ""), 10);
+        for (var mk in this._localMeasures[rowIdx]) {
+          if (!this._localMeasures[rowIdx].hasOwnProperty(mk)) { continue; }
+          var mIdx = parseInt(mk.replace("measures_", ""), 10);
           var mv = measValues[mIdx];
-          var mId = mv ? (typeof mv === "string" ? mv : (mv.id || mkey)) : mkey;
-          measures[mId] = this._localMeasures[rowIdx][mkey];
+          var mId = mv ? (typeof mv === "string" ? mv : (mv.id || mk)) : mk;
+          measures[mId] = this._localMeasures[rowIdx][mk];
         }
       }
 
@@ -2190,6 +2217,20 @@ class DropdownTableWidget extends HTMLElement {
     var cellWrapper = this._activeCell;
     // Resolve technical member ID (prefer full member id like [DIM].[HIER].&[ID])
     var technicalId = memberId;
+    
+    // First, try to resolve from _memberTechnicalMap (populated from ResultSet metadata)
+    if ((!technicalId || technicalId.indexOf(".&[") === -1) && this._memberTechnicalMap) {
+      for (var dimKey in this._memberTechnicalMap) {
+        if (!this._memberTechnicalMap.hasOwnProperty(dimKey)) { continue; }
+        var dimMap = this._memberTechnicalMap[dimKey];
+        if (dimMap && dimMap[memberLabel]) {
+          technicalId = dimMap[memberLabel];
+          console.log("[CACHE_RESOLVE] dimension=" + dimKey + " label=" + memberLabel + " => " + technicalId);
+          break;
+        }
+      }
+    }
+    
     // If incoming value looks like a simple label (no .&[ ), try to resolve from known option sources
     if (!technicalId || technicalId.indexOf(".&[") === -1) {
       // Try explicit dropdownOptions first
