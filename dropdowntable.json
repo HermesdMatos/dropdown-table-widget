@@ -1,24 +1,18 @@
 {
   "name": "Dropdown Table Widget",
-  "description": "SAC Table Widget with inline dropdown cell selection from data binding dimensions. v2.11.2: Technical ID resolution via _memberTechnicalMap cache for accurate SAC Planning integration.",
+  "description": "SAC Table Widget with inline dropdown cell selection from data binding dimensions",
   "newInstancePrefix": "dropdowntable",
   "eula": "",
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.11.2",
-  "changelog": [
-    "v2.11.2 — Adds _memberTechnicalMap cache for automatic description→technicalId resolution. Fixes issue where dropdown saved labels instead of technical IDs. Replaces Object.keys() with for...in loops for SAC runtime compatibility.",
-    "v2.11.1 — Improves technicalId resolution in dropdown member selection.",
-    "v2.11.0 — Normalizes decimal values to dots before serializing pendingChanges.",
-    "v2.10.55 — Refactors edits to local staging with _localData/_originalData."
-  ],
+  "version": "2.11.1",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-+/X3OAaNHphuYXZdAg8vWJst+Ti5jysygouK3EaLUrs="
+      "integrity": "sha256-ATUALIZAR_APOS_DEPLOY_v2.11.1"
     },
     {
       "kind": "styling",
