@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.10.55
+// dropdown-table-widget.js — v2.11.0
 // Changelog:
+//   v2.11.0 — Normaliza valor decimal para ponto antes de serializar no pendingChanges (compatibilidade SAC setUserInput)
 //   v2.10.55 — Refatora edicoes para staging local com _localData/_originalData
 //   v2.10.54 — Ajusta getPendingChanges() para retornar JSON string no SAC
 //   v2.10.53 — Adiciona buffer _pendingChanges e remove write-back imediato do dropdown
@@ -861,7 +862,9 @@ class DropdownTableWidget extends HTMLElement {
     for (var i = 0; i < changes.length; i++) {
       var item = changes[i] || {};
       if (i > 0) { result += "###"; }
-      result += (item.oldAddr || "") + "§" + (item.newAddr || "") + "§" + (item.value || "") + "§" + (item.measureId || "");
+      var rawVal = String(item.value || "");
+      var normVal = rawVal.replace(",", ".");
+      result += (item.oldAddr || "") + "§" + (item.newAddr || "") + "§" + normVal + "§" + (item.measureId || "");
     }
     return result;
   }
