@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.1
+// dropdown-table-widget.js — v2.11.2
 // Changelog:
+//   v2.11.2 — Fix: _getRowMeasureValue por medida; remove todos Object.keys (SAC compat)
 //   v2.11.1 — Fix technicalId: troca Object.keys por for...in no childrenFromBinding
 //   v2.11.1 — Fix measureId: resolve do mainStructureMembers direto antes do feeds
 //   v2.11.1 — Fix technicalId fallback: monta ID tecnico quando nao resolvido; Fix _mesIds para measureId correto
@@ -499,9 +500,8 @@ class DropdownTableWidget extends HTMLElement {
         } else if (measMeta.values) {
           measValues = measMeta.values;
         } else if (typeof measMeta === "object") {
-          var mkeys = Object.keys(measMeta);
-          for (var mk = 0; mk < mkeys.length; mk++) {
-            measValues.push(measMeta[mkeys[mk]]);
+          for (var mk in measMeta) {
+            if (measMeta[mk] !== undefined) { measValues.push(measMeta[mk]); }
           }
         }
       }
@@ -782,17 +782,15 @@ class DropdownTableWidget extends HTMLElement {
   getNewRowAddrStr() {
     return this._newRowAddrStr || "";
   }
-  _getRowMeasureValue(rowIndex) {
+  _getRowMeasureValue(rowIndex, measureKey) {
     if (rowIndex === -1 || !this._data) { return ""; }
     var rowData = this._data[rowIndex];
     if (!rowData) { return ""; }
 
-    var measureKey = "measures_0";
-    if (this._localMeasures && this._localMeasures[rowIndex]) {
-      var localMeasureKeys = Object.keys(this._localMeasures[rowIndex]);
-      if (localMeasureKeys.length > 0) {
-        return String(this._localMeasures[rowIndex][localMeasureKeys[0]]);
-      }
+    if (!measureKey) { measureKey = "measures_0"; }
+    // Checa localMeasures para essa medida específica
+    if (this._localMeasures && this._localMeasures[rowIndex] && this._localMeasures[rowIndex][measureKey] !== undefined) {
+      return String(this._localMeasures[rowIndex][measureKey]);
     }
 
     var mv = rowData[measureKey] || {};
@@ -861,8 +859,7 @@ class DropdownTableWidget extends HTMLElement {
   }
   _getFirstChangedMeasureKey(rowIndex) {
     if (this._localMeasures && this._localMeasures[rowIndex]) {
-      var localMeasureKeys = Object.keys(this._localMeasures[rowIndex]);
-      if (localMeasureKeys.length > 0) { return localMeasureKeys[0]; }
+      for (var fck in this._localMeasures[rowIndex]) { return fck; }
     }
     return "measures_0";
   }
@@ -929,9 +926,7 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
     if (includeLocalSelections && this._localSelections && this._localSelections[rowIndex]) {
-      var localKeys = Object.keys(this._localSelections[rowIndex]);
-      for (var lki = 0; lki < localKeys.length; lki++) {
-        var ldk = localKeys[lki];
+      for (var ldk in this._localSelections[rowIndex]) {
         var lsel = this._localSelections[rowIndex][ldk];
         if (lsel && lsel.id && lsel.id !== "") {
           var lRealId = this._metadata.dimensions && this._metadata.dimensions[ldk] ? this._metadata.dimensions[ldk].id : ldk;
@@ -944,9 +939,10 @@ class DropdownTableWidget extends HTMLElement {
       addrObj[oRealId] = overrideSelection.memberId || "";
     }
     var addrStr = "";
-    var keys = Object.keys(addrObj);
-    for (var k = 0; k < keys.length; k++) {
-      addrStr = addrStr + keys[k] + "|~|" + addrObj[keys[k]] + "|||";
+    for (var k in addrObj) {
+      if (addrObj[k] !== undefined && addrObj[k] !== "") {
+        addrStr = addrStr + k + "|~|" + addrObj[k] + "|||";
+      }
     }
     return addrStr;
   }
@@ -1387,18 +1383,15 @@ class DropdownTableWidget extends HTMLElement {
     var changedRows = {};
     // Coleta linhas com _localSelections
     if (this._localSelections) {
-      var lkeys = Object.keys(this._localSelections);
-      for (var li = 0; li < lkeys.length; li++) { changedRows[lkeys[li]] = true; }
+      for (var lsi2 in this._localSelections) { changedRows[lsi2] = true; }
     }
     // Coleta linhas com _localMeasures
     if (this._localMeasures) {
-      var mkeys = Object.keys(this._localMeasures);
-      for (var mi = 0; mi < mkeys.length; mi++) { changedRows[mkeys[mi]] = true; }
+      for (var msi2 in this._localMeasures) { changedRows[msi2] = true; }
     }
 
-    var rowIdxList = Object.keys(changedRows);
-    for (var ri = 0; ri < rowIdxList.length; ri++) {
-      var rowIdx = parseInt(rowIdxList[ri], 10);
+    for (var ri in changedRows) {
+      var rowIdx = parseInt(ri, 10);
       var rowData = this._data[rowIdx];
       if (!rowData) { continue; }
 
@@ -1439,17 +1432,16 @@ class DropdownTableWidget extends HTMLElement {
 
       // Monta addrStr
       var addrStr = "";
-      var addrKeys = Object.keys(addrObj);
-      for (var ak = 0; ak < addrKeys.length; ak++) {
-        addrStr = addrStr + addrKeys[ak] + "|~|" + addrObj[addrKeys[ak]] + "|||";
+      for (var ak in addrObj) {
+        if (addrObj[ak] !== undefined && addrObj[ak] !== "") {
+          addrStr = addrStr + ak + "|~|" + addrObj[ak] + "|||";
+        }
       }
 
       // Medidas alteradas
       var measures = {};
       if (this._localMeasures && this._localMeasures[rowIdx]) {
-        var mkList = Object.keys(this._localMeasures[rowIdx]);
-        for (var mk2 = 0; mk2 < mkList.length; mk2++) {
-          var mkey = mkList[mk2];
+        for (var mkey in this._localMeasures[rowIdx]) {
           var mIdx = parseInt(mkey.replace("measures_", ""), 10);
           var mv = measValues[mIdx];
           var mId = mv ? (typeof mv === "string" ? mv : (mv.id || mkey)) : mkey;
@@ -2279,11 +2271,12 @@ class DropdownTableWidget extends HTMLElement {
 
     } catch(ex) { console.error("dropAddrStr build error:", ex); }
 
-    // Serializa addrObj para addrStr
+    // Serializa addrObj para addrStr — sem Object.keys()
     var dropAddrStr = "";
-    var dropKeys = Object.keys(dropAddrObj);
-    for (var dki = 0; dki < dropKeys.length; dki++) {
-      dropAddrStr = dropAddrStr + dropKeys[dki] + "|~|" + dropAddrObj[dropKeys[dki]] + "|||";
+    for (var dki in dropAddrObj) {
+      if (dropAddrObj[dki] !== undefined && dropAddrObj[dki] !== "") {
+        dropAddrStr = dropAddrStr + dki + "|~|" + dropAddrObj[dki] + "|||";
+      }
     }
 
     this._dropdownChangeAddrStr = dropAddrStr;
@@ -2300,7 +2293,7 @@ class DropdownTableWidget extends HTMLElement {
       var pendingMeasureKey = pendingMeasureKeys[pmk];
       var pendingMeasureId = this._getMeasureIdByKey(pendingMeasureKey);
       var currentValue = this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId);
-      if (currentValue === "") { currentValue = this._getRowMeasureValue(rowIndex); }
+      if (currentValue === "") { currentValue = this._getRowMeasureValue(rowIndex, pendingMeasureKey); }
       this._setLocalCellValue(this._newRowAddrStr, pendingMeasureId, currentValue);
       this._addPendingChange({
         type: "dropdown",
@@ -2350,10 +2343,9 @@ class DropdownTableWidget extends HTMLElement {
       for (var i = 0; i < dimensions.length; i++) {
         try { binding.removeDimensionFilter(dimensions[i].id); } catch(e) {}
       }
-      var keys = Object.keys(this._activeFilters);
-      for (var k = 0; k < keys.length; k++) {
-        var mid = this._activeFilters[keys[k]];
-        if (mid) { binding.setDimensionFilter(keys[k], [mid]); }
+      for (var afk in this._activeFilters) {
+        var mid = this._activeFilters[afk];
+        if (mid) { binding.setDimensionFilter(afk, [mid]); }
       }
     } catch(e) { console.error("DropdownTable _applyFilters:", e); }
   }
