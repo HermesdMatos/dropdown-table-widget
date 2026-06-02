@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.0
+// dropdown-table-widget.js — v2.11.1
 // Changelog:
+//   v2.11.1 — Corrige obtenção de technicalId para dropdowns em hierarquias (usava id do membro, que pode ser vazio, ao invés de technicalId)
 //   v2.11.0 — Normaliza valor decimal para ponto antes de serializar no pendingChanges (compatibilidade SAC setUserInput)
 //   v2.10.55 — Refatora edicoes para staging local com _localData/_originalData
 //   v2.10.54 — Ajusta getPendingChanges() para retornar JSON string no SAC
@@ -551,7 +552,23 @@ class DropdownTableWidget extends HTMLElement {
               if (this._childrenFromBinding[dk][pid][ex].value === cell.id) { exists = true; break; }
             }
             if (!exists) {
-              this._childrenFromBinding[dk][pid].push({ value: cell.id, label: cell.label || cell.id });
+              var technicalId = cell.id || "";
+              if (!technicalId && cell.technicalId) {
+                technicalId = cell.technicalId;
+              }
+              if (!technicalId && cell.dimensionMember && cell.dimensionMember.id) {
+                technicalId = cell.dimensionMember.id;
+                
+              }
+              if (!technicalId) {
+                technicalId = cell.id || "";
+              }
+              this._childrenFromBinding[dk][pid].push({
+                value: cell.id,
+                label: cell.label || cell.id,
+                technicalId: technicalId,
+                dimensionMember: cell.dimensionMember || null
+              });
             }
           }
         }
@@ -800,10 +817,63 @@ class DropdownTableWidget extends HTMLElement {
   _getMeasureIdByKey(measureKey) {
     var fallback = measureKey || "measures_0";
     var mIdx = parseInt(fallback.replace("measures_", ""), 10);
-    var measFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
-    var measValues = measFeed ? measFeed.values : [];
-    var mv = !isNaN(mIdx) ? measValues[mIdx] : null;
-    return mv ? (typeof mv === "string" ? mv : (mv.id || fallback)) : fallback;
+    var measFeed = null;
+    if (this._metadata) {
+      if (this._metadata.feeds && this._metadata.feeds.mainStructureMembers) {
+        measFeed = this._metadata.feeds.mainStructureMembers;
+      } else if (this._metadata.feeds && this._metadata.feeds.measures) {
+        measFeed = this._metadata.feeds.measures;
+      } else if (this._metadata.mainStructureMembers) {
+        measFeed = this._metadata.mainStructureMembers;
+      } else if (this._metadata.measures) {
+        measFeed = this._metadata.measures;
+      }
+    }
+    var measValues = [];
+    if (Array.isArray(measFeed)) {
+      measValues = measFeed;
+    } else if (measFeed && measFeed.values) {
+      measValues = measFeed.values;
+    } else if (measFeed && typeof measFeed === "object") {
+      for (var mk in measFeed) {
+        if (measFeed.hasOwnProperty(mk)) {
+          measValues.push(measFeed[mk]);
+        }
+      }
+    }
+    var mv = (!isNaN(mIdx) && mIdx >= 0 && mIdx < measValues.length) ? measValues[mIdx] : null;
+    var resolved = "";
+    if (mv) {
+      if (typeof mv === "string") {
+        resolved = mv;
+      } else if (mv.id) {
+        resolved = mv.id;
+      } else if (mv.value) {
+        resolved = mv.value;
+      } else if (mv.feedKey) {
+        resolved = mv.feedKey;
+      } else if (mv.memberId) {
+        resolved = mv.memberId;
+      } else if (mv.name) {
+        resolved = mv.name;
+      }
+    }
+    if (!resolved) {
+      for (var mi = 0; mi < measValues.length; mi++) {
+        var candidate = measValues[mi];
+        if (candidate && typeof candidate === "object" && candidate.id) {
+          resolved = candidate.id;
+          break;
+        }
+      }
+    }
+    if (!resolved) {
+      console.log("[MEASURE_RESOLVE] fallback no measure id for key", measureKey, "using", fallback);
+      resolved = fallback;
+    } else {
+      console.log("[MEASURE_RESOLVE] resolved", measureKey, "=>", resolved);
+    }
+    return resolved;
   }
   _createRowKey(addrStr, measureId) {
     return (addrStr || "") + "___" + (measureId || "");
@@ -2117,6 +2187,7 @@ class DropdownTableWidget extends HTMLElement {
 
     if (!this._localSelections) { this._localSelections = {}; }
     if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
+    var cellWrapper = this._activeCell;
     // Resolve technical member ID (prefer full member id like [DIM].[HIER].&[ID])
     var technicalId = memberId;
     // If incoming value looks like a simple label (no .&[ ), try to resolve from known option sources
@@ -2135,15 +2206,27 @@ class DropdownTableWidget extends HTMLElement {
       } catch(e) {}
       // Try children from binding (flatten groups)
       if ((!technicalId || technicalId.indexOf(".&[") === -1) && this._childrenFromBinding && this._childrenFromBinding[dimensionId]) {
-        var keys = Object.keys(this._childrenFromBinding[dimensionId]);
-        for (var k = 0; k < keys.length && (technicalId.indexOf(".&[") === -1); k++) {
-          var arr = this._childrenFromBinding[dimensionId][keys[k]] || [];
-          for (var a = 0; a < arr.length; a++) {
+        for (var parentKey in this._childrenFromBinding[dimensionId]) {
+          if (!this._childrenFromBinding[dimensionId].hasOwnProperty(parentKey)) { continue; }
+          var arr = this._childrenFromBinding[dimensionId][parentKey] || [];
+          for (var a = 0; a < arr.length && (technicalId.indexOf(".&[") === -1); a++) {
             var ao = arr[a];
             if ((ao.label && ao.label === memberLabel) || (ao.value && ao.value === memberId)) {
-              if (ao.value && ao.value.indexOf(".&[") !== -1) { technicalId = ao.value; break; }
+              if (ao.technicalId && ao.technicalId.indexOf(".&[") !== -1) {
+                technicalId = ao.technicalId;
+                break;
+              }
+              if (ao.value && ao.value.indexOf(".&[") !== -1) {
+                technicalId = ao.value;
+                break;
+              }
+              if (ao.dimensionMember && ao.dimensionMember.id && ao.dimensionMember.id.indexOf(".&[") !== -1) {
+                technicalId = ao.dimensionMember.id;
+                break;
+              }
             }
           }
+          if (technicalId && technicalId.indexOf(".&[") !== -1) { break; }
         }
       }
     }
@@ -2169,6 +2252,7 @@ class DropdownTableWidget extends HTMLElement {
     // Persist selection using technical id
     this._localSelections[rowIndex][dimensionId] = { id: technicalId, label: memberLabel };
     this._newRowAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
+    console.log("[TECHNICAL_ID] dimension=", dimensionId, "memberLabel=", memberLabel, "resolved=", technicalId);
 
     var cellWrapper = this._activeCell;
     if (cellWrapper) {
