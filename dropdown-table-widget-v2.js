@@ -2114,8 +2114,58 @@ class DropdownTableWidget extends HTMLElement {
 
     if (!this._localSelections) { this._localSelections = {}; }
     if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
-    this._localSelections[rowIndex][dimensionId] = { id: memberId, label: memberLabel };
-    this._newRowAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: memberId }, true);
+    // Resolve technical member ID (prefer full member id like [DIM].[HIER].&[ID])
+    var technicalId = memberId;
+    // If incoming value looks like a simple label (no .&[ ), try to resolve from known option sources
+    if (!technicalId || technicalId.indexOf(".&[") === -1) {
+      // Try explicit dropdownOptions first
+      try {
+        if (this._dropdownOptions && this._dropdownOptions[dimensionId]) {
+          var dopts = this._dropdownOptions[dimensionId];
+          for (var di = 0; di < dopts.length; di++) {
+            var o = dopts[di];
+            if ((o.label && o.label === memberLabel) || (o.value && o.value === memberId)) {
+              if (o.value && o.value.indexOf(".&[") !== -1) { technicalId = o.value; break; }
+            }
+          }
+        }
+      } catch(e) {}
+      // Try children from binding (flatten groups)
+      if ((!technicalId || technicalId.indexOf(".&[") === -1) && this._childrenFromBinding && this._childrenFromBinding[dimensionId]) {
+        var keys = Object.keys(this._childrenFromBinding[dimensionId]);
+        for (var k = 0; k < keys.length && (technicalId.indexOf(".&[") === -1); k++) {
+          var arr = this._childrenFromBinding[dimensionId][keys[k]] || [];
+          for (var a = 0; a < arr.length; a++) {
+            var ao = arr[a];
+            if ((ao.label && ao.label === memberLabel) || (ao.value && ao.value === memberId)) {
+              if (ao.value && ao.value.indexOf(".&[") !== -1) { technicalId = ao.value; break; }
+            }
+          }
+        }
+      }
+    }
+
+    // Block placeholder/invalid selections — do not persist or mount address
+    var placeholders = ["RESPONSAVEL", "Periodos", "FONTE", "Selecionar...", "RESPONSABILIDADE", "FONTE", "PERIODICIDADE", "DESCRICAO_DA_CONTA"];
+    var isPlaceholder = false;
+    for (var ph = 0; ph < placeholders.length; ph++) {
+      if ((memberLabel && memberLabel === placeholders[ph]) || (memberId && memberId === placeholders[ph]) || (technicalId && technicalId === placeholders[ph])) { isPlaceholder = true; break; }
+    }
+    if (isPlaceholder) {
+      // Revert displayed value to previous value if available
+      if (cellWrapper) {
+        var prevLabel = (this._previousCellData && this._previousCellData.memberLabel) ? this._previousCellData.memberLabel : "Selecionar...";
+        var valSpan2 = cellWrapper.querySelector(".cell-value");
+        if (valSpan2) { valSpan2.textContent = prevLabel; }
+        cellWrapper._currentId = this._previousCellData && this._previousCellData.memberId ? this._previousCellData.memberId : "";
+        cellWrapper.classList.remove("changed-cell");
+      }
+      return;
+    }
+
+    // Persist selection using technical id
+    this._localSelections[rowIndex][dimensionId] = { id: technicalId, label: memberLabel };
+    this._newRowAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
 
     var cellWrapper = this._activeCell;
     if (cellWrapper) {
@@ -2124,7 +2174,7 @@ class DropdownTableWidget extends HTMLElement {
         valSpan.textContent = memberLabel;
         valSpan.className = "cell-value";
       }
-      cellWrapper._currentId = memberId;
+      cellWrapper._currentId = technicalId;
       cellWrapper.classList.add("changed-cell");
     }
 
@@ -2180,7 +2230,7 @@ class DropdownTableWidget extends HTMLElement {
       if (this._metadata.dimensions && this._metadata.dimensions[dimensionId]) {
         dimRealIdNew = this._metadata.dimensions[dimensionId].id || dimensionId;
       }
-      dropAddrObj[dimRealIdNew] = memberId;
+      dropAddrObj[dimRealIdNew] = technicalId;
 
     } catch(ex) { console.error("dropAddrStr build error:", ex); }
 
