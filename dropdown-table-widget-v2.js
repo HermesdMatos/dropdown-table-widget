@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.11
+// dropdown-table-widget.js — v2.11.12
 // Changelog:
+//   v2.11.12 — Fix: usa _getRowMeasureValue como fonte primaria do valor no pendingChanges
 //   v2.11.11 — Fix: _justSaved protege estado visual no refresh apos save
 //   v2.11.10 — Fix: fingerprint inclui todos os IDs e valores para detectar troca de cliente
 //   v2.11.9 — Fix: limpa estado local ao detectar troca de contexto via fingerprint
@@ -2350,8 +2351,10 @@ class DropdownTableWidget extends HTMLElement {
     for (var pmk = 0; pmk < pendingMeasureKeys.length; pmk++) {
       var pendingMeasureKey = pendingMeasureKeys[pmk];
       var pendingMeasureId = this._getMeasureIdByKey(pendingMeasureKey);
-      var currentValue = this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId);
-      if (currentValue === "") { currentValue = this._getRowMeasureValue(rowIndex, pendingMeasureKey); }
+      // Usa _getRowMeasureValue como fonte primária (binding direto) — mais confiável que _originalData
+      var currentValue = this._getRowMeasureValue(rowIndex, pendingMeasureKey);
+      // Fallback: _originalData via oldRowAddrStr
+      if (currentValue === "") { currentValue = this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId); }
       this._setLocalCellValue(this._newRowAddrStr, pendingMeasureId, currentValue);
       this._addPendingChange({
         type: "dropdown",
