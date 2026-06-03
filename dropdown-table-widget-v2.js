@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.2
+// dropdown-table-widget.js — v2.11.3
 // Changelog:
+//   v2.11.3 — Fix technicalId fallback: usa memberId (ID real) em vez de memberLabel (display label)
 //   v2.11.2 — Fix: _getRowMeasureValue por medida; remove todos Object.keys (SAC compat)
 //   v2.11.1 — Fix technicalId: troca Object.keys por for...in no childrenFromBinding
 //   v2.11.1 — Fix measureId: resolve do mainStructureMembers direto antes do feeds
@@ -2178,7 +2179,12 @@ class DropdownTableWidget extends HTMLElement {
       if (dimMetaEntry && dimMetaEntry.id) {
         var dimRealKey = dimMetaEntry.id;
         var hierKey = dimMetaEntry.hierarchies && dimMetaEntry.hierarchies[0] ? dimMetaEntry.hierarchies[0].id : (dimRealKey + "_H1");
-        technicalId = "[" + dimRealKey + "].[" + hierKey + "].&[" + (memberLabel || memberId) + "]";
+        // Usa memberId como label (é o ID real), só cai no memberLabel se memberId parecer um label de display
+        var idForLabel = memberId || memberLabel;
+        // Se memberId já tem formato técnico parcial, extrai só o label
+        var labelMatch2 = idForLabel ? idForLabel.match(/\.&\[([^\]]+)\]$/) : null;
+        if (labelMatch2) { idForLabel = labelMatch2[1]; }
+        technicalId = "[" + dimRealKey + "].[" + hierKey + "].&[" + idForLabel + "]";
       }
     }
 
