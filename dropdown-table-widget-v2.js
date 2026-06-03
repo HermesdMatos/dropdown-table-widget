@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.9
+// dropdown-table-widget.js — v2.11.10
 // Changelog:
+//   v2.11.10 — Fix: fingerprint inclui todos os IDs e valores para detectar troca de cliente
 //   v2.11.9 — Fix: limpa estado local ao detectar troca de contexto via fingerprint
 //   v2.11.8 — Fix: preserva bindingId original ao aplicar localSelection no render
 //   v2.11.7 — Fix: verifica cellHasChildren e opts com bindingId alem do cId
@@ -467,12 +468,16 @@ class DropdownTableWidget extends HTMLElement {
     try {
       if (!dataBinding || !dataBinding.metadata || !dataBinding.data) return;
 
-      // Detecta troca de contexto (ex: mudança de cliente) comparando fingerprint dos dados
-      // Se o conjunto de linhas mudou, limpa estado local para não sobrepor dados do novo contexto
+      // Detecta troca de contexto comparando IDs de todas as linhas
       var newFingerprint = "";
       if (dataBinding.data && dataBinding.data.length > 0) {
-        var fp0 = dataBinding.data[0]["dimensions_0"] || {};
-        newFingerprint = String(dataBinding.data.length) + "|" + (fp0.id || "");
+        for (var fpi = 0; fpi < dataBinding.data.length; fpi++) {
+          var fpRow  = dataBinding.data[fpi];
+          var fpCell = fpRow["dimensions_0"] || {};
+          var fpMes  = fpRow["measures_0"] || {};
+          var fpVal  = fpMes.raw !== undefined ? String(fpMes.raw) : (fpMes.formattedValue || "");
+          newFingerprint = newFingerprint + (fpCell.id || "") + ":" + fpVal + "|";
+        }
       }
       if (this._dataFingerprint !== undefined && this._dataFingerprint !== newFingerprint) {
         this._localSelections = {};
