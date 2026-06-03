@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.3
+// dropdown-table-widget.js — v2.11.4
 // Changelog:
+//   v2.11.4 — Fix: preserva _localSelections apos save; limpa apenas no novo binding
 //   v2.11.3 — Fix technicalId fallback: usa memberId (ID real) em vez de memberLabel (display label)
 //   v2.11.2 — Fix: _getRowMeasureValue por medida; remove todos Object.keys (SAC compat)
 //   v2.11.1 — Fix technicalId: troca Object.keys por for...in no childrenFromBinding
@@ -459,6 +460,10 @@ class DropdownTableWidget extends HTMLElement {
     try {
       if (!dataBinding || !dataBinding.metadata || !dataBinding.data) return;
 
+      // Limpa estado local ao receber novos dados do binding
+      this._localSelections = {};
+      this._localMeasures   = {};
+
       var meta = dataBinding.metadata;
       var dimLabels = [];
       var mesLabels = [];
@@ -703,8 +708,8 @@ class DropdownTableWidget extends HTMLElement {
     this._pendingChanges = [];
     this._localData = {};
     this._originalData = {};
-    this._localMeasures = {};
-    this._localSelections = {};
+    // Mantém _localSelections e _localMeasures para preservar estado visual
+    // até o binding atualizar com os novos dados do modelo
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
       detail: { properties: { pendingChanges: "" } }
