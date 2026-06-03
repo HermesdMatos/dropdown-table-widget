@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.6
+// dropdown-table-widget.js — v2.11.7
 // Changelog:
+//   v2.11.7 — Fix: verifica cellHasChildren e opts com bindingId alem do cId
 //   v2.11.6 — Fix: indexa _localSelections por dimensions_0.id em vez de rowIndex
 //   v2.11.5 — Fix: flag _justSaved controla limpeza de estado local apenas apos save
 //   v2.11.4 — Fix: preserva _localSelections apos save; limpa apenas no novo binding
@@ -1745,13 +1746,21 @@ class DropdownTableWidget extends HTMLElement {
           || self2._dropdownDimensions.indexOf(dim2.id) !== -1
         );
 
-        var hasChildrenInBinding = self2._childrenFromBinding &&
-          self2._childrenFromBinding[dk2] &&
-          self2._childrenFromBinding[dk2][cId] &&
-          self2._childrenFromBinding[dk2][cId].length > 0;
-        var cellHasChildren = hasChildren[dk2][cId] ||
-          (childrenByParent[dk2] && childrenByParent[dk2][cId] && childrenByParent[dk2][cId].length > 0) ||
-          hasChildrenInBinding;
+        // Verifica children com cId atual E com bindingId original (caso localSelection tenha mudado o cId)
+        var checkIds = [cId];
+        if (bindingId && bindingId !== cId) { checkIds.push(bindingId); }
+        var hasChildrenInBinding = false;
+        var cellHasChildren = false;
+        for (var chk = 0; chk < checkIds.length; chk++) {
+          var chkId = checkIds[chk];
+          if (self2._childrenFromBinding && self2._childrenFromBinding[dk2] && self2._childrenFromBinding[dk2][chkId] && self2._childrenFromBinding[dk2][chkId].length > 0) {
+            hasChildrenInBinding = true;
+          }
+          if (hasChildren[dk2][chkId] || (childrenByParent[dk2] && childrenByParent[dk2][chkId] && childrenByParent[dk2][chkId].length > 0)) {
+            cellHasChildren = true;
+          }
+        }
+        cellHasChildren = cellHasChildren || hasChildrenInBinding;
         // Força dropdown quando rowValuesMap tem valor para essa linha/dimensão
         var hasRowValueMap = false;
         if (self2._rowValuesMap && dk2 !== "dimensions_0") {
@@ -1769,8 +1778,12 @@ class DropdownTableWidget extends HTMLElement {
           opts = self2._dropdownOptions[dk2];
         } else if (self2._childrenFromBinding && self2._childrenFromBinding[dk2] && self2._childrenFromBinding[dk2][cId]) {
           opts = self2._childrenFromBinding[dk2][cId];
+        } else if (self2._childrenFromBinding && self2._childrenFromBinding[dk2] && bindingId && self2._childrenFromBinding[dk2][bindingId]) {
+          opts = self2._childrenFromBinding[dk2][bindingId];
         } else if (childrenByParent[dk2] && childrenByParent[dk2][cId]) {
           opts = childrenByParent[dk2][cId];
+        } else if (childrenByParent[dk2] && bindingId && childrenByParent[dk2][bindingId]) {
+          opts = childrenByParent[dk2][bindingId];
         }
         if (isDrop && (!opts || opts.length === 0) && !hasRowValueMap) { isDrop = false; }
 
