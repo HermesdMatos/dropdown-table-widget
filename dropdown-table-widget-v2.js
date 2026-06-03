@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.10
+// dropdown-table-widget.js — v2.11.11
 // Changelog:
+//   v2.11.11 — Fix: _justSaved protege estado visual no refresh apos save
 //   v2.11.10 — Fix: fingerprint inclui todos os IDs e valores para detectar troca de cliente
 //   v2.11.9 — Fix: limpa estado local ao detectar troca de contexto via fingerprint
 //   v2.11.8 — Fix: preserva bindingId original ao aplicar localSelection no render
@@ -480,9 +481,15 @@ class DropdownTableWidget extends HTMLElement {
         }
       }
       if (this._dataFingerprint !== undefined && this._dataFingerprint !== newFingerprint) {
-        this._localSelections = {};
-        this._localMeasures   = {};
-        this._pendingChanges  = [];
+        if (this._justSaved) {
+          // Após save: fingerprint mudou por causa dos novos valores — preserva estado visual
+          this._justSaved = false;
+        } else {
+          // Troca real de contexto (ex: mudança de cliente) — limpa estado local
+          this._localSelections = {};
+          this._localMeasures   = {};
+          this._pendingChanges  = [];
+        }
       }
       this._dataFingerprint = newFingerprint;
 
