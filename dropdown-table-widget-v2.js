@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.12
+// dropdown-table-widget.js — v2.11.13
 // Changelog:
+//   v2.11.13 — Fix: remove changed-cell highlight apos save
 //   v2.11.12 — Fix: usa _getRowMeasureValue como fonte primaria do valor no pendingChanges
 //   v2.11.11 — Fix: _justSaved protege estado visual no refresh apos save
 //   v2.11.10 — Fix: fingerprint inclui todos os IDs e valores para detectar troca de cliente
@@ -739,6 +740,11 @@ class DropdownTableWidget extends HTMLElement {
     this._localData = {};
     this._originalData = {};
     this._justSaved = true; // flag: próximo binding update limpa estado local
+    // Remove visual de célula alterada de todas as células do DOM
+    var changedCells = this.shadowRoot.querySelectorAll(".changed-cell");
+    for (var cc = 0; cc < changedCells.length; cc++) {
+      changedCells[cc].classList.remove("changed-cell");
+    }
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
       detail: { properties: { pendingChanges: "" } }
