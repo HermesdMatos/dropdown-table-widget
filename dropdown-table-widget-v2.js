@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.5
+// dropdown-table-widget.js — v2.11.6
 // Changelog:
+//   v2.11.6 — Fix: indexa _localSelections por dimensions_0.id em vez de rowIndex
 //   v2.11.5 — Fix: flag _justSaved controla limpeza de estado local apenas apos save
 //   v2.11.4 — Fix: preserva _localSelections apos save; limpa apenas no novo binding
 //   v2.11.3 — Fix technicalId fallback: usa memberId (ID real) em vez de memberLabel (display label)
@@ -462,12 +463,8 @@ class DropdownTableWidget extends HTMLElement {
     try {
       if (!dataBinding || !dataBinding.metadata || !dataBinding.data) return;
 
-      // Limpa estado local apenas após save confirmado
-      if (this._justSaved) {
-        this._localSelections = {};
-        this._localMeasures   = {};
-        this._justSaved = false;
-      }
+      // Estado local (_localSelections, _localMeasures) é preservado entre refreshes
+      // e limpo apenas pelo clearAllLocalState() chamado explicitamente
 
       var meta = dataBinding.metadata;
       var dimLabels = [];
@@ -935,9 +932,11 @@ class DropdownTableWidget extends HTMLElement {
         }
       }
     }
-    if (includeLocalSelections && this._localSelections && this._localSelections[rowIndex]) {
-      for (var ldk in this._localSelections[rowIndex]) {
-        var lsel = this._localSelections[rowIndex][ldk];
+    var brsRowData = this._data && this._data[rowIndex] ? this._data[rowIndex] : {};
+    var brsKey = (brsRowData["dimensions_0"] || {}).id || String(rowIndex);
+    if (includeLocalSelections && this._localSelections && this._localSelections[brsKey]) {
+      for (var ldk in this._localSelections[brsKey]) {
+        var lsel = this._localSelections[brsKey][ldk];
         if (lsel && lsel.id && lsel.id !== "") {
           var lRealId = this._metadata.dimensions && this._metadata.dimensions[ldk] ? this._metadata.dimensions[ldk].id : ldk;
           addrObj[lRealId] = lsel.id;
@@ -1687,7 +1686,9 @@ class DropdownTableWidget extends HTMLElement {
         var td    = document.createElement("td");
         var cData = rowData[dk2] || {};
 
-        var localSelection = self2._localSelections && self2._localSelections[ri] ? self2._localSelections[ri][dk2] : null;
+        var dim0ForKey = rowData["dimensions_0"] || {};
+        var rowKey0 = dim0ForKey.id || String(ri);
+        var localSelection = self2._localSelections && self2._localSelections[rowKey0] ? self2._localSelections[rowKey0][dk2] : null;
 
         var cLbl = cData.label || cData.id || "";
         var cId  = cData.id || "";
@@ -2150,7 +2151,10 @@ class DropdownTableWidget extends HTMLElement {
     var changedMeasureId = this._getMeasureIdByKey(changedMeasureKey);
 
     if (!this._localSelections) { this._localSelections = {}; }
-    if (!this._localSelections[rowIndex]) { this._localSelections[rowIndex] = {}; }
+    // Usa dimensions_0 id como chave para sobreviver a reordenação do binding
+    var rowData0 = this._data && this._data[rowIndex] ? this._data[rowIndex] : {};
+    var dim0Key = (rowData0["dimensions_0"] || {}).id || String(rowIndex);
+    if (!this._localSelections[dim0Key]) { this._localSelections[dim0Key] = {}; }
     // Resolve technical member ID (prefer full member id like [DIM].[HIER].&[ID])
     var technicalId = memberId;
     // If incoming value looks like a simple label (no .&[ ), try to resolve from known option sources
@@ -2216,7 +2220,7 @@ class DropdownTableWidget extends HTMLElement {
     }
 
     // Persist selection using technical id
-    this._localSelections[rowIndex][dimensionId] = { id: technicalId, label: memberLabel };
+    this._localSelections[dim0Key][dimensionId] = { id: technicalId, label: memberLabel };
     this._newRowAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
 
     var cellWrapper = this._activeCell;
@@ -2262,11 +2266,11 @@ class DropdownTableWidget extends HTMLElement {
       }
 
       // 3. _localSelections — seleções manuais anteriores
-      if (this._localSelections && this._localSelections[rowIndex]) {
+      if (this._localSelections && this._localSelections[dim0Key]) {
         var lks = ["dimensions_1", "dimensions_2", "dimensions_3"];
         for (var lka = 0; lka < lks.length; lka++) {
           var ldka  = lks[lka];
-          var lsela = this._localSelections[rowIndex][ldka];
+          var lsela = this._localSelections[dim0Key][ldka];
           if (lsela && lsela.id && lsela.id !== "") {
             var lRealId = ldka;
             if (this._metadata.dimensions && this._metadata.dimensions[ldka]) {
