@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.7
+// dropdown-table-widget.js — v2.11.8
 // Changelog:
+//   v2.11.8 — Fix: preserva bindingId original ao aplicar localSelection no render
 //   v2.11.7 — Fix: verifica cellHasChildren e opts com bindingId alem do cId
 //   v2.11.6 — Fix: indexa _localSelections por dimensions_0.id em vez de rowIndex
 //   v2.11.5 — Fix: flag _justSaved controla limpeza de estado local apenas apos save
@@ -1731,7 +1732,7 @@ class DropdownTableWidget extends HTMLElement {
           cData = localSelection;
           cLbl = cData.label || cData.id || "";
           cId = cData.id || "";
-          bindingId = cId;
+          // Preserva bindingId original — necessário para localizar children/opts
           td.classList.add("changed-cell");
         }
 
