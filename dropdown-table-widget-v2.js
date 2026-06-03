@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.13
+// dropdown-table-widget.js — v2.11.14
 // Changelog:
+//   v2.11.14 — Fix: prioriza linha com maior valor ao deduplicar por dimensions_0
 //   v2.11.13 — Fix: remove changed-cell highlight apos save
 //   v2.11.12 — Fix: usa _getRowMeasureValue como fonte primaria do valor no pendingChanges
 //   v2.11.11 — Fix: _justSaved protege estado visual no refresh apos save
@@ -1677,9 +1678,27 @@ class DropdownTableWidget extends HTMLElement {
     var renderList = [];
     var rendered = {};
 
+    // Pré-seleciona por dimensions_0.id a linha com maior valor de medida
+    // Evita exibir linha zerada quando existe linha com valor real para mesma conta
+    var bestRowByDim0 = {};
+    for (var br = 0; br < this._data.length; br++) {
+      var brCell = this._data[br]["dimensions_0"] || {};
+      if (!brCell.id) { continue; }
+      var brMes = this._data[br]["measures_0"] || {};
+      var brVal = brMes.raw !== null && brMes.raw !== undefined ? parseFloat(brMes.raw) : 0;
+      if (isNaN(brVal)) { brVal = 0; }
+      if (bestRowByDim0[brCell.id] === undefined) {
+        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal };
+      } else if (brVal > bestRowByDim0[brCell.id].val) {
+        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal };
+      }
+    }
+
     for (var rl = 0; rl < this._data.length; rl++) {
       var rlCell = this._data[rl]["dimensions_0"] || {};
-      if (!rlCell.id || rendered[rlCell.id]) continue;
+      if (!rlCell.id || rendered[rlCell.id]) { continue; }
+      // Pula se não for a linha preferida para essa conta
+      if (bestRowByDim0[rlCell.id] && bestRowByDim0[rlCell.id].rowIndex !== rl) { continue; }
 
       var hasPidDot = rlCell.parentId && rlCell.parentId.indexOf(".&[") !== -1;
 
