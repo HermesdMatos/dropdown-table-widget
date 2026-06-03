@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.4
+// dropdown-table-widget.js — v2.11.5
 // Changelog:
+//   v2.11.5 — Fix: flag _justSaved controla limpeza de estado local apenas apos save
 //   v2.11.4 — Fix: preserva _localSelections apos save; limpa apenas no novo binding
 //   v2.11.3 — Fix technicalId fallback: usa memberId (ID real) em vez de memberLabel (display label)
 //   v2.11.2 — Fix: _getRowMeasureValue por medida; remove todos Object.keys (SAC compat)
@@ -371,6 +372,7 @@ class DropdownTableWidget extends HTMLElement {
     this._deleteMemberId          = "";
     this._deleteMemberDimensionId = "";
     this._rowValuesMap = {};
+    this._justSaved = false;
     this._oldRowAddrStr = "";
     this._newRowAddrStr = "";
     this._changedValue = "";
@@ -460,9 +462,12 @@ class DropdownTableWidget extends HTMLElement {
     try {
       if (!dataBinding || !dataBinding.metadata || !dataBinding.data) return;
 
-      // Limpa estado local ao receber novos dados do binding
-      this._localSelections = {};
-      this._localMeasures   = {};
+      // Limpa estado local apenas após save confirmado
+      if (this._justSaved) {
+        this._localSelections = {};
+        this._localMeasures   = {};
+        this._justSaved = false;
+      }
 
       var meta = dataBinding.metadata;
       var dimLabels = [];
@@ -708,8 +713,7 @@ class DropdownTableWidget extends HTMLElement {
     this._pendingChanges = [];
     this._localData = {};
     this._originalData = {};
-    // Mantém _localSelections e _localMeasures para preservar estado visual
-    // até o binding atualizar com os novos dados do modelo
+    this._justSaved = true; // flag: próximo binding update limpa estado local
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
       detail: { properties: { pendingChanges: "" } }
