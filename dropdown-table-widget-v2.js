@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.8
+// dropdown-table-widget.js — v2.11.9
 // Changelog:
+//   v2.11.9 — Fix: limpa estado local ao detectar troca de contexto via fingerprint
 //   v2.11.8 — Fix: preserva bindingId original ao aplicar localSelection no render
 //   v2.11.7 — Fix: verifica cellHasChildren e opts com bindingId alem do cId
 //   v2.11.6 — Fix: indexa _localSelections por dimensions_0.id em vez de rowIndex
@@ -376,6 +377,7 @@ class DropdownTableWidget extends HTMLElement {
     this._deleteMemberDimensionId = "";
     this._rowValuesMap = {};
     this._justSaved = false;
+    this._dataFingerprint = undefined;
     this._oldRowAddrStr = "";
     this._newRowAddrStr = "";
     this._changedValue = "";
@@ -465,8 +467,19 @@ class DropdownTableWidget extends HTMLElement {
     try {
       if (!dataBinding || !dataBinding.metadata || !dataBinding.data) return;
 
-      // Estado local (_localSelections, _localMeasures) é preservado entre refreshes
-      // e limpo apenas pelo clearAllLocalState() chamado explicitamente
+      // Detecta troca de contexto (ex: mudança de cliente) comparando fingerprint dos dados
+      // Se o conjunto de linhas mudou, limpa estado local para não sobrepor dados do novo contexto
+      var newFingerprint = "";
+      if (dataBinding.data && dataBinding.data.length > 0) {
+        var fp0 = dataBinding.data[0]["dimensions_0"] || {};
+        newFingerprint = String(dataBinding.data.length) + "|" + (fp0.id || "");
+      }
+      if (this._dataFingerprint !== undefined && this._dataFingerprint !== newFingerprint) {
+        this._localSelections = {};
+        this._localMeasures   = {};
+        this._pendingChanges  = [];
+      }
+      this._dataFingerprint = newFingerprint;
 
       var meta = dataBinding.metadata;
       var dimLabels = [];
