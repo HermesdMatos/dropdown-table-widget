@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.18
+// dropdown-table-widget.js — v2.11.19
 // Changelog:
+//   v2.11.19 — Fix: remove changed-cell do render; cor so aplicada em acao do usuario
 //   v2.11.18 — Fix: reseta style inline apos save — sobrepoe changed-cell independente de renders
 //   v2.11.17 — Fix: _skipHighlightRenders contador protege 2 ciclos de render apos save
 //   v2.11.16 — Fix: nao reaplica changed-cell no render apos save (_justSaved)
@@ -1795,7 +1796,6 @@ class DropdownTableWidget extends HTMLElement {
           cLbl = cData.label || cData.id || "";
           cId = cData.id || "";
           // Preserva bindingId original — necessário para localizar children/opts
-          td.classList.add("changed-cell");
         }
 
         if (!cLbl && cId) {
@@ -1903,7 +1903,6 @@ class DropdownTableWidget extends HTMLElement {
         }
         if (self2._localData && self2._localData[measureRowKey]) {
           mvVal = self2._localData[measureRowKey].value;
-          tdm.classList.add("changed-cell");
         }
         var input = document.createElement("input");
         input.type = "text";
