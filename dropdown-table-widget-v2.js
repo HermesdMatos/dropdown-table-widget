@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.14
+// dropdown-table-widget.js — v2.11.15
 // Changelog:
+//   v2.11.15 — Fix: soma todas as medidas para selecionar linha com valor real
 //   v2.11.14 — Fix: prioriza linha com maior valor ao deduplicar por dimensions_0
 //   v2.11.13 — Fix: remove changed-cell highlight apos save
 //   v2.11.12 — Fix: usa _getRowMeasureValue como fonte primaria do valor no pendingChanges
@@ -1678,15 +1679,21 @@ class DropdownTableWidget extends HTMLElement {
     var renderList = [];
     var rendered = {};
 
-    // Pré-seleciona por dimensions_0.id a linha com maior valor de medida
-    // Evita exibir linha zerada quando existe linha com valor real para mesma conta
+    // Pré-seleciona por dimensions_0.id a linha com maior soma de medidas
+    // Evita exibir linha zerada (ex: CLIENTE=0) quando existe linha com valor real (ex: SAPORE=6)
     var bestRowByDim0 = {};
     for (var br = 0; br < this._data.length; br++) {
       var brCell = this._data[br]["dimensions_0"] || {};
       if (!brCell.id) { continue; }
-      var brMes = this._data[br]["measures_0"] || {};
-      var brVal = brMes.raw !== null && brMes.raw !== undefined ? parseFloat(brMes.raw) : 0;
-      if (isNaN(brVal)) { brVal = 0; }
+      // Soma todas as medidas disponíveis
+      var brVal = 0;
+      for (var bmi = 0; bmi < 5; bmi++) {
+        var brMes = this._data[br]["measures_" + bmi];
+        if (brMes) {
+          var brMesVal = brMes.raw !== null && brMes.raw !== undefined ? parseFloat(brMes.raw) : 0;
+          if (!isNaN(brMesVal)) { brVal = brVal + Math.abs(brMesVal); }
+        }
+      }
       if (bestRowByDim0[brCell.id] === undefined) {
         bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal };
       } else if (brVal > bestRowByDim0[brCell.id].val) {
