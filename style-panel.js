@@ -233,6 +233,31 @@
                             <input id="style_subheader_color_picker" type="color" value="#1a3a6e">
                         </td>
                     </tr>
+                    <tr>
+                        <td>Save Button Background</td>
+                        <td class="color-row">
+                            <input id="style_save_btn_bg" type="text" class="color-input" value="#1a73e8">
+                            <input id="style_save_btn_bg_picker" type="color" value="#1a73e8">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Save Button Text</td>
+                        <td class="color-row">
+                            <input id="style_save_btn_color" type="text" class="color-input" value="#ffffff">
+                            <input id="style_save_btn_color_picker" type="color" value="#ffffff">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Save Button Hover</td>
+                        <td class="color-row">
+                            <input id="style_save_btn_hover_bg" type="text" class="color-input" value="#1557b0">
+                            <input id="style_save_btn_hover_bg_picker" type="color" value="#1557b0">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Save Button Label</td>
+                        <td><input id="style_save_btn_label" type="text" placeholder="Salvar"></td>
+                    </tr>
                 </table>
             </fieldset>
 
@@ -340,6 +365,13 @@
             this._subheaderBgPicker      = this._shadowRoot.getElementById("style_subheader_bg_picker");
             this._subheaderColorInput    = this._shadowRoot.getElementById("style_subheader_color");
             this._subheaderColorPicker   = this._shadowRoot.getElementById("style_subheader_color_picker");
+            this._saveBtnBgInput         = this._shadowRoot.getElementById("style_save_btn_bg");
+            this._saveBtnBgPicker        = this._shadowRoot.getElementById("style_save_btn_bg_picker");
+            this._saveBtnColorInput      = this._shadowRoot.getElementById("style_save_btn_color");
+            this._saveBtnColorPicker     = this._shadowRoot.getElementById("style_save_btn_color_picker");
+            this._saveBtnHoverBgInput    = this._shadowRoot.getElementById("style_save_btn_hover_bg");
+            this._saveBtnHoverBgPicker   = this._shadowRoot.getElementById("style_save_btn_hover_bg_picker");
+            this._saveBtnLabelInput      = this._shadowRoot.getElementById("style_save_btn_label");
             this._titleColorInput        = this._shadowRoot.getElementById("style_title_color");
             this._titleColorPicker       = this._shadowRoot.getElementById("style_title_color_picker");
 
@@ -377,6 +409,9 @@
                 [this._groupHeaderColorInput, this._groupHeaderColorPicker],
                 [this._subheaderBgInput,      this._subheaderBgPicker],
                 [this._subheaderColorInput,   this._subheaderColorPicker],
+                [this._saveBtnBgInput,        this._saveBtnBgPicker],
+                [this._saveBtnColorInput,     this._saveBtnColorPicker],
+                [this._saveBtnHoverBgInput,   this._saveBtnHoverBgPicker],
                 [this._titleColorInput,        this._titleColorPicker]
             ];
             pairs.forEach(function(pair) {
@@ -422,6 +457,10 @@
                             groupHeaderColor:    this._groupHeaderColorInput.value,
                             subheaderBg:         this._subheaderBgInput.value,
                             subheaderColor:      this._subheaderColorInput.value,
+                            saveBtnBg:           this._saveBtnBgInput.value,
+                            saveBtnColor:        this._saveBtnColorInput.value,
+                            saveBtnHoverBg:      this._saveBtnHoverBgInput.value,
+                            saveBtnLabel:        this._saveBtnLabelInput.value,
                             rowHeight:         parseInt(this._rowHeightSelect.value, 10),
                             colWidth:          this._colWidthSelect.value,
                             fontFamily:        this._fontFamilySelect.value,
@@ -471,6 +510,10 @@
                 if (cfg.groupHeaderColor) { this._groupHeaderColorInput.value = cfg.groupHeaderColor; this._groupHeaderColorPicker.value = cfg.groupHeaderColor; }
                 if (cfg.subheaderBg)      { this._subheaderBgInput.value = cfg.subheaderBg; this._subheaderBgPicker.value = cfg.subheaderBg; }
                 if (cfg.subheaderColor)   { this._subheaderColorInput.value = cfg.subheaderColor; this._subheaderColorPicker.value = cfg.subheaderColor; }
+                if (cfg.saveBtnBg)       { this._saveBtnBgInput.value = cfg.saveBtnBg; this._saveBtnBgPicker.value = cfg.saveBtnBg; }
+                if (cfg.saveBtnColor)    { this._saveBtnColorInput.value = cfg.saveBtnColor; this._saveBtnColorPicker.value = cfg.saveBtnColor; }
+                if (cfg.saveBtnHoverBg)  { this._saveBtnHoverBgInput.value = cfg.saveBtnHoverBg; this._saveBtnHoverBgPicker.value = cfg.saveBtnHoverBg; }
+                if (cfg.saveBtnLabel)    { this._saveBtnLabelInput.value = cfg.saveBtnLabel; }
                 if (cfg.headerAlign)  { this._setAlignActive("header", cfg.headerAlign); }
                 if (cfg.cellAlign)    { this._setAlignActive("cell",   cfg.cellAlign); }
                 if (cfg.titleAlign)   { this._setAlignActive("title",  cfg.titleAlign); }

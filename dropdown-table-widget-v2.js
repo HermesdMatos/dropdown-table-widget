@@ -1,5 +1,7 @@
-// dropdown-table-widget.js — v2.11.20
+// dropdown-table-widget.js — v2.11.22
 // Changelog:
+//   v2.11.22 — Feature: save button label configurável via style panel
+//   v2.11.21 — Feature: save button cores configuráveis via style panel
 //   v2.11.20 — Feature: group header e subheader cores configuráveis via style panel
 //   v2.11.19 — Fix: remove changed-cell do render; cor so aplicada em acao do usuario
 //   v2.11.18 — Fix: reseta style inline apos save — sobrepoe changed-cell independente de renders
@@ -156,8 +158,8 @@ TMPL.innerHTML = `
   }
   .dt-toolbar.hidden { display: none; }
   .dt-save-btn {
-    background: #1a73e8;
-    color: #fff;
+    background: var(--save-btn-bg, #1a73e8);
+    color: var(--save-btn-color, #fff);
     border: none;
     border-radius: 4px;
     padding: 7px 18px;
@@ -166,7 +168,7 @@ TMPL.innerHTML = `
     cursor: pointer;
     font-family: Arial, sans-serif;
   }
-  .dt-save-btn:hover { background: #1557b0; }
+  .dt-save-btn:hover { background: var(--save-btn-hover-bg, #1557b0); }
   .dt-save-btn:active { background: #0e4191; }
   .changed-cell {
     background: #fff3cd !important;
@@ -649,6 +651,13 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.groupHeaderColor !== undefined) { this.style.setProperty("--group-header-color", cfg.groupHeaderColor); }
       if (cfg.subheaderBg      !== undefined) { this.style.setProperty("--subheader-bg",       cfg.subheaderBg); }
       if (cfg.subheaderColor   !== undefined) { this.style.setProperty("--subheader-color",    cfg.subheaderColor); }
+      if (cfg.saveBtnBg        !== undefined) { this.style.setProperty("--save-btn-bg",       cfg.saveBtnBg); }
+      if (cfg.saveBtnColor     !== undefined) { this.style.setProperty("--save-btn-color",    cfg.saveBtnColor); }
+      if (cfg.saveBtnHoverBg   !== undefined) { this.style.setProperty("--save-btn-hover-bg", cfg.saveBtnHoverBg); }
+      if (cfg.saveBtnLabel     !== undefined) {
+        var btnEl = this.shadowRoot.getElementById("dt-save-btn");
+        if (btnEl) { btnEl.textContent = cfg.saveBtnLabel || "Salvar"; }
+      }
       this._applyDynamicStyles();
       this._render();
     } catch(e) { console.error("applyStyleConfig error:", e); }
