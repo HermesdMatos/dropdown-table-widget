@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.19
+// dropdown-table-widget.js — v2.11.20
 // Changelog:
+//   v2.11.20 — Feature: group header e subheader cores configuráveis via style panel
 //   v2.11.19 — Fix: remove changed-cell do render; cor so aplicada em acao do usuario
 //   v2.11.18 — Fix: reseta style inline apos save — sobrepoe changed-cell independente de renders
 //   v2.11.17 — Fix: _skipHighlightRenders contador protege 2 ciclos de render apos save
@@ -41,6 +42,9 @@ TMPL.innerHTML = `
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
   thead tr { background: var(--header-color, #1a73e8); }
+
+  .dt-group-header td { background: var(--group-header-bg, #f0f4ff) !important; color: var(--group-header-color, #1a3a6e) !important; }
+  .dt-subheader td { background: var(--subheader-bg, #e8f0fe) !important; color: var(--subheader-color, #1a3a6e) !important; }
   thead th {
     color: var(--header-text-color, #ffffff);
     background: var(--header-color, #1a73e8);
@@ -641,6 +645,10 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.titleSize   !== undefined) { this._titleSize   = cfg.titleSize; }
       if (cfg.headerAlign !== undefined) { this._headerAlign = cfg.headerAlign; }
       if (cfg.titleAlign  !== undefined) { this._titleAlign  = cfg.titleAlign; }
+      if (cfg.groupHeaderBg    !== undefined) { this.style.setProperty("--group-header-bg",    cfg.groupHeaderBg); }
+      if (cfg.groupHeaderColor !== undefined) { this.style.setProperty("--group-header-color", cfg.groupHeaderColor); }
+      if (cfg.subheaderBg      !== undefined) { this.style.setProperty("--subheader-bg",       cfg.subheaderBg); }
+      if (cfg.subheaderColor   !== undefined) { this.style.setProperty("--subheader-color",    cfg.subheaderColor); }
       this._applyDynamicStyles();
       this._render();
     } catch(e) { console.error("applyStyleConfig error:", e); }
@@ -2061,7 +2069,8 @@ class DropdownTableWidget extends HTMLElement {
         var trH = document.createElement("tr");
         var tdH = document.createElement("td");
         tdH.colSpan = totalCols;
-        tdH.style.cssText = "font-weight:700;background:#f0f4ff;color:#1a3a6e;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;letter-spacing:0.5px;";
+        tdH.style.cssText = "font-weight:700;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;letter-spacing:0.5px;";
+        trH.classList.add("dt-group-header");
         tdH.textContent = item.label;
         trH.appendChild(tdH);
         tbody.appendChild(trH);
@@ -2069,7 +2078,8 @@ class DropdownTableWidget extends HTMLElement {
         var trSH = document.createElement("tr");
         var tdSH = document.createElement("td");
         tdSH.colSpan = totalCols;
-        tdSH.style.cssText = "font-weight:600;background:#e8f0fe;color:#1a3a6e;padding:0 24px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;";
+        tdSH.style.cssText = "font-weight:600;padding:0 24px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;";
+        trSH.classList.add("dt-subheader");
         tdSH.textContent = item.label;
         trSH.appendChild(tdSH);
         tbody.appendChild(trSH);

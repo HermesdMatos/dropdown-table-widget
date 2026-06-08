@@ -205,6 +205,34 @@
                             <input id="style_editable_color_picker" type="color" value="#fffbe6">
                         </td>
                     </tr>
+                    <tr>
+                        <td>Group Header Background</td>
+                        <td class="color-row">
+                            <input id="style_group_header_bg" type="text" class="color-input" value="#f0f4ff">
+                            <input id="style_group_header_bg_picker" type="color" value="#f0f4ff">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Group Header Text</td>
+                        <td class="color-row">
+                            <input id="style_group_header_color" type="text" class="color-input" value="#1a3a6e">
+                            <input id="style_group_header_color_picker" type="color" value="#1a3a6e">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Subheader Background</td>
+                        <td class="color-row">
+                            <input id="style_subheader_bg" type="text" class="color-input" value="#e8f0fe">
+                            <input id="style_subheader_bg_picker" type="color" value="#e8f0fe">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Subheader Text</td>
+                        <td class="color-row">
+                            <input id="style_subheader_color" type="text" class="color-input" value="#1a3a6e">
+                            <input id="style_subheader_color_picker" type="color" value="#1a3a6e">
+                        </td>
+                    </tr>
                 </table>
             </fieldset>
 
@@ -304,6 +332,14 @@
             this._tableTextColorPicker   = this._shadowRoot.getElementById("style_table_text_color_picker");
             this._editableColorInput     = this._shadowRoot.getElementById("style_editable_color");
             this._editableColorPicker    = this._shadowRoot.getElementById("style_editable_color_picker");
+            this._groupHeaderBgInput     = this._shadowRoot.getElementById("style_group_header_bg");
+            this._groupHeaderBgPicker    = this._shadowRoot.getElementById("style_group_header_bg_picker");
+            this._groupHeaderColorInput  = this._shadowRoot.getElementById("style_group_header_color");
+            this._groupHeaderColorPicker = this._shadowRoot.getElementById("style_group_header_color_picker");
+            this._subheaderBgInput       = this._shadowRoot.getElementById("style_subheader_bg");
+            this._subheaderBgPicker      = this._shadowRoot.getElementById("style_subheader_bg_picker");
+            this._subheaderColorInput    = this._shadowRoot.getElementById("style_subheader_color");
+            this._subheaderColorPicker   = this._shadowRoot.getElementById("style_subheader_color_picker");
             this._titleColorInput        = this._shadowRoot.getElementById("style_title_color");
             this._titleColorPicker       = this._shadowRoot.getElementById("style_title_color_picker");
 
@@ -337,6 +373,10 @@
                 [this._hoverRowColorInput,     this._hoverRowColorPicker],
                 [this._tableTextColorInput,    this._tableTextColorPicker],
                 [this._editableColorInput,     this._editableColorPicker],
+                [this._groupHeaderBgInput,    this._groupHeaderBgPicker],
+                [this._groupHeaderColorInput, this._groupHeaderColorPicker],
+                [this._subheaderBgInput,      this._subheaderBgPicker],
+                [this._subheaderColorInput,   this._subheaderColorPicker],
                 [this._titleColorInput,        this._titleColorPicker]
             ];
             pairs.forEach(function(pair) {
@@ -377,7 +417,11 @@
                         hoverRowColor:     this._hoverRowColorInput.value,
                         tableTextColor:    this._tableTextColorInput.value,
                         styleConfig: JSON.stringify({
-                            editableCellColor: this._editableColorInput.value,
+                            editableCellColor:   this._editableColorInput.value,
+                            groupHeaderBg:       this._groupHeaderBgInput.value,
+                            groupHeaderColor:    this._groupHeaderColorInput.value,
+                            subheaderBg:         this._subheaderBgInput.value,
+                            subheaderColor:      this._subheaderColorInput.value,
                             rowHeight:         parseInt(this._rowHeightSelect.value, 10),
                             colWidth:          this._colWidthSelect.value,
                             fontFamily:        this._fontFamilySelect.value,
@@ -422,7 +466,11 @@
                 if (cfg.fontSize)     { this._fontSizeSelect.value = cfg.fontSize; }
                 if (cfg.fontWeight)   { this._fontWeightSelect.value = cfg.fontWeight; }
                 if (cfg.rowHeight)    { this._rowHeightSelect.value = String(cfg.rowHeight); }
-                if (cfg.colWidth)     { this._colWidthSelect.value = cfg.colWidth; }
+                if (cfg.colWidth)          { this._colWidthSelect.value = cfg.colWidth; }
+                if (cfg.groupHeaderBg)    { this._groupHeaderBgInput.value = cfg.groupHeaderBg; this._groupHeaderBgPicker.value = cfg.groupHeaderBg; }
+                if (cfg.groupHeaderColor) { this._groupHeaderColorInput.value = cfg.groupHeaderColor; this._groupHeaderColorPicker.value = cfg.groupHeaderColor; }
+                if (cfg.subheaderBg)      { this._subheaderBgInput.value = cfg.subheaderBg; this._subheaderBgPicker.value = cfg.subheaderBg; }
+                if (cfg.subheaderColor)   { this._subheaderColorInput.value = cfg.subheaderColor; this._subheaderColorPicker.value = cfg.subheaderColor; }
                 if (cfg.headerAlign)  { this._setAlignActive("header", cfg.headerAlign); }
                 if (cfg.cellAlign)    { this._setAlignActive("cell",   cfg.cellAlign); }
                 if (cfg.titleAlign)   { this._setAlignActive("title",  cfg.titleAlign); }
