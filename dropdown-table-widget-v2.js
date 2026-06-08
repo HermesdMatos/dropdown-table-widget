@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.15
+// dropdown-table-widget.js — v2.11.16
 // Changelog:
+//   v2.11.16 — Fix: nao reaplica changed-cell no render apos save (_justSaved)
 //   v2.11.15 — Fix: soma todas as medidas para selecionar linha com valor real
 //   v2.11.14 — Fix: prioriza linha com maior valor ao deduplicar por dimensions_0
 //   v2.11.13 — Fix: remove changed-cell highlight apos save
@@ -1791,7 +1792,7 @@ class DropdownTableWidget extends HTMLElement {
           cLbl = cData.label || cData.id || "";
           cId = cData.id || "";
           // Preserva bindingId original — necessário para localizar children/opts
-          td.classList.add("changed-cell");
+          if (!self2._justSaved) { td.classList.add("changed-cell"); }
         }
 
         if (!cLbl && cId) {
@@ -1899,7 +1900,7 @@ class DropdownTableWidget extends HTMLElement {
         }
         if (self2._localData && self2._localData[measureRowKey]) {
           mvVal = self2._localData[measureRowKey].value;
-          tdm.classList.add("changed-cell");
+          if (!self2._justSaved) { tdm.classList.add("changed-cell"); }
         }
         var input = document.createElement("input");
         input.type = "text";
