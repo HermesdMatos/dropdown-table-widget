@@ -1,5 +1,7 @@
-// dropdown-table-widget.js — v2.11.16
+// dropdown-table-widget.js — v2.11.18
 // Changelog:
+//   v2.11.18 — Fix: reseta style inline apos save — sobrepoe changed-cell independente de renders
+//   v2.11.17 — Fix: _skipHighlightRenders contador protege 2 ciclos de render apos save
 //   v2.11.16 — Fix: nao reaplica changed-cell no render apos save (_justSaved)
 //   v2.11.15 — Fix: soma todas as medidas para selecionar linha com valor real
 //   v2.11.14 — Fix: prioriza linha com maior valor ao deduplicar por dimensions_0
@@ -383,7 +385,7 @@ class DropdownTableWidget extends HTMLElement {
     this._deleteMemberId          = "";
     this._deleteMemberDimensionId = "";
     this._rowValuesMap = {};
-    this._justSaved = false;
+    this._skipHighlightRenders = 0;
     this._dataFingerprint = undefined;
     this._oldRowAddrStr = "";
     this._newRowAddrStr = "";
@@ -486,9 +488,8 @@ class DropdownTableWidget extends HTMLElement {
         }
       }
       if (this._dataFingerprint !== undefined && this._dataFingerprint !== newFingerprint) {
-        if (this._justSaved) {
-          // Após save: fingerprint mudou por causa dos novos valores — preserva estado visual
-          this._justSaved = false;
+        if (this._skipHighlightRenders && this._skipHighlightRenders > 0) {
+          // Após save: fingerprint mudou — preserva estado visual
         } else {
           // Troca real de contexto (ex: mudança de cliente) — limpa estado local
           this._localSelections = {};
@@ -742,11 +743,13 @@ class DropdownTableWidget extends HTMLElement {
     this._pendingChanges = [];
     this._localData = {};
     this._originalData = {};
-    this._justSaved = true; // flag: próximo binding update limpa estado local
-    // Remove visual de célula alterada de todas as células do DOM
+    this._skipHighlightRenders = 2; // protege 2 ciclos de render após save
+    // Reseta cor de todas as células alteradas para transparente (cor natural da tabela)
     var changedCells = this.shadowRoot.querySelectorAll(".changed-cell");
     for (var cc = 0; cc < changedCells.length; cc++) {
       changedCells[cc].classList.remove("changed-cell");
+      changedCells[cc].style.background = "transparent";
+      changedCells[cc].style.border = "";
     }
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
@@ -1792,7 +1795,7 @@ class DropdownTableWidget extends HTMLElement {
           cLbl = cData.label || cData.id || "";
           cId = cData.id || "";
           // Preserva bindingId original — necessário para localizar children/opts
-          if (!self2._justSaved) { td.classList.add("changed-cell"); }
+          td.classList.add("changed-cell");
         }
 
         if (!cLbl && cId) {
@@ -1900,7 +1903,7 @@ class DropdownTableWidget extends HTMLElement {
         }
         if (self2._localData && self2._localData[measureRowKey]) {
           mvVal = self2._localData[measureRowKey].value;
-          if (!self2._justSaved) { tdm.classList.add("changed-cell"); }
+          tdm.classList.add("changed-cell");
         }
         var input = document.createElement("input");
         input.type = "text";
