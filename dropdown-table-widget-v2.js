@@ -1,40 +1,10 @@
-// dropdown-table-widget.js — v2.11.22
+// dropdown-table-widget.js — v2.11.23
 // Changelog:
+//   v2.11.23 — Feature: loading spinner overlay durante carregamento do binding
 //   v2.11.22 — Feature: save button label configurável via style panel
 //   v2.11.21 — Feature: save button cores configuráveis via style panel
 //   v2.11.20 — Feature: group header e subheader cores configuráveis via style panel
 //   v2.11.19 — Fix: remove changed-cell do render; cor so aplicada em acao do usuario
-//   v2.11.18 — Fix: reseta style inline apos save — sobrepoe changed-cell independente de renders
-//   v2.11.17 — Fix: _skipHighlightRenders contador protege 2 ciclos de render apos save
-//   v2.11.16 — Fix: nao reaplica changed-cell no render apos save (_justSaved)
-//   v2.11.15 — Fix: soma todas as medidas para selecionar linha com valor real
-//   v2.11.14 — Fix: prioriza linha com maior valor ao deduplicar por dimensions_0
-//   v2.11.13 — Fix: remove changed-cell highlight apos save
-//   v2.11.12 — Fix: usa _getRowMeasureValue como fonte primaria do valor no pendingChanges
-//   v2.11.11 — Fix: _justSaved protege estado visual no refresh apos save
-//   v2.11.10 — Fix: fingerprint inclui todos os IDs e valores para detectar troca de cliente
-//   v2.11.9 — Fix: limpa estado local ao detectar troca de contexto via fingerprint
-//   v2.11.8 — Fix: preserva bindingId original ao aplicar localSelection no render
-//   v2.11.7 — Fix: verifica cellHasChildren e opts com bindingId alem do cId
-//   v2.11.6 — Fix: indexa _localSelections por dimensions_0.id em vez de rowIndex
-//   v2.11.5 — Fix: flag _justSaved controla limpeza de estado local apenas apos save
-//   v2.11.4 — Fix: preserva _localSelections apos save; limpa apenas no novo binding
-//   v2.11.3 — Fix technicalId fallback: usa memberId (ID real) em vez de memberLabel (display label)
-//   v2.11.2 — Fix: _getRowMeasureValue por medida; remove todos Object.keys (SAC compat)
-//   v2.11.1 — Fix technicalId: troca Object.keys por for...in no childrenFromBinding
-//   v2.11.1 — Fix measureId: resolve do mainStructureMembers direto antes do feeds
-//   v2.11.1 — Fix technicalId fallback: monta ID tecnico quando nao resolvido; Fix _mesIds para measureId correto
-//   v2.11.0 — Normaliza valor decimal para ponto antes de serializar no pendingChanges (compatibilidade SAC setUserInput)
-//   v2.10.55 — Refatora edicoes para staging local com _localData/_originalData
-//   v2.10.54 — Ajusta getPendingChanges() para retornar JSON string no SAC
-//   v2.10.53 — Adiciona buffer _pendingChanges e remove write-back imediato do dropdown
-//   v2.10.52 — Adiciona getChangedValue() para expor o valor alterado/usado na movimentacao
-//   v2.10.51 — Adiciona getNewRowAddrStr() para expor a linha apos alteracao do dropdown
-//   v2.10.40 — Fix write-back: _localSelections sobrescreve addrStr — seleções manuais passam para setUserInput
-//   v2.10.39 — Adiciona getDataSource() para compatibilidade com padrão SAC
-//              dropdowntable_1.getDataSource().setDimensionFilter(...) agora funciona
-//   v2.10.1 — Fix context menu position, campo hierarquia no modal, dimensionRealId no payload
-//   v2.10.0 — Context menu + modal "Adicionar membro" + eventos SAC
 
 var TMPL = document.createElement("template");
 TMPL.innerHTML = `
@@ -139,6 +109,34 @@ TMPL.innerHTML = `
     font-weight: 600;
   }
 
+  .dt-loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.75);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    gap: 12px;
+  }
+  .dt-loading-overlay.hidden { display: none; }
+  .dt-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid #e0e0e0;
+    border-top-color: #1a73e8;
+    border-radius: 50%;
+    animation: dt-spin 0.7s linear infinite;
+  }
+  @keyframes dt-spin {
+    to { transform: rotate(360deg); }
+  }
+  .dt-loading-text {
+    font-size: 13px;
+    color: #555;
+    font-family: Arial, sans-serif;
+  }
   .dt-title {
     padding: 8px 12px 6px 12px;
     font-weight: 700;
@@ -170,6 +168,11 @@ TMPL.innerHTML = `
   }
   .dt-save-btn:hover { background: var(--save-btn-hover-bg, #1557b0); }
   .dt-save-btn:active { background: #0e4191; }
+  .dt-measure-cell-selected {
+    outline: 2px solid #1a73e8 !important;
+    outline-offset: -2px;
+    background: #e8f0fe !important;
+  }
   .changed-cell {
     background: #fff3cd !important;
     border: 1px solid #ffc107 !important;
@@ -305,6 +308,10 @@ TMPL.innerHTML = `
     <tbody id="dt-body"></tbody>
   </table>
   <div class="dt-empty" id="dt-empty">Nenhum dado disponível</div>
+  <div class="dt-loading-overlay hidden" id="dt-loading-overlay">
+    <div class="dt-spinner"></div>
+    <div class="dt-loading-text">Carregando...</div>
+  </div>
   <div class="dt-dropdown-list hidden" id="dt-dropdown"></div>
 
   <!-- Context Menu — dentro do wrapper para position:absolute funcionar corretamente -->
@@ -392,6 +399,9 @@ class DropdownTableWidget extends HTMLElement {
     this._deleteMemberId          = "";
     this._deleteMemberDimensionId = "";
     this._rowValuesMap = {};
+    this._selectedCells  = []; // [{rowIndex, measureKey, tdEl}]
+    this._selAnchor      = null; // {rowIndex, measureKey}
+    this._isDragging     = false;
     this._skipHighlightRenders = 0;
     this._dataFingerprint = undefined;
     this._oldRowAddrStr = "";
@@ -432,6 +442,7 @@ class DropdownTableWidget extends HTMLElement {
     document.addEventListener("click", this._onDocCtxClose);
     this._bindContextMenu();
     this._bindModal();
+    this._bindSelectionKeys();
     this._bindSaveButton();
   }
 
@@ -440,12 +451,26 @@ class DropdownTableWidget extends HTMLElement {
     document.removeEventListener("click", this._onDocCtxClose);
   }
 
+  // ─── Loading Overlay ─────────────────────────────────────────
+  _showLoading() {
+    var el = this.shadowRoot.getElementById("dt-loading-overlay");
+    if (el) { el.classList.remove("hidden"); }
+  }
+  _hideLoading() {
+    var el = this.shadowRoot.getElementById("dt-loading-overlay");
+    if (el) { el.classList.add("hidden"); }
+  }
+
   // ─── SAC Lifecycle ────────────────────────────────────────────
   onCustomWidgetReady() { this._loadBinding(); }
   onCustomWidgetBeforeUpdate(c) {}
   onCustomWidgetAfterUpdate(changedProperties) {
     if (changedProperties && "myDataBinding" in changedProperties) {
       var dataBinding = changedProperties.myDataBinding;
+      if (dataBinding && dataBinding.state !== "success") {
+        this._showLoading();
+        return;
+      }
       if (dataBinding && dataBinding.state === "success") {
         this._processDataBinding(dataBinding);
         return;
@@ -473,8 +498,8 @@ class DropdownTableWidget extends HTMLElement {
   _loadBinding() {
     try {
       var b = this.myDataBinding;
-      if (!b || !b.metadata || !b.data) return;
-      if (b.state && b.state !== "success") return;
+      if (!b || !b.metadata || !b.data) { this._showLoading(); return; }
+      if (b.state && b.state !== "success") { this._showLoading(); return; }
       this._processDataBinding(b);
     } catch(e) { console.error("DropdownTable _loadBinding:", e); }
   }
@@ -585,6 +610,7 @@ class DropdownTableWidget extends HTMLElement {
 
       this._processChildrenBinding();
       this._render();
+      this._hideLoading();
     } catch(e) { console.error("DropdownTable _processDataBinding:", e); }
   }
 
@@ -1079,6 +1105,139 @@ class DropdownTableWidget extends HTMLElement {
       this._rowValuesMap = map;
       this._render();
     } catch(e) { console.error("setRowValues error:", e); }
+  }
+
+  // ─── Cell Selection ──────────────────────────────────────────────
+  _getAllMeasureCells() {
+    return Array.from(this.shadowRoot.querySelectorAll("tbody td.dt-mcell"));
+  }
+
+  _clearSelection() {
+    for (var cs = 0; cs < this._selectedCells.length; cs++) {
+      if (this._selectedCells[cs].tdEl) {
+        this._selectedCells[cs].tdEl.classList.remove("dt-measure-cell-selected");
+      }
+    }
+    this._selectedCells = [];
+  }
+
+  _selectCell(rowIndex, measureKey, tdEl) {
+    tdEl.classList.add("dt-measure-cell-selected");
+    this._selectedCells.push({ rowIndex: rowIndex, measureKey: measureKey, tdEl: tdEl });
+  }
+
+  _selectRange(anchorRow, anchorKey, endRow, endKey) {
+    this._clearSelection();
+    var allCells = this._getAllMeasureCells();
+    if (allCells.length === 0) { return; }
+
+    // Resolve índices de coluna das medidas
+    var measureKeys = [];
+    var firstRow = this.shadowRoot.querySelector("tbody tr[data-row-index]");
+    if (firstRow) {
+      var mCells = firstRow.querySelectorAll("td.dt-mcell");
+      for (var mc = 0; mc < mCells.length; mc++) {
+        measureKeys.push(mCells[mc].getAttribute("data-measure-key"));
+      }
+    }
+
+    var anchorColIdx = measureKeys.indexOf(anchorKey);
+    var endColIdx    = measureKeys.indexOf(endKey);
+    if (anchorColIdx === -1) { anchorColIdx = 0; }
+    if (endColIdx    === -1) { endColIdx    = 0; }
+
+    var minRow = anchorRow < endRow ? anchorRow : endRow;
+    var maxRow = anchorRow < endRow ? endRow     : anchorRow;
+    var minCol = anchorColIdx < endColIdx ? anchorColIdx : endColIdx;
+    var maxCol = anchorColIdx < endColIdx ? endColIdx    : anchorColIdx;
+
+    for (var ci = 0; ci < allCells.length; ci++) {
+      var td = allCells[ci];
+      var ri = parseInt(td.getAttribute("data-row-index"), 10);
+      var mk = td.getAttribute("data-measure-key");
+      var colIdx = measureKeys.indexOf(mk);
+      if (ri >= minRow && ri <= maxRow && colIdx >= minCol && colIdx <= maxCol) {
+        this._selectCell(ri, mk, td);
+      }
+    }
+  }
+
+  _bindSelectionKeys() {
+    var self = this;
+    var wrapper = this.shadowRoot.getElementById("dt-wrapper");
+    if (!wrapper) { return; }
+
+    wrapper.setAttribute("tabindex", "0");
+
+    wrapper.addEventListener("keydown", function(e) {
+      // Delete — dispara evento com células selecionadas
+      if (e.key === "Delete" && self._selectedCells.length > 0) {
+        e.preventDefault();
+        var cells = [];
+        for (var sc = 0; sc < self._selectedCells.length; sc++) {
+          cells.push({
+            rowIndex:   self._selectedCells[sc].rowIndex,
+            measureKey: self._selectedCells[sc].measureKey
+          });
+        }
+        self.dispatchEvent(new CustomEvent("onCellsDeleteRequested", {
+          bubbles: true, composed: true,
+          detail: { cells: cells }
+        }));
+        self._clearSelection();
+        return;
+      }
+
+      // Escape — limpa seleção
+      if (e.key === "Escape") { self._clearSelection(); return; }
+
+      // Ctrl+A — seleciona todas as células de medida
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault();
+        self._clearSelection();
+        var allCells = self._getAllMeasureCells();
+        for (var ac = 0; ac < allCells.length; ac++) {
+          var acTd = allCells[ac];
+          self._selectCell(
+            parseInt(acTd.getAttribute("data-row-index"), 10),
+            acTd.getAttribute("data-measure-key"),
+            acTd
+          );
+        }
+        return;
+      }
+
+      // Ctrl+Shift+Seta — expande seleção
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        if (!self._selAnchor) { return; }
+
+        var allCells2 = self._getAllMeasureCells();
+        var measureKeys2 = [];
+        var firstRow2 = self.shadowRoot.querySelector("tbody tr[data-row-index]");
+        if (firstRow2) {
+          var mCells2 = firstRow2.querySelectorAll("td.dt-mcell");
+          for (var mc2 = 0; mc2 < mCells2.length; mc2++) {
+            measureKeys2.push(mCells2[mc2].getAttribute("data-measure-key"));
+          }
+        }
+
+        var lastSel = self._selectedCells.length > 0 ? self._selectedCells[self._selectedCells.length - 1] : self._selAnchor;
+        var curRow  = lastSel.rowIndex;
+        var curCol  = measureKeys2.indexOf(lastSel.measureKey);
+        if (curCol === -1) { curCol = 0; }
+
+        var newRow = curRow;
+        var newCol = curCol;
+        if (e.key === "ArrowRight") { newCol = Math.min(newCol + 1, measureKeys2.length - 1); }
+        if (e.key === "ArrowLeft")  { newCol = Math.max(newCol - 1, 0); }
+        if (e.key === "ArrowDown")  { newRow = newRow + 1; }
+        if (e.key === "ArrowUp")    { newRow = Math.max(newRow - 1, 0); }
+
+        var newKey = measureKeys2[newCol] || lastSel.measureKey;
+        self._selectRange(self._selAnchor.rowIndex, self._selAnchor.measureKey, newRow, newKey);
+      }
+    });
   }
 
   // ─── Context Menu wiring ──────────────────────────────────────
@@ -1749,6 +1908,38 @@ class DropdownTableWidget extends HTMLElement {
     var totalCols = dimensions.length + measures.length;
     var self2 = this;
 
+    // Mouse drag selection
+    var wrapper2 = self2.shadowRoot.getElementById("dt-wrapper");
+    if (wrapper2 && !wrapper2._selBound) {
+      wrapper2._selBound = true;
+
+      wrapper2.addEventListener("mousedown", function(e) {
+        var td = e.target.closest("td.dt-mcell");
+        if (!td) { return; }
+        e.preventDefault();
+        self2._clearSelection();
+        self2._isDragging  = true;
+        var ri2 = parseInt(td.getAttribute("data-row-index"), 10);
+        var mk3 = td.getAttribute("data-measure-key");
+        self2._selAnchor   = { rowIndex: ri2, measureKey: mk3 };
+        self2._selectCell(ri2, mk3, td);
+        wrapper2.focus();
+      });
+
+      wrapper2.addEventListener("mouseover", function(e) {
+        if (!self2._isDragging) { return; }
+        var td = e.target.closest("td.dt-mcell");
+        if (!td) { return; }
+        var ri3 = parseInt(td.getAttribute("data-row-index"), 10);
+        var mk4 = td.getAttribute("data-measure-key");
+        self2._selectRange(self2._selAnchor.rowIndex, self2._selAnchor.measureKey, ri3, mk4);
+      });
+
+      document.addEventListener("mouseup", function() {
+        self2._isDragging = false;
+      });
+    }
+
     var renderRow = function(ri) {
       var rowData = self2._data[ri];
       var tr = document.createElement("tr");
@@ -1898,6 +2089,9 @@ class DropdownTableWidget extends HTMLElement {
         var mk2  = "measures_" + mi2;
         var tdm  = document.createElement("td");
         tdm.style.padding = "0";
+        tdm.classList.add("dt-mcell");
+        tdm.setAttribute("data-row-index", ri);
+        tdm.setAttribute("data-measure-key", "measures_" + mi2);
         var measureId2 = self2._getMeasureIdByKey(mk2);
         var visualAddrStr = self2._buildRowAddrStr(ri, null, true);
         var measureRowKey = self2._createRowKey(visualAddrStr, measureId2);

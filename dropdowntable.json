@@ -6,13 +6,13 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.11.22",
+  "version": "2.11.23",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-ATUALIZAR_APOS_DEPLOY_v2.11.22"
+      "integrity": "sha256-ATUALIZAR_APOS_DEPLOY_v2.11.23"
     },
     {
       "kind": "styling",
@@ -379,6 +379,9 @@
     },
     "onSaveRequested": {
       "description": "Fired when user clicks Salvar. Detail: array of {rowIndex, addrStr, measures, address} for changed rows only."
+    },
+    "onCellsDeleteRequested": {
+      "description": "Fired when user presses Delete with measure cells selected. Detail: {cells: [{rowIndex, measureKey}]}"
     }
   },
   "dataBindings": {
