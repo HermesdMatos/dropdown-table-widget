@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.24
+// dropdown-table-widget.js — v2.11.25
 // Changelog:
+//   v2.11.25 — Fix: dt-empty hidden por padrao
 //   v2.11.24 — Fix: input focus restaurado; Delete funciona em selecao multipla
 //   v2.11.23 — Feature: loading spinner overlay durante carregamento do binding
 //   v2.11.22 — Feature: save button label configurável via style panel
@@ -308,7 +309,7 @@ TMPL.innerHTML = `
     <thead><tr id="dt-header"></tr></thead>
     <tbody id="dt-body"></tbody>
   </table>
-  <div class="dt-empty" id="dt-empty">Nenhum dado disponível</div>
+  <div class="dt-empty hidden" id="dt-empty">Nenhum dado disponível</div>
   <div class="dt-loading-overlay hidden" id="dt-loading-overlay">
     <div class="dt-spinner"></div>
     <div class="dt-loading-text">Carregando...</div>
