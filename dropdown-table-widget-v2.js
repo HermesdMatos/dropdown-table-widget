@@ -1,5 +1,6 @@
-// dropdown-table-widget.js — v2.11.23
+// dropdown-table-widget.js — v2.11.24
 // Changelog:
+//   v2.11.24 — Fix: input focus restaurado; Delete funciona em selecao multipla
 //   v2.11.23 — Feature: loading spinner overlay durante carregamento do binding
 //   v2.11.22 — Feature: save button label configurável via style panel
 //   v2.11.21 — Feature: save button cores configuráveis via style panel
@@ -1916,6 +1917,8 @@ class DropdownTableWidget extends HTMLElement {
       wrapper2.addEventListener("mousedown", function(e) {
         var td = e.target.closest("td.dt-mcell");
         if (!td) { return; }
+        // Não previne default se clicou diretamente no input — deixa o foco funcionar
+        if (e.target.tagName === "INPUT") { self2._clearSelection(); return; }
         e.preventDefault();
         self2._clearSelection();
         self2._isDragging  = true;
@@ -2131,6 +2134,17 @@ class DropdownTableWidget extends HTMLElement {
           e.target.style.cursor = "pointer";
         });
         input.addEventListener("keydown", function(e) {
+          // Delete com células selecionadas — dispara evento e não apaga o input focado
+          if (e.key === "Delete" && self2._selectedCells && self2._selectedCells.length > 1) {
+            e.preventDefault();
+            var cells = [];
+            for (var sc = 0; sc < self2._selectedCells.length; sc++) {
+              cells.push({ rowIndex: self2._selectedCells[sc].rowIndex, measureKey: self2._selectedCells[sc].measureKey });
+            }
+            self2.dispatchEvent(new CustomEvent("onCellsDeleteRequested", { bubbles: true, composed: true, detail: { cells: cells } }));
+            self2._clearSelection();
+            return;
+          }
           if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
             e.preventDefault();
             var allInputs = Array.from(self2.shadowRoot.querySelectorAll("tbody input, tbody .cell-dropdown"));
