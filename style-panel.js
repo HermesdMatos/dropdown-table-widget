@@ -349,6 +349,12 @@
                 <legend>Dropdowns (validação de dados)</legend>
                 <div class="dd-hint">Marque as dimensões que viram lista de seleção em cada linha. Nenhuma marcada = comportamento antigo (por script).</div>
                 <div id="dd_dims" class="dd-dims"></div>
+                <table>
+                    <tr>
+                        <td>Valor inicial (sem valor gravado)</td>
+                        <td><input id="style_empty_default" type="text" value="NÃO APLICAVEL" placeholder="vazio = Selecionar..."></td>
+                    </tr>
+                </table>
                 <label class="dd-check"><input type="checkbox" id="style_debug_mode"> Modo diagnóstico (logs no console)</label>
             </fieldset>
 
@@ -415,6 +421,7 @@
             // Dropdowns
             this._ddDimsContainer = this._shadowRoot.getElementById("dd_dims");
             this._debugModeInput  = this._shadowRoot.getElementById("style_debug_mode");
+            this._emptyDefaultInput = this._shadowRoot.getElementById("style_empty_default");
             this._availableDims   = [];  // [{key, id, label}] publicado pelo widget
             this._ddSelected      = [];  // IDs reais das dimensões marcadas
             this._renderDropdownDims();
@@ -501,7 +508,8 @@
                             cellAlign:         this._cellAlign,
                             titleAlign:        this._titleAlign,
                             dropdownDimensions: this._ddSelected.slice(),
-                            debugMode:          this._debugModeInput.checked
+                            debugMode:          this._debugModeInput.checked,
+                            emptyDefaultLabel:  this._emptyDefaultInput.value
                         })
                     }
                 }
@@ -550,6 +558,7 @@
                 if (cfg.titleAlign)   { this._setAlignActive("title",  cfg.titleAlign); }
                 if (Array.isArray(cfg.dropdownDimensions)) { this._ddSelected = cfg.dropdownDimensions.slice(); this._renderDropdownDims(); }
                 if (cfg.debugMode !== undefined) { this._debugModeInput.checked = !!cfg.debugMode; }
+                if (cfg.emptyDefaultLabel !== undefined) { this._emptyDefaultInput.value = cfg.emptyDefaultLabel; }
             } catch(ex) {}
         }
 

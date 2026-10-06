@@ -27,6 +27,8 @@
 <div class="widget-box"><dropdowntable-widget id="wE" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>F — sem nada marcado no painel e sem script (padrão novo)</h2>
 <div class="widget-box"><dropdowntable-widget id="wF" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>G — conta sem valor inicia com NÃO APLICÁVEL</h2>
+<div class="widget-box"><dropdowntable-widget id="wG" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -169,6 +171,20 @@
     await tick();
     check("F1 sem painel e sem script: todas as dimensões viram dropdown", F.shadowRoot.querySelectorAll('tr[data-row-index="3"] .cell-dropdown').length === 2, rowCells(F, 3));
     check("F2 sem painel e sem script: mostra o valor gravado", rowCells(F, 3).slice(1, 3).join("|") === "Anual|Ana", rowCells(F, 3));
+
+    // ── G ─────────────────────────────────────────────────────────
+    var G = document.getElementById("wG");
+    setup(G, { mainBinding: M.mainBindingWithParentLevels(), dataBindings: M.dataBindings(true) });
+    await tick(80);
+    check("G1 conta sem valor inicia com NÃO APLICÁVEL (grafias diferentes)", rowCells(G, 4).slice(1, 3).join("|") === "NÃO APLICÁVEL|Nao Aplicavel", rowCells(G, 4));
+    check("G2 conta com valor gravado não muda", rowCells(G, 3).slice(1, 3).join("|") === "Anual|Ana", rowCells(G, 3));
+    var gAddr = G._buildRowAddrStr(4, null, true);
+    check("G3 endereço da conta sem valor usa os membros NÃO APLICÁVEL", gAddr.indexOf("[NA]") !== -1 && gAddr.indexOf("[NAO_APLICAVEL]") !== -1, gAddr);
+    var gInp = G.shadowRoot.querySelector('tr[data-row-index="4"] input');
+    gInp.value = "10"; gInp.dispatchEvent(new Event("change"));
+    check("G4 medida digitada nessa conta grava no endereço NÃO APLICÁVEL", G.getPendingChanges().indexOf("[NA]") !== -1, G.getPendingChanges());
+    G.styleConfig = JSON.stringify({ emptyDefaultLabel: "" });
+    check("G5 valor inicial vazio no painel volta para 'Selecionar...'", rowCells(G, 4)[1] === "Selecionar...", rowCells(G, 4));
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

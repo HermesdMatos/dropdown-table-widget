@@ -77,7 +77,7 @@
   }
 
   // this.dataBindings do custom widget (API assíncrona). MemberInfo não tem parentId.
-  function dataBindings() {
+  function dataBindings(withNotApplicable) {
     var members = {
       PERIODICIDADE: [
         { id: PER + "[PER_ALL]", description: "Periodicidade" },
@@ -90,6 +90,11 @@
         { id: RESP + "[ANA]", description: "Ana" }
       ]
     };
+    if (withNotApplicable) {
+      // Grafias diferentes de propósito: o widget compara sem acento/caixa/espaços
+      members.PERIODICIDADE.push({ id: PER + "[NA]", description: "NÃO APLICÁVEL" });
+      members.RESPONSAVEL.push({ id: RESP + "[NAO_APLICAVEL]", description: "Nao Aplicavel" });
+    }
     return {
       getDataBinding: function() {
         return Promise.resolve({

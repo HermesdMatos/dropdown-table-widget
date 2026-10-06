@@ -441,6 +441,7 @@ class DropdownTableWidget extends HTMLElement {
     this._dsMembersRequested = false;
     this._explicitDropdownDims = []; // styleConfig.dropdownDimensions (painel)
     this._debugMode = false;
+    this._emptyDefaultLabel = "NÃO APLICAVEL"; // membro inicial quando a célula não tem valor
     this._availableDimensions = "[]";
     this._dataFingerprint = undefined;
     this._oldRowAddrStr = "";
@@ -894,7 +895,7 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   // Opções do dropdown. Prioridade: setDropdownOptions → filhos no childrenBinding →
-  // filhos no binding principal → getMembers() da DataSource → membros vistos nos bindings
+  // getMembers() da DataSource (lista completa) → filhos no binding principal → membros vistos nos bindings
   _resolveDropdownOptions(feedKey, ids, childrenByParent) {
     if (this._dropdownOptions && this._dropdownOptions[feedKey] && this._dropdownOptions[feedKey].length > 0) {
       return this._dropdownOptions[feedKey];
@@ -904,12 +905,12 @@ class DropdownTableWidget extends HTMLElement {
     for (i = 0; i < ids.length; i++) {
       if (ids[i] && cfb && cfb[ids[i]] && cfb[ids[i]].length > 0) { return cfb[ids[i]]; }
     }
+    if (this._dsMembers && this._dsMembers[feedKey] && this._dsMembers[feedKey].length > 0) {
+      return this._dsMembers[feedKey];
+    }
     var cbp = childrenByParent && childrenByParent[feedKey];
     for (i = 0; i < ids.length; i++) {
       if (ids[i] && cbp && cbp[ids[i]] && cbp[ids[i]].length > 0) { return cbp[ids[i]]; }
-    }
-    if (this._dsMembers && this._dsMembers[feedKey] && this._dsMembers[feedKey].length > 0) {
-      return this._dsMembers[feedKey];
     }
     // Último recurso: membros gravados vistos no valuesBinding e no binding principal (sem nós)
     var opts = [];
@@ -925,6 +926,27 @@ class DropdownTableWidget extends HTMLElement {
     }
     opts.sort(function(a, b) { return String(a.label).localeCompare(String(b.label), "pt-BR"); });
     return opts;
+  }
+
+  // "NÃO APLICÁVEL" / "Nao Aplicavel" / "NAO_APLICAVEL" → "NAOAPLICAVEL"
+  _normalizeLabel(s) {
+    var t = String(s || "").toUpperCase();
+    try { t = t.normalize("NFD").replace(/[̀-ͯ]/g, ""); } catch(e) {}
+    return t.replace(/[^A-Z0-9]/g, "");
+  }
+
+  // Membro padrão (styleConfig.emptyDefaultLabel) entre as opções da dimensão, comparando
+  // descrição e ID sem acento/caixa/espaços. null se não configurado ou não encontrado.
+  _getDefaultMember(feedKey, ids, childrenByParent) {
+    var target = this._normalizeLabel(this._emptyDefaultLabel);
+    if (!target) { return null; }
+    var opts = this._resolveDropdownOptions(feedKey, ids || [], childrenByParent);
+    for (var i = 0; i < opts.length; i++) {
+      if (this._normalizeLabel(opts[i].label) === target || this._normalizeLabel(this._cleanMemberId(opts[i].value)) === target) {
+        return opts[i];
+      }
+    }
+    return null;
   }
 
   // Lista de dimensões do binding para o painel montar os checkboxes (sem script)
@@ -1027,6 +1049,7 @@ class DropdownTableWidget extends HTMLElement {
         this._dsMembersRequested = false; // dimensões mudaram → recarrega membros
       }
       if (cfg.debugMode !== undefined) { this._debugMode = !!cfg.debugMode; }
+      if (cfg.emptyDefaultLabel !== undefined) { this._emptyDefaultLabel = String(cfg.emptyDefaultLabel || ""); }
       if (cfg.groupHeaderBg    !== undefined) { this.style.setProperty("--group-header-bg",    cfg.groupHeaderBg); }
       if (cfg.groupHeaderColor !== undefined) { this.style.setProperty("--group-header-color", cfg.groupHeaderColor); }
       if (cfg.subheaderBg      !== undefined) { this.style.setProperty("--subheader-bg",       cfg.subheaderBg); }
@@ -1450,8 +1473,19 @@ class DropdownTableWidget extends HTMLElement {
         }
       }
     }
+    // Dimensões de dropdown ainda sem valor: membro padrão ("NÃO APLICAVEL") — é o que a célula mostra
+    if (this._isExplicitDropdownMode() && this._metadata.feeds && this._metadata.feeds.dimensions) {
+      var ddCount = this._metadata.feeds.dimensions.values.length;
+      for (var ddi = 1; ddi < ddCount; ddi++) {
+        var ddKey = "dimensions_" + ddi;
+        var ddReal = this._dimRealId(ddKey);
+        if (addrObj[ddReal] || !this._isDropdownDimension(ddKey)) { continue; }
+        var ddDef = this._getDefaultMember(ddKey, [(rowData[ddKey] || {}).id], null);
+        if (ddDef) { addrObj[ddReal] = ddDef.value; }
+      }
+    }
     if (overrideSelection && overrideSelection.dimensionId) {
-      var oRealId = this._metadata.dimensions && this._metadata.dimensions[overrideSelection.dimensionId] ? this._metadata.dimensions[overrideSelection.dimensionId].id : overrideSelection.dimensionId;
+      var oRealId =this._metadata.dimensions && this._metadata.dimensions[overrideSelection.dimensionId] ? this._metadata.dimensions[overrideSelection.dimensionId].id : overrideSelection.dimensionId;
       addrObj[oRealId] = overrideSelection.memberId || "";
     }
     return addrObj;
@@ -2339,8 +2373,14 @@ class DropdownTableWidget extends HTMLElement {
 
         if (self2._isExplicitDropdownMode()) {
           // Modo explícito (painel): a dimensão marcada é dropdown em toda linha de dados.
-          // Célula ainda no nó pai, sem valor gravado nem seleção → "Selecionar..."
-          if (isDrop && !rowValue && !shownSelection && self2._isNodeId(dk2, cId, childrenByParent)) { cLbl = ""; }
+          // Célula ainda no nó pai, sem valor gravado nem seleção → membro padrão ("NÃO APLICAVEL"),
+          // ou "Selecionar..." se ele não existir nas opções
+          if (isDrop && !rowValue && !shownSelection && (!cId || self2._isNodeId(dk2, cId, childrenByParent))) {
+            // Mesma busca usada no endereço (_buildRowAddrObj): tela e gravação sempre iguais
+            var defMember = self2._getDefaultMember(dk2, [nodeId], null);
+            cLbl = defMember ? defMember.label : "";
+            if (defMember) { cId = defMember.value; }
+          }
         } else {
           // Modo legado: dropdown só onde há filhos ou valor gravado
           var cellHasChildren = hasChildren[dk2][cId] || hasChildren[dk2][bindingId]
