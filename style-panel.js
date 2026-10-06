@@ -506,6 +506,7 @@
                 if (cfg.fontWeight)   { this._fontWeightSelect.value = cfg.fontWeight; }
                 if (cfg.rowHeight)    { this._rowHeightSelect.value = String(cfg.rowHeight); }
                 if (cfg.colWidth)          { this._colWidthSelect.value = cfg.colWidth; }
+                if (cfg.editableCellColor) { this._editableColorInput.value = cfg.editableCellColor; this._editableColorPicker.value = cfg.editableCellColor; }
                 if (cfg.groupHeaderBg)    { this._groupHeaderBgInput.value = cfg.groupHeaderBg; this._groupHeaderBgPicker.value = cfg.groupHeaderBg; }
                 if (cfg.groupHeaderColor) { this._groupHeaderColorInput.value = cfg.groupHeaderColor; this._groupHeaderColorPicker.value = cfg.groupHeaderColor; }
                 if (cfg.subheaderBg)      { this._subheaderBgInput.value = cfg.subheaderBg; this._subheaderBgPicker.value = cfg.subheaderBg; }

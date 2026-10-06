@@ -1,5 +1,11 @@
-// dropdown-table-widget.js — v2.11.25
+// dropdown-table-widget.js — v2.12.0
 // Changelog:
+//   v2.12.0  — Fix: parse numerico pt-BR (1.593,95 / 1.500); pendingChanges com valor canonico
+//              Fix: onSaveRequested inclui linhas alteradas por dropdown (chave de _localSelections)
+//              Fix: troca de contexto volta a limpar estado local apos o primeiro save
+//              Fix: dt-empty oculto de fato; cellAlign aplicado; revert de placeholder
+//              Fix: pendingChanges sem duplicatas (A→B→C colapsa em A→C)
+//              Refactor: endereco da linha centralizado em _buildRowAddrObj; remove codigo morto
 //   v2.11.25 — Fix: dt-empty hidden por padrao
 //   v2.11.24 — Fix: input focus restaurado; Delete funciona em selecao multipla
 //   v2.11.23 — Feature: loading spinner overlay durante carregamento do binding
@@ -170,6 +176,8 @@ TMPL.innerHTML = `
   }
   .dt-save-btn:hover { background: var(--save-btn-hover-bg, #1557b0); }
   .dt-save-btn:active { background: #0e4191; }
+  .dt-empty { padding: 16px; color: #888; text-align: center; font-size: 13px; }
+  .dt-empty.hidden { display: none; }
   .dt-measure-cell-selected {
     outline: 2px solid #1a73e8 !important;
     outline-offset: -2px;
@@ -405,6 +413,8 @@ class DropdownTableWidget extends HTMLElement {
     this._selAnchor      = null; // {rowIndex, measureKey}
     this._isDragging     = false;
     this._skipHighlightRenders = 0;
+    this._skipUntil = 0;
+    this._selectionRowIndex = {}; // {dim0Id: rowIndex} da ultima selecao de dropdown
     this._dataFingerprint = undefined;
     this._oldRowAddrStr = "";
     this._newRowAddrStr = "";
@@ -437,11 +447,13 @@ class DropdownTableWidget extends HTMLElement {
 
     this._onDocClick    = this._closeDropdown.bind(this);
     this._onDocCtxClose = this._closeCtxMenu.bind(this);
+    this._onDocMouseUp  = function() { this._isDragging = false; }.bind(this);
   }
 
   connectedCallback() {
     document.addEventListener("click", this._onDocClick);
     document.addEventListener("click", this._onDocCtxClose);
+    document.addEventListener("mouseup", this._onDocMouseUp);
     this._bindContextMenu();
     this._bindModal();
     this._bindSelectionKeys();
@@ -451,6 +463,7 @@ class DropdownTableWidget extends HTMLElement {
   disconnectedCallback() {
     document.removeEventListener("click", this._onDocClick);
     document.removeEventListener("click", this._onDocCtxClose);
+    document.removeEventListener("mouseup", this._onDocMouseUp);
   }
 
   // ─── Loading Overlay ─────────────────────────────────────────
@@ -494,6 +507,7 @@ class DropdownTableWidget extends HTMLElement {
   onCustomWidgetDestroy() {
     document.removeEventListener("click", this._onDocClick);
     document.removeEventListener("click", this._onDocCtxClose);
+    document.removeEventListener("mouseup", this._onDocMouseUp);
   }
 
   // ─── Binding ──────────────────────────────────────────────────
@@ -521,14 +535,18 @@ class DropdownTableWidget extends HTMLElement {
           newFingerprint = newFingerprint + (fpCell.id || "") + ":" + fpVal + "|";
         }
       }
+      // Janela pós-save: protege no máximo 2 bindings e 15s após clearPendingChanges
+      var inSaveWindow = this._skipHighlightRenders > 0 && Date.now() < this._skipUntil;
+      if (this._skipHighlightRenders > 0) { this._skipHighlightRenders--; }
       if (this._dataFingerprint !== undefined && this._dataFingerprint !== newFingerprint) {
-        if (this._skipHighlightRenders && this._skipHighlightRenders > 0) {
-          // Após save: fingerprint mudou — preserva estado visual
-        } else {
+        if (!inSaveWindow) {
           // Troca real de contexto (ex: mudança de cliente) — limpa estado local
-          this._localSelections = {};
-          this._localMeasures   = {};
-          this._pendingChanges  = [];
+          this._localSelections   = {};
+          this._localMeasures     = {};
+          this._pendingChanges    = [];
+          this._localData         = {};
+          this._originalData      = {};
+          this._selectionRowIndex = {};
         }
       }
       this._dataFingerprint = newFingerprint;
@@ -675,6 +693,7 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.titleSize   !== undefined) { this._titleSize   = cfg.titleSize; }
       if (cfg.headerAlign !== undefined) { this._headerAlign = cfg.headerAlign; }
       if (cfg.titleAlign  !== undefined) { this._titleAlign  = cfg.titleAlign; }
+      if (cfg.cellAlign   !== undefined) { this._cellAlign   = cfg.cellAlign; }
       if (cfg.groupHeaderBg    !== undefined) { this.style.setProperty("--group-header-bg",    cfg.groupHeaderBg); }
       if (cfg.groupHeaderColor !== undefined) { this.style.setProperty("--group-header-color", cfg.groupHeaderColor); }
       if (cfg.subheaderBg      !== undefined) { this.style.setProperty("--subheader-bg",       cfg.subheaderBg); }
@@ -691,26 +710,7 @@ class DropdownTableWidget extends HTMLElement {
     } catch(e) { console.error("applyStyleConfig error:", e); }
   }
 
-  set dropdownOptions(v) {
-    try {
-      var cfg = JSON.parse(v);
-      this._dropdownOptions = {};
-      for (var i = 0; i < cfg.length; i++) {
-        var item = cfg[i];
-        var opts = [];
-        for (var j = 0; j < item.options.length; j++) {
-          var o = item.options[j];
-          if (typeof o === "string") {
-            opts.push({ value: o, label: o });
-          } else {
-            opts.push({ value: o.value || o.id || o, label: o.label || o.description || o.value || o });
-          }
-        }
-        this._dropdownOptions[item.dimensionKey] = opts;
-      }
-      this._render();
-    } catch(e) { console.error("dropdownOptions set error:", e); }
-  }
+  set dropdownOptions(v) { this.setDropdownOptions(v); }
 
   get dropdownDimensions() { return JSON.stringify(this._dropdownDimensions); }
   set dropdownDimensions(v) {
@@ -789,7 +789,8 @@ class DropdownTableWidget extends HTMLElement {
     this._pendingChanges = [];
     this._localData = {};
     this._originalData = {};
-    this._skipHighlightRenders = 2; // protege 2 ciclos de render após save
+    this._skipHighlightRenders = 2; // protege até 2 bindings após save...
+    this._skipUntil = Date.now() + 15000; // ...dentro de 15s
     // Reseta cor de todas as células alteradas para transparente (cor natural da tabela)
     var changedCells = this.shadowRoot.querySelectorAll(".changed-cell");
     for (var cc = 0; cc < changedCells.length; cc++) {
@@ -894,12 +895,37 @@ class DropdownTableWidget extends HTMLElement {
       return String(mv.value);
     }
     if (mv.formattedValue !== undefined && mv.formattedValue !== null && String(mv.formattedValue) !== "") {
-      return String(mv.formattedValue).replace(/[a-zA-Z]+$/, "").trim();
+      return this._toCanonicalNumber(mv.formattedValue);
     }
     if (mv.formatted !== undefined && mv.formatted !== null && String(mv.formatted) !== "" && String(mv.formatted) !== "NaN") {
-      return String(mv.formatted).replace(/[a-zA-Z]+$/, "").trim();
+      return this._toCanonicalNumber(mv.formatted);
     }
     return "";
+  }
+  // Converte texto numérico (pt-BR ou en) em número.
+  //   "1.593,95" → 1593.95 | "1,593.95" → 1593.95 | "10,5" → 10.5
+  //   "1.500" → 1500 (ponto + 3 dígitos = milhar) | "10.5" → 10.5 | "" → NaN
+  _parseLocaleNumber(v) {
+    if (typeof v === "number") { return v; }
+    var s = String(v === null || v === undefined ? "" : v).replace(/[^0-9.,\-]/g, "");
+    if (s === "" || s === "-") { return NaN; }
+    var lastComma = s.lastIndexOf(",");
+    var lastDot   = s.lastIndexOf(".");
+    if (lastComma !== -1 && lastDot !== -1) {
+      if (lastComma > lastDot) { s = s.replace(/\./g, "").replace(",", "."); }
+      else                     { s = s.replace(/,/g, ""); }
+    } else if (lastComma !== -1) {
+      s = s.split(",").length > 2 ? s.replace(/,/g, "") : s.replace(",", ".");
+    } else if (lastDot !== -1) {
+      var dotParts = s.split(".");
+      if (dotParts.length > 2 || dotParts[1].length === 3) { s = s.replace(/\./g, ""); }
+    }
+    return parseFloat(s);
+  }
+  // Retorna o número em formato canônico ("1593.95") ou "" se não for numérico
+  _toCanonicalNumber(v) {
+    var n = this._parseLocaleNumber(v);
+    return isNaN(n) ? "" : String(n);
   }
   _getMeasureIdByKey(measureKey) {
     var fallback = measureKey || "measures_0";
@@ -927,6 +953,18 @@ class DropdownTableWidget extends HTMLElement {
       return this._metadata._mesLabels[mIdx];
     }
     return fallback;
+  }
+  // Resolve a chave de _localSelections (id de dimensions_0, ou rowIndex como string) para o rowIndex
+  _findRowIndexByDim0(key) {
+    if (!this._data) { return -1; }
+    var known = this._selectionRowIndex ? this._selectionRowIndex[key] : undefined;
+    if (known !== undefined && this._data[known] && ((this._data[known]["dimensions_0"] || {}).id || String(known)) === key) {
+      return known;
+    }
+    for (var fr = 0; fr < this._data.length; fr++) {
+      if (((this._data[fr]["dimensions_0"] || {}).id || String(fr)) === key) { return fr; }
+    }
+    return -1;
   }
   _createRowKey(addrStr, measureId) {
     return (addrStr || "") + "___" + (measureId || "");
@@ -958,6 +996,17 @@ class DropdownTableWidget extends HTMLElement {
   }
   _addPendingChange(change) {
     if (!this._pendingChanges) { this._pendingChanges = []; }
+    // Encadeia com registro existente da mesma medida cujo destino é a origem desta mudança:
+    // A→B seguido de B→C vira A→C; edições repetidas na mesma célula atualizam o valor.
+    for (var pi = this._pendingChanges.length - 1; pi >= 0; pi--) {
+      var existing = this._pendingChanges[pi];
+      if (existing.measureId === change.measureId && existing.newAddr === change.oldAddr) {
+        existing.newAddr = change.newAddr;
+        existing.value   = change.value;
+        if (existing.oldAddr !== existing.newAddr) { existing.type = "dropdown"; }
+        return;
+      }
+    }
     this._pendingChanges.push(change);
   }
   _parsePendingChangesString(value) {
@@ -984,16 +1033,29 @@ class DropdownTableWidget extends HTMLElement {
     for (var i = 0; i < changes.length; i++) {
       var item = changes[i] || {};
       if (i > 0) { result += "###"; }
-      var rawVal = String(item.value || "");
-      var normVal = rawVal.replace(",", ".");
-      result += (item.oldAddr || "") + "§" + (item.newAddr || "") + "§" + normVal + "§" + (item.measureId || "");
+      // value já chega canônico ("1593.95") — ver _parseLocaleNumber
+      var val = item.value === undefined || item.value === null ? "" : String(item.value);
+      result += (item.oldAddr || "") + "§" + (item.newAddr || "") + "§" + val + "§" + (item.measureId || "");
     }
     return result;
   }
   _buildRowAddrStr(rowIndex, overrideSelection, includeLocalSelections) {
-    if (rowIndex === -1 || !this._data || !this._metadata) { return ""; }
+    return this._serializeAddrObj(this._buildRowAddrObj(rowIndex, overrideSelection, includeLocalSelections));
+  }
+  _serializeAddrObj(addrObj) {
+    var addrStr = "";
+    for (var k in addrObj) {
+      if (addrObj[k] !== undefined && addrObj[k] !== "") {
+        addrStr = addrStr + k + "|~|" + addrObj[k] + "|||";
+      }
+    }
+    return addrStr;
+  }
+  // Endereço da linha: dimensions_0 do binding → rowValuesMap → _localSelections → override
+  _buildRowAddrObj(rowIndex, overrideSelection, includeLocalSelections) {
+    if (rowIndex === -1 || !this._data || !this._metadata) { return {}; }
     var rowData = this._data[rowIndex];
-    if (!rowData) { return ""; }
+    if (!rowData) { return {}; }
     var addrObj = {};
     var dim0 = rowData["dimensions_0"] || {};
     if (dim0.id) {
@@ -1033,13 +1095,7 @@ class DropdownTableWidget extends HTMLElement {
       var oRealId = this._metadata.dimensions && this._metadata.dimensions[overrideSelection.dimensionId] ? this._metadata.dimensions[overrideSelection.dimensionId].id : overrideSelection.dimensionId;
       addrObj[oRealId] = overrideSelection.memberId || "";
     }
-    var addrStr = "";
-    for (var k in addrObj) {
-      if (addrObj[k] !== undefined && addrObj[k] !== "") {
-        addrStr = addrStr + k + "|~|" + addrObj[k] + "|||";
-      }
-    }
-    return addrStr;
+    return addrObj;
   }
   getActiveFilters() { return JSON.stringify(this._activeFilters); }
 
@@ -1609,11 +1665,14 @@ class DropdownTableWidget extends HTMLElement {
     var measValues = measFeed ? measFeed.values : [];
 
     var changedRows = {};
-    // Coleta linhas com _localSelections
+    // Coleta linhas com _localSelections (chave = id de dimensions_0 → resolve o rowIndex)
     if (this._localSelections) {
-      for (var lsi2 in this._localSelections) { changedRows[lsi2] = true; }
+      for (var lsKey in this._localSelections) {
+        var lsRow = this._findRowIndexByDim0(lsKey);
+        if (lsRow !== -1) { changedRows[lsRow] = true; }
+      }
     }
-    // Coleta linhas com _localMeasures
+    // Coleta linhas com _localMeasures (chave = rowIndex)
     if (this._localMeasures) {
       for (var msi2 in this._localMeasures) { changedRows[msi2] = true; }
     }
@@ -1623,48 +1682,8 @@ class DropdownTableWidget extends HTMLElement {
       var rowData = this._data[rowIdx];
       if (!rowData) { continue; }
 
-      var addrObj = {};
-      // dimensions_0 do binding
-      var dim0 = rowData["dimensions_0"] || {};
-      if (dim0.id) {
-        var realId0 = "dimensions_0";
-        if (this._metadata.dimensions && this._metadata.dimensions["dimensions_0"]) {
-          realId0 = this._metadata.dimensions["dimensions_0"].id || realId0;
-        }
-        addrObj[realId0] = dim0.id;
-      }
-      // rowValuesMap
-      if (this._rowValuesMap && dim0.id && this._rowValuesMap[dim0.id]) {
-        var rparts = this._rowValuesMap[dim0.id].split("|");
-        var rd1 = this._metadata.dimensions && this._metadata.dimensions["dimensions_1"] ? this._metadata.dimensions["dimensions_1"].id : "dimensions_1";
-        var rd2 = this._metadata.dimensions && this._metadata.dimensions["dimensions_2"] ? this._metadata.dimensions["dimensions_2"].id : "dimensions_2";
-        var rd3 = this._metadata.dimensions && this._metadata.dimensions["dimensions_3"] ? this._metadata.dimensions["dimensions_3"].id : "dimensions_3";
-        if (rparts[1] !== "") { addrObj[rd1] = rparts[1]; }
-        if (rparts[2] !== "") { addrObj[rd2] = rparts[2]; }
-        if (rparts[3] !== "") { addrObj[rd3] = rparts[3]; }
-      }
-      // localSelections sobrescreve
-      if (this._localSelections && this._localSelections[rowIdx]) {
-        var lks = ["dimensions_1", "dimensions_2", "dimensions_3"];
-        for (var lk = 0; lk < lks.length; lk++) {
-          var lsel = this._localSelections[rowIdx][lks[lk]];
-          if (lsel && lsel.id && lsel.id !== "") {
-            var lRealId = lks[lk];
-            if (this._metadata.dimensions && this._metadata.dimensions[lks[lk]]) {
-              lRealId = this._metadata.dimensions[lks[lk]].id || lRealId;
-            }
-            addrObj[lRealId] = lsel.id;
-          }
-        }
-      }
-
-      // Monta addrStr
-      var addrStr = "";
-      for (var ak in addrObj) {
-        if (addrObj[ak] !== undefined && addrObj[ak] !== "") {
-          addrStr = addrStr + ak + "|~|" + addrObj[ak] + "|||";
-        }
-      }
+      var addrObj = this._buildRowAddrObj(rowIdx, null, true);
+      var addrStr = this._serializeAddrObj(addrObj);
 
       // Medidas alteradas
       var measures = {};
@@ -1777,57 +1796,6 @@ class DropdownTableWidget extends HTMLElement {
       headerRow.appendChild(thm);
     }
 
-    // ── Dropdown options from binding ────────────────────────────
-    var dimOptions = {};
-    for (var d = 0; d < dimensions.length; d++) {
-      dimOptions["dimensions_" + d] = [];
-    }
-
-    try {
-      var binding = this.myDataBinding;
-      for (var dm = 0; dm < dimensions.length; dm++) {
-        var dk = "dimensions_" + dm;
-        var dimId = dimensions[dm].id;
-        var members = binding.getDimensionMembers(dimId);
-        if (members && members.length > 0) {
-          for (var mx = 0; mx < members.length; mx++) {
-            var mem = members[mx];
-            if (mem && mem.id && mem.parentId) {
-              dimOptions[dk].push({ value: mem.id, label: mem.description || mem.id });
-            }
-          }
-        }
-      }
-    } catch(e) {
-      var dimRootIds = {};
-      for (var dr = 0; dr < dimensions.length; dr++) {
-        dimRootIds["dimensions_" + dr] = null;
-        for (var rr = 0; rr < this._data.length; rr++) {
-          var cr = this._data[rr]["dimensions_" + dr];
-          if (cr && cr.isCollapsed === true && dimRootIds["dimensions_" + dr] === null) {
-            dimRootIds["dimensions_" + dr] = cr.id;
-            break;
-          }
-        }
-      }
-      for (var r = 0; r < this._data.length; r++) {
-        var row = this._data[r];
-        for (var d2 = 0; d2 < dimensions.length; d2++) {
-          var dkf = "dimensions_" + d2;
-          var cell = row[dkf];
-          if (cell && cell.id && cell.id !== dimRootIds[dkf]) {
-            var exists = false;
-            for (var ex = 0; ex < dimOptions[dkf].length; ex++) {
-              if (dimOptions[dkf][ex].value === cell.id) { exists = true; break; }
-            }
-            if (!exists) {
-              dimOptions[dkf].push({ value: cell.id, label: cell.label || cell.id });
-            }
-          }
-        }
-      }
-    }
-
     // ── Children map ─────────────────────────────────────────────
     var childrenByParent = {};
     var hasChildren = {};
@@ -1938,10 +1906,7 @@ class DropdownTableWidget extends HTMLElement {
         var mk4 = td.getAttribute("data-measure-key");
         self2._selectRange(self2._selAnchor.rowIndex, self2._selAnchor.measureKey, ri3, mk4);
       });
-
-      document.addEventListener("mouseup", function() {
-        self2._isDragging = false;
-      });
+      // mouseup global fica em connectedCallback (_onDocMouseUp)
     }
 
     var renderRow = function(ri) {
@@ -2169,62 +2134,30 @@ class DropdownTableWidget extends HTMLElement {
         (function(inputEl, rowIdx, measureKey, measureId, rowD) {
           inputEl.addEventListener("change", function() {
             var rawInputValue = inputEl.value;
-            var newVal = parseFloat(inputEl.value.replace(",", ".").replace(/[^0-9.\-]/g, ""));
+            var newVal = self2._parseLocaleNumber(rawInputValue);
             if (isNaN(newVal)) { newVal = 0; }
+            // Valor canônico para o SAC; input vazio continua indo vazio
+            var pendingVal = rawInputValue.trim() === "" ? "" : String(newVal);
             if (!self2._localMeasures) { self2._localMeasures = {}; }
             if (!self2._localMeasures[rowIdx]) { self2._localMeasures[rowIdx] = {}; }
             self2._localMeasures[rowIdx][measureKey] = newVal;
 
-            // Monta endereço das dimensões para o script SAC — mantém IDs completos
-            var dims3    = self2._metadata.feeds.dimensions.values;
-            var addrStr  = "";
-            var addrObj  = {};
+            // Endereço: dimensões do binding, sobrepostas por rowValuesMap e _localSelections
+            var rowAddrObj = self2._buildRowAddrObj(rowIdx, null, true);
+            var addrStr    = self2._serializeAddrObj(rowAddrObj);
+            var addrObj    = {};
+            var dims3      = self2._metadata.feeds.dimensions.values;
             for (var x = 0; x < dims3.length; x++) {
               var dc = rowD["dimensions_" + x] || {};
               if (dc.id) {
-                // Resolve ID real da dimensão do metadata
                 var dimRealId3 = "dimensions_" + x;
                 if (self2._metadata.dimensions && self2._metadata.dimensions["dimensions_" + x]) {
                   dimRealId3 = self2._metadata.dimensions["dimensions_" + x].id || dimRealId3;
                 }
                 addrObj[dimRealId3] = dc.id;
-                addrStr = addrStr + dimRealId3 + "|~|" + dc.id + "|||";
               }
             }
-
-            // Aplica rowValuesMap se disponível (dimensões pré-selecionadas)
-            if (self2._rowValuesMap) {
-              var dim0c = rowD["dimensions_0"] || {};
-              var cid0  = dim0c.id || "";
-              if (cid0 !== "" && self2._rowValuesMap[cid0]) {
-                var parts = self2._rowValuesMap[cid0].split("|");
-                var dimId1 = self2._metadata.dimensions && self2._metadata.dimensions["dimensions_1"] ? self2._metadata.dimensions["dimensions_1"].id : "dimensions_1";
-                var dimId2 = self2._metadata.dimensions && self2._metadata.dimensions["dimensions_2"] ? self2._metadata.dimensions["dimensions_2"].id : "dimensions_2";
-                var dimId3 = self2._metadata.dimensions && self2._metadata.dimensions["dimensions_3"] ? self2._metadata.dimensions["dimensions_3"].id : "dimensions_3";
-                if (parts[1] !== "") { addrObj[dimId1] = parts[1]; addrStr = addrStr + dimId1 + "|~|" + parts[1] + "|||"; }
-                if (parts[2] !== "") { addrObj[dimId2] = parts[2]; addrStr = addrStr + dimId2 + "|~|" + parts[2] + "|||"; }
-                if (parts[3] !== "") { addrObj[dimId3] = parts[3]; addrStr = addrStr + dimId3 + "|~|" + parts[3] + "|||"; }
-              }
-            }
-
-            // Aplica _localSelections — sobrescreve com seleções manuais do usuário (prioridade máxima)
-            if (self2._localSelections && self2._localSelections[rowIdx]) {
-              var lKeys = ["dimensions_1", "dimensions_2", "dimensions_3"];
-              for (var ls = 0; ls < lKeys.length; ls++) {
-                var ldk = lKeys[ls];
-                var lsel = self2._localSelections[rowIdx][ldk];
-                if (lsel && lsel.id && lsel.id !== "") {
-                  var lDimRealId = ldk;
-                  if (self2._metadata.dimensions && self2._metadata.dimensions[ldk]) {
-                    lDimRealId = self2._metadata.dimensions[ldk].id || ldk;
-                  }
-                  addrObj[lDimRealId] = lsel.id;
-                  addrStr = addrStr + lDimRealId + "|~|" + lsel.id + "|||";
-                }
-              }
-            }
-
-            addrStr = self2._buildRowAddrStr(rowIdx, null, true);
+            for (var rak in rowAddrObj) { addrObj[rak] = rowAddrObj[rak]; }
             self2._setLocalCellValue(addrStr, measureId, rawInputValue);
             if (inputEl.parentElement) { inputEl.parentElement.classList.add("changed-cell"); }
 
@@ -2240,7 +2173,7 @@ class DropdownTableWidget extends HTMLElement {
               type: "measure",
               oldAddr: addrStr,
               newAddr: addrStr,
-              value: rawInputValue,
+              value: pendingVal,
               measureId: measureId
             });
 
@@ -2510,6 +2443,7 @@ class DropdownTableWidget extends HTMLElement {
     for (var ph = 0; ph < placeholders.length; ph++) {
       if ((memberLabel && memberLabel === placeholders[ph]) || (memberId && memberId === placeholders[ph]) || (technicalId && technicalId === placeholders[ph])) { isPlaceholder = true; break; }
     }
+    var cellWrapper = this._activeCell;
     if (isPlaceholder) {
       // Revert displayed value to previous value if available
       if (cellWrapper) {
@@ -2524,9 +2458,9 @@ class DropdownTableWidget extends HTMLElement {
 
     // Persist selection using technical id
     this._localSelections[dim0Key][dimensionId] = { id: technicalId, label: memberLabel };
-    this._newRowAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
+    if (!this._selectionRowIndex) { this._selectionRowIndex = {}; }
+    this._selectionRowIndex[dim0Key] = rowIndex;
 
-    var cellWrapper = this._activeCell;
     if (cellWrapper) {
       var valSpan = cellWrapper.querySelector(".cell-value");
       if (valSpan) {
@@ -2537,71 +2471,8 @@ class DropdownTableWidget extends HTMLElement {
       cellWrapper.classList.add("changed-cell");
     }
 
-    // Monta addrObj completo da linha — usa objeto para evitar duplicatas
-    var dropAddrObj = {};
-    try {
-      var rowData2 = this._data[rowIndex];
-      var dims2    = this._metadata.feeds.dimensions.values;
-
-      // 1. Base: binding (dimensions_0 sempre)
-      var dim0base = rowData2["dimensions_0"] || {};
-      if (dim0base.id) {
-        var realId0 = "dimensions_0";
-        if (this._metadata.dimensions && this._metadata.dimensions["dimensions_0"]) {
-          realId0 = this._metadata.dimensions["dimensions_0"].id || realId0;
-        }
-        dropAddrObj[realId0] = dim0base.id;
-      }
-
-      // 2. rowValuesMap — valores salvos no modelo
-      if (this._rowValuesMap && rowData2) {
-        var dim0rv = rowData2["dimensions_0"] || {};
-        var cid0rv = dim0rv.id || "";
-        if (cid0rv !== "" && this._rowValuesMap[cid0rv]) {
-          var rparts = this._rowValuesMap[cid0rv].split("|");
-          var rd1 = this._metadata.dimensions && this._metadata.dimensions["dimensions_1"] ? this._metadata.dimensions["dimensions_1"].id : "dimensions_1";
-          var rd2 = this._metadata.dimensions && this._metadata.dimensions["dimensions_2"] ? this._metadata.dimensions["dimensions_2"].id : "dimensions_2";
-          var rd3 = this._metadata.dimensions && this._metadata.dimensions["dimensions_3"] ? this._metadata.dimensions["dimensions_3"].id : "dimensions_3";
-          if (rparts[1] !== "") { dropAddrObj[rd1] = rparts[1]; }
-          if (rparts[2] !== "") { dropAddrObj[rd2] = rparts[2]; }
-          if (rparts[3] !== "") { dropAddrObj[rd3] = rparts[3]; }
-        }
-      }
-
-      // 3. _localSelections — seleções manuais anteriores
-      if (this._localSelections && this._localSelections[dim0Key]) {
-        var lks = ["dimensions_1", "dimensions_2", "dimensions_3"];
-        for (var lka = 0; lka < lks.length; lka++) {
-          var ldka  = lks[lka];
-          var lsela = this._localSelections[dim0Key][ldka];
-          if (lsela && lsela.id && lsela.id !== "") {
-            var lRealId = ldka;
-            if (this._metadata.dimensions && this._metadata.dimensions[ldka]) {
-              lRealId = this._metadata.dimensions[ldka].id || ldka;
-            }
-            dropAddrObj[lRealId] = lsela.id;
-          }
-        }
-      }
-
-      // 4. Dimensão atual — sobrescreve com o novo valor (prioridade máxima)
-      var dimRealIdNew = dimensionId;
-      if (this._metadata.dimensions && this._metadata.dimensions[dimensionId]) {
-        dimRealIdNew = this._metadata.dimensions[dimensionId].id || dimensionId;
-      }
-      dropAddrObj[dimRealIdNew] = technicalId;
-
-    } catch(ex) { console.error("dropAddrStr build error:", ex); }
-
-    // Serializa addrObj para addrStr — sem Object.keys()
-    var dropAddrStr = "";
-    for (var dki in dropAddrObj) {
-      if (dropAddrObj[dki] !== undefined && dropAddrObj[dki] !== "") {
-        dropAddrStr = dropAddrStr + dki + "|~|" + dropAddrObj[dki] + "|||";
-      }
-    }
-
-    this._dropdownChangeAddrStr = dropAddrStr;
+    // Endereço completo da linha com a nova seleção (prioridade máxima para a dimensão atual)
+    var dropAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
     this._newRowAddrStr = dropAddrStr;
     var pendingMeasureKeys = [];
     var pendingMeasFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
@@ -2617,7 +2488,7 @@ class DropdownTableWidget extends HTMLElement {
       // Usa _getRowMeasureValue como fonte primária (binding direto) — mais confiável que _originalData
       var currentValue = this._getRowMeasureValue(rowIndex, pendingMeasureKey);
       // Fallback: _originalData via oldRowAddrStr
-      if (currentValue === "") { currentValue = this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId); }
+      if (currentValue === "") { currentValue = this._toCanonicalNumber(this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId)); }
       this._setLocalCellValue(this._newRowAddrStr, pendingMeasureId, currentValue);
       this._addPendingChange({
         type: "dropdown",
@@ -2659,22 +2530,8 @@ class DropdownTableWidget extends HTMLElement {
     });
   }
 
-  _applyFilters() {
-    try {
-      var binding = this.myDataBinding;
-      if (!binding || !this._metadata) return;
-      var dimensions = this._metadata.feeds.dimensions.values;
-      for (var i = 0; i < dimensions.length; i++) {
-        try { binding.removeDimensionFilter(dimensions[i].id); } catch(e) {}
-      }
-      for (var afk in this._activeFilters) {
-        var mid = this._activeFilters[afk];
-        if (mid) { binding.setDimensionFilter(afk, [mid]); }
-      }
-    } catch(e) { console.error("DropdownTable _applyFilters:", e); }
-  }
 }
 
 customElements.define("dropdowntable-widget", DropdownTableWidget);
 
-// v2.10.50
+// v2.12.0

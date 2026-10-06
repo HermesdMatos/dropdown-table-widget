@@ -6,19 +6,19 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.11.25",
+  "version": "2.12.0",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
       "url": "https://hermesdmatos.github.io/dropdown-table-widget/dropdown-table-widget-v2.js",
-      "integrity": "sha256-ATUALIZAR_APOS_DEPLOY_v2.11.25"
+      "integrity": "sha256-ATUALIZAR_NO_MERGE_v2.12.0"
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling",
-      "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js?v=3",
-      "integrity": "sha256-tH87ZTEi4sYLLsen2G6jJewgNhyIjwvC+OFgICFw7OM="
+      "url": "https://hermesdmatos.github.io/dropdown-table-widget/style-panel.js?v=4",
+      "integrity": "sha256-ATUALIZAR_NO_MERGE_v2.12.0"
     }
   ],
   "properties": {
@@ -84,7 +84,7 @@
     },
     "pendingChanges": {
       "type": "string",
-      "description": "Delimited string with pending changes. Format: dimensionId§technicalMemberId§value§measureId###... (§ separates fields, ### separates records). Technical IDs are resolved from _memberTechnicalMap cache during _selectValue().",
+      "description": "Delimited string with pending changes. Format: oldAddr§newAddr§value§measureId###... (§ separates fields, ### separates records). Addresses use DIM|~|MEMBER_ID|||... ; value is canonical (e.g. 1593.95) or empty when the cell was cleared.",
       "default": ""
     },
     "measureChangeMeasureId": {
@@ -192,7 +192,7 @@
       "returnType": "string",
       "description": "Retorna o buffer de alteracoes pendentes.",
       "parameters": [],
-      "body": "return this.pendingChanges || '[]';"
+      "body": "return this.pendingChanges || '';"
     },
     "clearPendingChanges": {
       "description": "Limpa o buffer de alteracoes pendentes.",
@@ -295,8 +295,7 @@
     "getActiveFilters": {
       "returnType": "string",
       "description": "Get all active dropdown filters as JSON string",
-      "parameters": [],
-      "body": "return this.selectedCellData || '{}';"
+      "parameters": []
     },
     "setDimensionFilter": {
       "description": "Aplica filtro de dimensão. Ex: setDimensionFilter(\"Date\", \"[Date].[YM].&[202606]\")",
@@ -356,6 +355,32 @@
       "returnType": "string",
       "description": "Retorna o addrStr da linha apos a ultima troca de dropdown.",
       "parameters": []
+    },
+    "setMeasureLabels": {
+      "description": "Define rótulos das colunas de medida. Ex: setMeasureLabels('[\"Custo\",\"Quantidade\"]')",
+      "parameters": [
+        {
+          "name": "v",
+          "type": "string",
+          "description": "JSON array de rótulos, na ordem das medidas"
+        }
+      ]
+    },
+    "getMeasureLabels": {
+      "returnType": "string",
+      "description": "Retorna os rótulos de medida definidos via setMeasureLabels (JSON array).",
+      "parameters": []
+    },
+    "getNewMemberDimensionId": {
+      "returnType": "string",
+      "description": "Retorna o ID real da dimensão do membro criado no modal Adicionar membro.",
+      "parameters": []
+    },
+    "getMeasureChangeRowIndex": {
+      "returnType": "string",
+      "description": "Retorna o índice da linha da última medida alterada.",
+      "parameters": [],
+      "body": "return this.measureChangeRowIndex || '';"
     }
   },
   "events": {
