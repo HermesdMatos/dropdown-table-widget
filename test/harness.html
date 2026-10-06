@@ -25,6 +25,8 @@
 <div class="widget-box"><dropdowntable-widget id="wD" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 <h2>E — Builder com "Nível 2" + "Incluir níveis-pai"</h2>
 <div class="widget-box"><dropdowntable-widget id="wE" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>F — sem nada marcado no painel e sem script (padrão novo)</h2>
+<div class="widget-box"><dropdowntable-widget id="wF" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -160,6 +162,13 @@
     var eIdx = eRow ? eRow.getAttribute("data-row-index") : "";
     check("E1 'Incluir níveis-pai': escolhe a linha das folhas (Anual|Ana), não a do nó", eIdx === "3" && rowCells(E, 3).slice(1, 3).join("|") === "Anual|Ana", { linha: eIdx, celulas: eIdx ? rowCells(E, eIdx) : null });
     check("E2 conta sem dado (só nó) aparece com 'Selecionar...'", rowCells(E, 4).slice(1, 3).join("|") === "Selecionar...|Selecionar...", rowCells(E, 4));
+
+    // ── F ─────────────────────────────────────────────────────────
+    var F = document.getElementById("wF");
+    setup(F, { mainBinding: M.mainBindingWithParentLevels() });   // nada marcado, nenhum script
+    await tick();
+    check("F1 sem painel e sem script: todas as dimensões viram dropdown", F.shadowRoot.querySelectorAll('tr[data-row-index="3"] .cell-dropdown').length === 2, rowCells(F, 3));
+    check("F2 sem painel e sem script: mostra o valor gravado", rowCells(F, 3).slice(1, 3).join("|") === "Anual|Ana", rowCells(F, 3));
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

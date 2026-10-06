@@ -853,17 +853,32 @@ class DropdownTableWidget extends HTMLElement {
     return { id: id, label: (this._rowValueLabels && this._rowValueLabels[id]) || this._cleanMemberId(id) };
   }
 
-  // Modo explícito: dimensões marcadas no painel (styleConfig.dropdownDimensions)
+  // A story ainda configura os dropdowns por script (setDropdownDimensions/setRowValues/setDropdownOptions)?
+  _hasScriptDropdownConfig() {
+    if (this._dropdownDimensions && this._dropdownDimensions.length > 0) { return true; }
+    var k;
+    for (k in (this._rowValuesMap || {})) { return true; }
+    for (k in (this._dropdownOptions || {})) {
+      if (this._dropdownOptions[k] && this._dropdownOptions[k].length > 0) { return true; }
+    }
+    return false;
+  }
+
+  // Modo explícito (sem script): dimensões marcadas no painel ou, sem nada marcado e sem
+  // configuração por script, todas as dimensões depois da conta.
+  // Modo legado: stories que ainda chamam as funções por script continuam como antes.
   _isExplicitDropdownMode() {
-    return !!(this._explicitDropdownDims && this._explicitDropdownDims.length > 0);
+    if (this._explicitDropdownDims && this._explicitDropdownDims.length > 0) { return true; }
+    return !this._hasScriptDropdownConfig();
   }
 
   _isDropdownDimension(feedKey, feedDimId) {
     if (feedKey === "dimensions_0") { return false; }
-    if (this._isExplicitDropdownMode()) {
+    if (this._explicitDropdownDims && this._explicitDropdownDims.length > 0) {
       var realId = this._dimRealId(feedKey);
       return this._explicitDropdownDims.indexOf(realId) !== -1 || this._explicitDropdownDims.indexOf(feedKey) !== -1;
     }
+    if (this._isExplicitDropdownMode()) { return true; }
     return this._dropdownDimensions.length === 0
       || this._dropdownDimensions.indexOf(feedKey) !== -1
       || (feedDimId !== undefined && this._dropdownDimensions.indexOf(feedDimId) !== -1);

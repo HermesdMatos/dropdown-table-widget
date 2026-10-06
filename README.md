@@ -16,7 +16,7 @@ Custom widget de planejamento: tabela com medidas editáveis e dimensões escolh
 1. **Builder → myDataBinding**: linhas = Conta + dimensões de dropdown (podem ficar no nó pai); medidas editáveis.
 2. **Builder → valuesBinding** *(substitui a tabela espelho / `setRowValues`)*: Conta (1ª dimensão) + dimensões de dropdown **no nível folha** + uma medida. O widget casa as dimensões pelo ID e usa, por conta, a combinação de maior valor como "valor gravado".
 3. **Builder → childrenBinding** *(opções da lista)*: as dimensões de dropdown com seus membros-filho, sem medidas. Se ficar vazio, o widget tenta `getMembers()` da DataSource e depois os membros vistos no `valuesBinding`.
-4. **Painel de estilo → Dropdowns**: marque Periodicidade, Responsável, Fonte… → **Aplicar**. Se nenhuma dimensão estiver marcada, vale o comportamento antigo (`setDropdownDimensions`, `setRowValues`, `setDropdownOptions` por script, que continuam funcionando).
+4. **Dropdowns**: sem configuração, toda dimensão depois da conta vira lista. Para escolher só algumas, use **Painel de estilo → Dropdowns** → Aplicar. Stories que ainda chamam `setDropdownDimensions`, `setRowValues` ou `setDropdownOptions` continuam no comportamento antigo.
 5. **Modo diagnóstico** (mesmo painel): registra no console do navegador (F12) os bindings, o resultado do `getMembers()` e o `pendingChanges`.
 
 ### Único script necessário: salvar
