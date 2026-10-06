@@ -1,6 +1,6 @@
 {
   "name": "Dropdown Table Widget (DEV)",
-  "description": "[DEV @ 73104ce] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
+  "description": "[DEV @ 75a42d8] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
   "newInstancePrefix": "dropdowntableDev",
   "eula": "",
   "vendor": "Custom",
@@ -11,14 +11,14 @@
     {
       "kind": "main",
       "tag": "dropdowntable-widget-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@73104ce7d9651b0527b764b1a07392dc727ae030/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
-      "integrity": "sha256-WcO9fFllGEz0/2JM6YdUUH/fTUN5jZ9/kROsuOOxmgA="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@75a42d8655fcbf0036ee56ab0d0b6546099d2caf/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
+      "integrity": "sha256-r9R5aUlupJwRtV/V5H05qcQBN5eLCXjHR2S36vvRXqg="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@73104ce7d9651b0527b764b1a07392dc727ae030/style-panel.js?tag=dropdowntable-styling-dev",
-      "integrity": "sha256-mzt0wJtRYr91thoR30dAlJHkeCEJ+YGcM4OurlMQwMQ="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@75a42d8655fcbf0036ee56ab0d0b6546099d2caf/style-panel.js?tag=dropdowntable-styling-dev",
+      "integrity": "sha256-qWqgNovas6YFT+lmNL9W2kgSIjJt48JtgBnKwnbP0nA="
     }
   ],
   "properties": {
@@ -386,6 +386,76 @@
       "description": "Retorna o índice da linha da última medida alterada.",
       "parameters": [],
       "body": "return this.measureChangeRowIndex || '';"
+    },
+    "getWriteCount": {
+      "returnType": "integer",
+      "description": "Monta a lista de gravação a partir das alterações pendentes (hierarquias, apagar endereço antigo, membros sem valor, sem duplicatas) e retorna quantos setUserInput fazer.",
+      "parameters": []
+    },
+    "getWriteDimensionCount": {
+      "returnType": "integer",
+      "description": "Quantidade de dimensões da gravação i.",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        }
+      ]
+    },
+    "getWriteDimensionId": {
+      "returnType": "string",
+      "description": "ID da dimensão d da gravação i (chave do objeto de seleção).",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        },
+        {
+          "name": "d",
+          "type": "integer",
+          "description": "Índice da dimensão"
+        }
+      ]
+    },
+    "getWriteMemberId": {
+      "returnType": "string",
+      "description": "ID do membro da dimensão d da gravação i, na hierarquia configurada no painel.",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        },
+        {
+          "name": "d",
+          "type": "integer",
+          "description": "Índice da dimensão"
+        }
+      ]
+    },
+    "getWriteMeasureId": {
+      "returnType": "string",
+      "description": "ID da medida da gravação i (para @MeasureDimension).",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        }
+      ]
+    },
+    "getWriteValue": {
+      "returnType": "string",
+      "description": "Valor da gravação i. Apagar = valor configurado no painel (padrão vazio = null).",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        }
+      ]
     }
   },
   "events": {
