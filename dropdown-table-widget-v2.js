@@ -2193,10 +2193,17 @@ class DropdownTableWidget extends HTMLElement {
           if (!isNaN(brMesVal)) { brVal = brVal + Math.abs(brMesVal); }
         }
       }
-      if (bestRowByDim0[brCell.id] === undefined) {
-        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal };
-      } else if (brVal > bestRowByDim0[brCell.id].val) {
-        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal };
+      // Com "Incluir níveis-pai" no Builder a linha do nó traz o total (>= folha): prefere a linha
+      // com mais membros-folha (o valor gravado) e só depois a de maior valor
+      var brLeaves = 0;
+      for (var blk in this._data[br]) {
+        if (blk.indexOf("dimensions_") !== 0 || blk === "dimensions_0") { continue; }
+        var blCell = this._data[br][blk] || {};
+        if (blCell.id && !this._isNodeId(blk, blCell.id, null) && this._cleanMemberId(blCell.id) !== "#") { brLeaves++; }
+      }
+      var brBest = bestRowByDim0[brCell.id];
+      if (brBest === undefined || brLeaves > brBest.leaves || (brLeaves === brBest.leaves && brVal > brBest.val)) {
+        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal, leaves: brLeaves };
       }
     }
 

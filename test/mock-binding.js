@@ -116,5 +116,23 @@
     return b;
   }
 
-  window.DTMock = { mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
+  // Builder com "Nível 2" + "Incluir níveis-pai": cada conta vem com a linha do nó (total,
+  // sempre >= folha) antes das linhas das folhas. Contas sem dado só têm a linha do nó.
+  function mainBindingWithParentLevels() {
+    var b = mainBinding(0);
+    var perNode = cell(PER + "[PER_ALL]", "Periodos");
+    var respNode = cell(RESP + "[RESP_ALL]", "RESPONSAVEL");
+    var c1 = cell(CONTA + "[C1]", "Conta 1", CONTA + "[ROOT]");
+    var c3 = cell(CONTA + "[C3]", "Conta 3", CONTA + "[ROOT]");
+    b.data = [
+      b.data[0],
+      { dimensions_0: c1, dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(1000, "1.000,00") },
+      { dimensions_0: c1, dimensions_1: cell(PER + "[ANUAL]", "Anual", PER + "[PER_ALL]"), dimensions_2: respNode, measures_0: measure(1000, "1.000,00") },
+      { dimensions_0: c1, dimensions_1: cell(PER + "[ANUAL]", "Anual", PER + "[PER_ALL]"), dimensions_2: cell(RESP + "[ANA]", "Ana", RESP + "[RESP_ALL]"), measures_0: measure(1000, "1.000,00") },
+      { dimensions_0: c3, dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(null, "") }
+    ];
+    return b;
+  }
+
+  window.DTMock = { mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, mainBindingWithParentLevels: mainBindingWithParentLevels, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
 })();

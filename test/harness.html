@@ -23,6 +23,8 @@
 <div class="widget-box"><dropdowntable-widget id="wB" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 <h2>D — valores gravados no próprio binding principal (sem childrenBinding/valuesBinding)</h2>
 <div class="widget-box"><dropdowntable-widget id="wD" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+<h2>E — Builder com "Nível 2" + "Incluir níveis-pai"</h2>
+<div class="widget-box"><dropdowntable-widget id="wE" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -146,6 +148,18 @@
       pc.length === 1 && pc[0].split("§")[0].indexOf("[MENSAL]") !== -1 && pc[0].split("§")[0].indexOf("[BRUNO]") !== -1
       && pc[0].split("§")[1].indexOf("[ANUAL]") !== -1 && pc[0].split("§")[1].indexOf("[BRUNO]") !== -1, pc);
     check("D5 conta sem dado não leva o nó 'Periodos' no endereço", D._buildRowAddrStr(3, null, true).indexOf("PER_ALL") === -1, D._buildRowAddrStr(3, null, true));
+
+    // ── E ─────────────────────────────────────────────────────────
+    var E = document.getElementById("wE");
+    setup(E, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE", "RESPONSAVEL"] },
+      mainBinding: M.mainBindingWithParentLevels()
+    });
+    await tick();
+    var eRow = E.shadowRoot.querySelector("tr[data-row-index]");
+    var eIdx = eRow ? eRow.getAttribute("data-row-index") : "";
+    check("E1 'Incluir níveis-pai': escolhe a linha das folhas (Anual|Ana), não a do nó", eIdx === "3" && rowCells(E, 3).slice(1, 3).join("|") === "Anual|Ana", { linha: eIdx, celulas: eIdx ? rowCells(E, eIdx) : null });
+    check("E2 conta sem dado (só nó) aparece com 'Selecionar...'", rowCells(E, 4).slice(1, 3).join("|") === "Selecionar...|Selecionar...", rowCells(E, 4));
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");
