@@ -1,6 +1,6 @@
 {
   "name": "Dropdown Table Widget (DEV)",
-  "description": "[DEV @ 950120a] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
+  "description": "[DEV @ 73104ce] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
   "newInstancePrefix": "dropdowntableDev",
   "eula": "",
   "vendor": "Custom",
@@ -11,13 +11,13 @@
     {
       "kind": "main",
       "tag": "dropdowntable-widget-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@950120add6e03810e94c0deca85a05653b464efe/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
-      "integrity": "sha256-btdDvwBUwJ7/uHmr5ycc5tAz8Xx8CnhGec9jYoc6LKQ="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@73104ce7d9651b0527b764b1a07392dc727ae030/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
+      "integrity": "sha256-WcO9fFllGEz0/2JM6YdUUH/fTUN5jZ9/kROsuOOxmgA="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@950120add6e03810e94c0deca85a05653b464efe/style-panel.js?tag=dropdowntable-styling-dev",
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@73104ce7d9651b0527b764b1a07392dc727ae030/style-panel.js?tag=dropdowntable-styling-dev",
       "integrity": "sha256-mzt0wJtRYr91thoR30dAlJHkeCEJ+YGcM4OurlMQwMQ="
     }
   ],
