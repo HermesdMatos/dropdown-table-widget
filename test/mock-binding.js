@@ -134,7 +134,9 @@
       { dimensions_0: c1, dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(1000, "1.000,00") },
       { dimensions_0: c1, dimensions_1: cell(PER + "[ANUAL]", "Anual", PER + "[PER_ALL]"), dimensions_2: respNode, measures_0: measure(1000, "1.000,00") },
       { dimensions_0: c1, dimensions_1: cell(PER + "[ANUAL]", "Anual", PER + "[PER_ALL]"), dimensions_2: cell(RESP + "[ANA]", "Ana", RESP + "[RESP_ALL]"), measures_0: measure(1000, "1.000,00") },
-      { dimensions_0: c3, dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(null, "") }
+      { dimensions_0: c3, dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(null, "") },
+      // Como no SAC: conta sem dado também vem com uma linha de folhas (sem valor) — não é valor gravado
+      { dimensions_0: c3, dimensions_1: cell(PER + "[ANUAL]", "Anual", PER + "[PER_ALL]"), dimensions_2: cell(RESP + "[ANA]", "Ana", RESP + "[RESP_ALL]"), measures_0: measure(null, "") }
     ];
     return b;
   }

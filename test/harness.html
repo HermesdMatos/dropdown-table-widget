@@ -177,6 +177,11 @@
     setup(G, { mainBinding: M.mainBindingWithParentLevels(), dataBindings: M.dataBindings(true) });
     await tick(80);
     check("G1 conta sem valor inicia com NÃO APLICÁVEL (grafias diferentes)", rowCells(G, 4).slice(1, 3).join("|") === "NÃO APLICÁVEL|Nao Aplicavel", rowCells(G, 4));
+    var gC3 = G.shadowRoot.querySelectorAll('tr[data-row-index]');
+    var gC3Last = gC3[gC3.length - 1];
+    check("G1b conta sem dado com linha de folhas vazias também inicia com NÃO APLICÁVEL",
+      gC3.length === 2 && Array.prototype.slice.call(gC3Last.querySelectorAll("td"), 1, 3).map(function(td) { return td.textContent.trim(); }).join("|") === "NÃO APLICÁVEL|Nao Aplicavel",
+      Array.prototype.map.call(gC3, function(tr) { return tr.textContent.trim(); }));
     check("G2 conta com valor gravado não muda", rowCells(G, 3).slice(1, 3).join("|") === "Anual|Ana", rowCells(G, 3));
     var gAddr = G._buildRowAddrStr(4, null, true);
     check("G3 endereço da conta sem valor usa os membros NÃO APLICÁVEL", gAddr.indexOf("[NA]") !== -1 && gAddr.indexOf("[NAO_APLICAVEL]") !== -1, gAddr);

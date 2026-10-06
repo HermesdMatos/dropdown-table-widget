@@ -746,6 +746,17 @@ class DropdownTableWidget extends HTMLElement {
     } catch(e) {}
   }
 
+  // Linha com algum valor nas medidas. Sem valor, as folhas que o SAC manda (com "Incluir
+  // níveis-pai") não são valor gravado — são só combinações sem dado.
+  _rowHasData(rowData) {
+    for (var k in rowData) {
+      if (k.indexOf("measures_") !== 0 || !rowData[k]) { continue; }
+      var raw = rowData[k].raw;
+      if (raw !== null && raw !== undefined && raw !== "" && !isNaN(parseFloat(raw))) { return true; }
+    }
+    return false;
+  }
+
   _cleanMemberId(id) {
     var m = id ? String(id).match(/\.&\[([^\]]+)\]$/) : null;
     return m ? m[1] : (id || "");
@@ -1435,8 +1446,11 @@ class DropdownTableWidget extends HTMLElement {
       }
       addrObj[realId0] = dim0.id;
     }
-    // Membro gravado que o próprio binding já traz na linha (folha com parentId; nunca nó)
+    // Membro gravado que o próprio binding já traz na linha (folha com parentId; nunca nó;
+    // só em linha com valor — sem valor é combinação vazia, não gravação)
+    var rowHasData = this._rowHasData(rowData);
     for (var bk in rowData) {
+      if (!rowHasData) { break; }
       if (bk.indexOf("dimensions_") !== 0 || bk === "dimensions_0") { continue; }
       var bcell = rowData[bk] || {};
       if (bcell.id && bcell.parentId && !this._isNodeId(bk, bcell.id, null) && this._cleanMemberId(bcell.id) !== "#") {
@@ -2242,17 +2256,23 @@ class DropdownTableWidget extends HTMLElement {
           if (!isNaN(brMesVal)) { brVal = brVal + Math.abs(brMesVal); }
         }
       }
-      // Com "Incluir níveis-pai" no Builder a linha do nó traz o total (>= folha): prefere a linha
-      // com mais membros-folha (o valor gravado) e só depois a de maior valor
+      // Com "Incluir níveis-pai" no Builder cada conta vem com a linha do nó (total >= folha) e
+      // linhas de folhas — inclusive sem valor. Prioridade: linha com dado → com mais folhas
+      // (o valor gravado) → maior valor. Sem dado nenhum: a de menos folhas (o nó).
       var brLeaves = 0;
       for (var blk in this._data[br]) {
         if (blk.indexOf("dimensions_") !== 0 || blk === "dimensions_0") { continue; }
         var blCell = this._data[br][blk] || {};
         if (blCell.id && !this._isNodeId(blk, blCell.id, null) && this._cleanMemberId(blCell.id) !== "#") { brLeaves++; }
       }
+      var brHasData = this._rowHasData(this._data[br]);
       var brBest = bestRowByDim0[brCell.id];
-      if (brBest === undefined || brLeaves > brBest.leaves || (brLeaves === brBest.leaves && brVal > brBest.val)) {
-        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal, leaves: brLeaves };
+      var brWins = brBest === undefined
+        || (brHasData && !brBest.hasData)
+        || (brHasData && brBest.hasData && (brLeaves > brBest.leaves || (brLeaves === brBest.leaves && brVal > brBest.val)))
+        || (!brHasData && !brBest.hasData && brLeaves < brBest.leaves);
+      if (brWins) {
+        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal, leaves: brLeaves, hasData: brHasData };
       }
     }
 
@@ -2375,7 +2395,8 @@ class DropdownTableWidget extends HTMLElement {
           // Modo explícito (painel): a dimensão marcada é dropdown em toda linha de dados.
           // Célula ainda no nó pai, sem valor gravado nem seleção → membro padrão ("NÃO APLICAVEL"),
           // ou "Selecionar..." se ele não existir nas opções
-          if (isDrop && !rowValue && !shownSelection && (!cId || self2._isNodeId(dk2, cId, childrenByParent))) {
+          // (folha numa linha sem valor também não é valor gravado)
+          if (isDrop && !rowValue && !shownSelection && (!cId || !self2._rowHasData(rowData) || self2._isNodeId(dk2, cId, childrenByParent))) {
             // Mesma busca usada no endereço (_buildRowAddrObj): tela e gravação sempre iguais
             var defMember = self2._getDefaultMember(dk2, [nodeId], null);
             cLbl = defMember ? defMember.label : "";
