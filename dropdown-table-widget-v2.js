@@ -6,6 +6,8 @@
 //              Fix: dt-empty oculto de fato; cellAlign aplicado; revert de placeholder
 //              Fix: pendingChanges sem duplicatas (A→B→C colapsa em A→C)
 //              Refactor: endereco da linha centralizado em _buildRowAddrObj; remove codigo morto
+//              Fix: escopo isolado (IIFE) e tag configuravel via ?tag= na URL — permite carregar
+//                   duas versoes na mesma pagina (ex: PROD + DEV) sem "already declared"
 //   v2.11.25 — Fix: dt-empty hidden por padrao
 //   v2.11.24 — Fix: input focus restaurado; Delete funciona em selecao multipla
 //   v2.11.23 — Feature: loading spinner overlay durante carregamento do binding
@@ -13,6 +15,17 @@
 //   v2.11.21 — Feature: save button cores configuráveis via style panel
 //   v2.11.20 — Feature: group header e subheader cores configuráveis via style panel
 //   v2.11.19 — Fix: remove changed-cell do render; cor so aplicada em acao do usuario
+
+(function() {
+
+// Tag do custom element: padrao "dropdowntable-widget"; sobrescrito por ?tag=... na URL do script
+// (o JSON DEV usa ?tag=dropdowntable-widget-dev). Deve bater com "tag" no JSON do widget.
+var DT_TAG = "dropdowntable-widget";
+try {
+  var dtScript = document.currentScript;
+  var dtTagMatch = dtScript && dtScript.src ? dtScript.src.match(/[?&]tag=([a-z0-9-]+)/i) : null;
+  if (dtTagMatch) { DT_TAG = dtTagMatch[1].toLowerCase(); }
+} catch(e) {}
 
 var TMPL = document.createElement("template");
 TMPL.innerHTML = `
@@ -2532,6 +2545,10 @@ class DropdownTableWidget extends HTMLElement {
 
 }
 
-customElements.define("dropdowntable-widget", DropdownTableWidget);
+if (!customElements.get(DT_TAG)) {
+  customElements.define(DT_TAG, DropdownTableWidget);
+}
+
+})();
 
 // v2.12.0

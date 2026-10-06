@@ -1,4 +1,12 @@
 (function() {
+    // Tag padrao "dropdowntable-styling"; sobrescrito por ?tag=... na URL do script (JSON DEV)
+    var STYLING_TAG = "dropdowntable-styling";
+    try {
+        var stScript = document.currentScript;
+        var stTagMatch = stScript && stScript.src ? stScript.src.match(/[?&]tag=([a-z0-9-]+)/i) : null;
+        if (stTagMatch) { STYLING_TAG = stTagMatch[1].toLowerCase(); }
+    } catch(e) {}
+
     var template = document.createElement("template");
     template.innerHTML = `
         <style>
@@ -533,5 +541,7 @@
         }
     }
 
-    customElements.define("dropdowntable-styling", DropdownTableStyling);
+    if (!customElements.get(STYLING_TAG)) {
+        customElements.define(STYLING_TAG, DropdownTableStyling);
+    }
 })();
