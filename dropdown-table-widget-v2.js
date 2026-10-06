@@ -664,15 +664,27 @@ class DropdownTableWidget extends HTMLElement {
       this._metadata._measCount = mesLabels.length;
       this._data = dataBinding.data;
 
-      // Nós de hierarquia vistos no binding (SAC marca isNode/isCollapsed) — nunca são opção
+      // Nós de hierarquia vistos no binding (isNode/isCollapsed ou pai de outra célula) — nunca são opção.
+      // As demais células (membros gravados, ex: "Anual", "RH") viram opção de último recurso.
       this._bindingNodeIds = {};
+      var leafCandidates = {};
       for (var nr = 0; nr < dataBinding.data.length; nr++) {
         for (var nk in dataBinding.data[nr]) {
           var ncell = dataBinding.data[nr][nk];
-          if (nk.indexOf("dimensions_") === 0 && ncell && ncell.id && (ncell.isNode === true || ncell.isCollapsed === true)) {
-            if (!this._bindingNodeIds[nk]) { this._bindingNodeIds[nk] = {}; }
-            this._bindingNodeIds[nk][ncell.id] = true;
-          }
+          if (nk.indexOf("dimensions_") !== 0 || nk === "dimensions_0" || !ncell || !ncell.id) { continue; }
+          if (!this._bindingNodeIds[nk]) { this._bindingNodeIds[nk] = {}; }
+          if (ncell.isNode === true || ncell.isCollapsed === true) { this._bindingNodeIds[nk][ncell.id] = true; }
+          if (ncell.parentId) { this._bindingNodeIds[nk][ncell.parentId] = true; }
+          if (!leafCandidates[nk]) { leafCandidates[nk] = {}; }
+          leafCandidates[nk][ncell.id] = ncell.label || this._cleanMemberId(ncell.id);
+        }
+      }
+      this._bindingLeaves = {};
+      for (var lk in leafCandidates) {
+        this._bindingLeaves[lk] = {};
+        for (var lid in leafCandidates[lk]) {
+          if (this._bindingNodeIds[lk][lid] || this._cleanMemberId(lid) === "#") { continue; }
+          this._bindingLeaves[lk][lid] = leafCandidates[lk][lid];
         }
       }
 
@@ -867,9 +879,11 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   // Opções do dropdown. Prioridade: setDropdownOptions → filhos no childrenBinding →
-  // filhos no binding principal → getMembers() da DataSource → membros vistos no valuesBinding
+  // filhos no binding principal → getMembers() da DataSource → membros vistos nos bindings
   _resolveDropdownOptions(feedKey, ids, childrenByParent) {
-    if (this._dropdownOptions && this._dropdownOptions[feedKey]) { return this._dropdownOptions[feedKey]; }
+    if (this._dropdownOptions && this._dropdownOptions[feedKey] && this._dropdownOptions[feedKey].length > 0) {
+      return this._dropdownOptions[feedKey];
+    }
     var i;
     var cfb = this._childrenFromBinding && this._childrenFromBinding[feedKey];
     for (i = 0; i < ids.length; i++) {
@@ -882,13 +896,20 @@ class DropdownTableWidget extends HTMLElement {
     if (this._dsMembers && this._dsMembers[feedKey] && this._dsMembers[feedKey].length > 0) {
       return this._dsMembers[feedKey];
     }
-    var vl = this._valuesLeaves && this._valuesLeaves[feedKey];
-    if (vl) {
-      var opts = [];
-      for (var vid in vl) { opts.push({ value: vid, label: vl[vid] }); }
-      if (opts.length > 0) { return opts; }
+    // Último recurso: membros gravados vistos no valuesBinding e no binding principal (sem nós)
+    var opts = [];
+    var seen = {};
+    var sources = [this._valuesLeaves && this._valuesLeaves[feedKey], this._bindingLeaves && this._bindingLeaves[feedKey]];
+    for (var s = 0; s < sources.length; s++) {
+      if (!sources[s]) { continue; }
+      for (var vid in sources[s]) {
+        if (seen[vid] || this._isNodeId(feedKey, vid, childrenByParent)) { continue; }
+        seen[vid] = true;
+        opts.push({ value: vid, label: sources[s][vid] });
+      }
     }
-    return [];
+    opts.sort(function(a, b) { return String(a.label).localeCompare(String(b.label), "pt-BR"); });
+    return opts;
   }
 
   // Lista de dimensões do binding para o painel montar os checkboxes (sem script)
@@ -1376,7 +1397,15 @@ class DropdownTableWidget extends HTMLElement {
       }
       addrObj[realId0] = dim0.id;
     }
-    // Valores gravados: setRowValues (script) ou valuesBinding (Builder)
+    // Membro gravado que o próprio binding já traz na linha (folha com parentId; nunca nó)
+    for (var bk in rowData) {
+      if (bk.indexOf("dimensions_") !== 0 || bk === "dimensions_0") { continue; }
+      var bcell = rowData[bk] || {};
+      if (bcell.id && bcell.parentId && !this._isNodeId(bk, bcell.id, null) && this._cleanMemberId(bcell.id) !== "#") {
+        addrObj[this._dimRealId(bk)] = bcell.id;
+      }
+    }
+    // Valores gravados: setRowValues (script) ou valuesBinding (Builder) — prevalecem sobre o binding
     var rvStr = this._getRowValuesString(dim0.id || "");
     if (rvStr) {
       var rparts = rvStr.split("|");

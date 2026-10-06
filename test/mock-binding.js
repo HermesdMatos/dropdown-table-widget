@@ -103,5 +103,18 @@
     };
   }
 
-  window.DTMock = { mainBinding: mainBinding, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
+  // Cenário real observado no SAC: com dados do cliente, o binding principal já traz o membro
+  // gravado (folha, com parentId); contas sem dado ficam no nó. Sem childrenBinding/valuesBinding.
+  function mainBindingWithBookedLeaves() {
+    var b = mainBinding(1593.95);
+    b.data[1].dimensions_1 = cell(PER + "[ANUAL]", "Anual", PER + "[PER_ALL]");
+    b.data[1].dimensions_2 = cell(RESP + "[ANA]", "Ana", RESP + "[RESP_ALL]");
+    b.data[2].dimensions_1 = cell(PER + "[MENSAL]", "Mensal", PER + "[PER_ALL]");
+    b.data[2].dimensions_2 = cell(RESP + "[BRUNO]", "Bruno", RESP + "[RESP_ALL]");
+    // Nó sem as flags isNode/isCollapsed: o widget deve reconhecê-lo pelo parentId das folhas
+    b.data[3].dimensions_1 = cell(PER + "[PER_ALL]", "Periodos");
+    return b;
+  }
+
+  window.DTMock = { mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
 })();

@@ -21,6 +21,8 @@
 <div class="widget-box"><dropdowntable-widget id="wA" style="display:block;width:900px;height:260px"></dropdowntable-widget></div>
 <h2>B — modo explícito só com getMembers() (sem childrenBinding/valuesBinding)</h2>
 <div class="widget-box"><dropdowntable-widget id="wB" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+<h2>D — valores gravados no próprio binding principal (sem childrenBinding/valuesBinding)</h2>
+<div class="widget-box"><dropdowntable-widget id="wD" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -50,7 +52,7 @@
     if (opts.dataBindings) { w.dataBindings = opts.dataBindings; }
     if (opts.childrenBinding) { w.childrenBinding = opts.childrenBinding; }
     if (opts.valuesBinding) { w.valuesBinding = opts.valuesBinding; }
-    w.myDataBinding = M.mainBinding(1593.95);
+    w.myDataBinding = opts.mainBinding || M.mainBinding(1593.95);
     w.onCustomWidgetAfterUpdate({ myDataBinding: w.myDataBinding });
   }
   function rowCells(w, rowIndex) {
@@ -126,6 +128,24 @@
     check("B1 só Periodicidade vira dropdown", B.shadowRoot.querySelectorAll('tr[data-row-index="1"] .cell-dropdown').length === 1);
     var optsB = openOptions(B, 1, 0); B._closeDropdown();
     check("B2 opções vêm do getMembers(), sem o nó pai", optsB.join(",") === "Mensal,Trimestral,Anual", optsB);
+
+    // ── D ─────────────────────────────────────────────────────────
+    var D = document.getElementById("wD");
+    setup(D, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE", "RESPONSAVEL"] },
+      mainBinding: M.mainBindingWithBookedLeaves()
+    });
+    await tick();
+    check("D1 valor gravado do binding principal aparece com dropdown", rowCells(D, 1).slice(1, 3).join("|") === "Anual|Ana" && D.shadowRoot.querySelectorAll('tr[data-row-index="1"] .cell-dropdown').length === 2, rowCells(D, 1));
+    var optsD = openOptions(D, 1, 0); D._closeDropdown();
+    check("D2 opções = membros gravados vistos no binding, sem o nó 'Periodos'", optsD.join(",") === "Anual,Mensal", optsD);
+    check("D3 conta sem dado (nó) mostra 'Selecionar...'", rowCells(D, 3)[1] === "Selecionar...", rowCells(D, 3));
+    pick(D, 2, 0, "Anual");
+    pc = D.getPendingChanges().split("###");
+    check("D4 troca parte do binding: oldAddr tem Mensal+Bruno, newAddr tem Anual+Bruno",
+      pc.length === 1 && pc[0].split("§")[0].indexOf("[MENSAL]") !== -1 && pc[0].split("§")[0].indexOf("[BRUNO]") !== -1
+      && pc[0].split("§")[1].indexOf("[ANUAL]") !== -1 && pc[0].split("§")[1].indexOf("[BRUNO]") !== -1, pc);
+    check("D5 conta sem dado não leva o nó 'Periodos' no endereço", D._buildRowAddrStr(3, null, true).indexOf("PER_ALL") === -1, D._buildRowAddrStr(3, null, true));
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");
