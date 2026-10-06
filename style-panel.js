@@ -78,6 +78,12 @@
             .align-btn.active { background: #1a73e8; border-color: #1a73e8; }
             .align-btn.active svg { stroke: #fff; }
             .align-btn svg { stroke: #555; }
+
+            /* Dropdowns */
+            .dd-hint { font-size: 11px; color: #666; margin-bottom: 8px; }
+            .dd-dims { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+            .dd-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+            .dd-empty { font-size: 11px; color: #999; font-style: italic; }
         </style>
         <form id="form">
             <fieldset>
@@ -339,6 +345,13 @@
                 </table>
             </fieldset>
 
+            <fieldset>
+                <legend>Dropdowns (validação de dados)</legend>
+                <div class="dd-hint">Marque as dimensões que viram lista de seleção em cada linha. Nenhuma marcada = comportamento antigo (por script).</div>
+                <div id="dd_dims" class="dd-dims"></div>
+                <label class="dd-check"><input type="checkbox" id="style_debug_mode"> Modo diagnóstico (logs no console)</label>
+            </fieldset>
+
             <button type="button" id="apply_styles" class="apply-button">✓ Aplicar</button>
             <input type="submit" style="display:none;">
         </form>
@@ -398,6 +411,13 @@
             this._titleAlign  = "left";
 
             this._applyButton = this._shadowRoot.getElementById("apply_styles");
+
+            // Dropdowns
+            this._ddDimsContainer = this._shadowRoot.getElementById("dd_dims");
+            this._debugModeInput  = this._shadowRoot.getElementById("style_debug_mode");
+            this._availableDims   = [];  // [{key, id, label}] publicado pelo widget
+            this._ddSelected      = [];  // IDs reais das dimensões marcadas
+            this._renderDropdownDims();
 
             this._connectColorPickers();
             this._connectAlignButtons();
@@ -479,7 +499,9 @@
                             titleSize:         this._titleSizeSelect.value,
                             headerAlign:       this._headerAlign,
                             cellAlign:         this._cellAlign,
-                            titleAlign:        this._titleAlign
+                            titleAlign:        this._titleAlign,
+                            dropdownDimensions: this._ddSelected.slice(),
+                            debugMode:          this._debugModeInput.checked
                         })
                     }
                 }
@@ -526,7 +548,54 @@
                 if (cfg.headerAlign)  { this._setAlignActive("header", cfg.headerAlign); }
                 if (cfg.cellAlign)    { this._setAlignActive("cell",   cfg.cellAlign); }
                 if (cfg.titleAlign)   { this._setAlignActive("title",  cfg.titleAlign); }
+                if (Array.isArray(cfg.dropdownDimensions)) { this._ddSelected = cfg.dropdownDimensions.slice(); this._renderDropdownDims(); }
+                if (cfg.debugMode !== undefined) { this._debugModeInput.checked = !!cfg.debugMode; }
             } catch(ex) {}
+        }
+
+        // Lista de dimensões publicada pelo widget a partir do binding
+        get availableDimensions() { return JSON.stringify(this._availableDims); }
+        set availableDimensions(v) {
+            try {
+                var list = typeof v === "string" ? JSON.parse(v || "[]") : v;
+                this._availableDims = Array.isArray(list) ? list : [];
+            } catch(ex) { this._availableDims = []; }
+            this._renderDropdownDims();
+        }
+
+        _renderDropdownDims() {
+            var self = this;
+            var box = this._ddDimsContainer;
+            if (!box) { return; }
+            box.innerHTML = "";
+            // dimensions_0 são as linhas (contas) — nunca vira dropdown
+            var dims = this._availableDims.filter(function(d) { return d && d.key !== "dimensions_0"; });
+            // Dimensões marcadas que ainda não chegaram do binding continuam visíveis
+            this._ddSelected.forEach(function(id) {
+                if (!dims.some(function(d) { return d.id === id; })) { dims.push({ key: "", id: id, label: id }); }
+            });
+            if (dims.length === 0) {
+                var empty = document.createElement("div");
+                empty.className = "dd-empty";
+                empty.textContent = "Vincule dados ao widget (Builder) para listar as dimensões.";
+                box.appendChild(empty);
+                return;
+            }
+            dims.forEach(function(d) {
+                var label = document.createElement("label");
+                label.className = "dd-check";
+                var cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.checked = self._ddSelected.indexOf(d.id) !== -1;
+                cb.addEventListener("change", function() {
+                    var idx = self._ddSelected.indexOf(d.id);
+                    if (cb.checked && idx === -1) { self._ddSelected.push(d.id); }
+                    if (!cb.checked && idx !== -1) { self._ddSelected.splice(idx, 1); }
+                });
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(" " + (d.label || d.id) + (d.label && d.label !== d.id ? " (" + d.id + ")" : "")));
+                box.appendChild(label);
+            });
         }
 
         _setAlignActive(group, align) {

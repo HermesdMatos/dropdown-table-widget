@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Dropdown Table — testes</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 16px; color: #222; }
+  h1 { font-size: 18px; } h2 { font-size: 14px; margin-top: 24px; }
+  #results li { margin: 2px 0; font-size: 13px; }
+  .pass { color: #1b7f3a; } .fail { color: #c62828; font-weight: bold; }
+  #summary { font-weight: bold; margin: 8px 0; }
+  .widget-box { border: 1px solid #ddd; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>Dropdown Table Widget — testes no navegador</h1>
+<div id="summary">Rodando…</div>
+<ul id="results"></ul>
+
+<h2>A — modo explícito (painel) + childrenBinding + valuesBinding</h2>
+<div class="widget-box"><dropdowntable-widget id="wA" style="display:block;width:900px;height:260px"></dropdowntable-widget></div>
+<h2>B — modo explícito só com getMembers() (sem childrenBinding/valuesBinding)</h2>
+<div class="widget-box"><dropdowntable-widget id="wB" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+<h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
+<div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+
+<script src="/mock-binding.js"></script>
+<script src="/dropdown-table-widget-v2.js"></script>
+<script>
+(async function() {
+  var results = [];
+  function check(name, ok, info) {
+    results.push({ name: name, ok: !!ok, info: info });
+    var li = document.createElement("li");
+    li.className = ok ? "pass" : "fail";
+    li.textContent = (ok ? "PASSOU  " : "FALHOU  ") + name + (ok || info === undefined ? "" : "  → " + JSON.stringify(info));
+    document.getElementById("results").appendChild(li);
+  }
+  var tick = function(ms) { return new Promise(function(r) { setTimeout(r, ms || 20); }); };
+  var M = window.DTMock;
+
+  function setup(w, opts) {
+    w._events = [];
+    w._props = {};
+    ["onSaveRequested", "onDropdownChanged", "onMeasureChanged"].forEach(function(n) {
+      w.addEventListener(n, function(e) { w._events.push({ name: n, detail: e.detail }); });
+    });
+    w.addEventListener("propertiesChanged", function(e) { Object.assign(w._props, e.detail.properties); });
+    if (opts.styleConfig) { w.styleConfig = JSON.stringify(opts.styleConfig); }
+    if (opts.dataBindings) { w.dataBindings = opts.dataBindings; }
+    if (opts.childrenBinding) { w.childrenBinding = opts.childrenBinding; }
+    if (opts.valuesBinding) { w.valuesBinding = opts.valuesBinding; }
+    w.myDataBinding = M.mainBinding(1593.95);
+    w.onCustomWidgetAfterUpdate({ myDataBinding: w.myDataBinding });
+  }
+  function rowCells(w, rowIndex) {
+    return Array.prototype.map.call(
+      w.shadowRoot.querySelectorAll('tr[data-row-index="' + rowIndex + '"] td'),
+      function(td) { var i = td.querySelector("input"); return i ? i.value : td.textContent.trim(); });
+  }
+  function dropdown(w, rowIndex, col) {
+    return w.shadowRoot.querySelectorAll('tr[data-row-index="' + rowIndex + '"] .cell-dropdown')[col];
+  }
+  function openOptions(w, rowIndex, col) {
+    dropdown(w, rowIndex, col).click();
+    return Array.prototype.map.call(w.shadowRoot.querySelectorAll(".dt-dropdown-item"), function(i) { return i.textContent; });
+  }
+  function pick(w, rowIndex, col, label) {
+    dropdown(w, rowIndex, col).click();
+    var item = Array.prototype.find.call(w.shadowRoot.querySelectorAll(".dt-dropdown-item"), function(i) { return i.textContent === label; });
+    item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+  }
+  function save(w) {
+    w._events = [];
+    w.shadowRoot.getElementById("dt-save-btn").click();
+  }
+
+  try {
+    // ── A ─────────────────────────────────────────────────────────
+    var A = document.getElementById("wA");
+    setup(A, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE", "RESPONSAVEL"] },
+      childrenBinding: M.childrenBinding(),
+      valuesBinding: M.valuesBinding()
+    });
+    await tick();
+    check("A1 dt-empty oculto com dados", getComputedStyle(A.shadowRoot.getElementById("dt-empty")).display === "none");
+    var avail = JSON.parse(A._props.availableDimensions || "[]");
+    check("A2 availableDimensions publicado para o painel", avail.length === 3 && avail[1].id === "PERIODICIDADE", avail);
+    check("A3 C1 mostra valores gravados do valuesBinding (sem setRowValues)", rowCells(A, 1).join("|") === "Conta 1|Mensal|Ana|1.593,95", rowCells(A, 1));
+    check("A4 C3 sem valor gravado mostra 'Selecionar...'", rowCells(A, 3).join("|") === "Conta 3|Selecionar...|Selecionar...|0,00", rowCells(A, 3));
+    var optsC3 = openOptions(A, 3, 0); A._closeDropdown();
+    check("A5 opções de Periodicidade = filhos do childrenBinding", optsC3.join(",") === "Mensal,Anual", optsC3);
+
+    pick(A, 1, 0, "Anual");
+    var pc = A.getPendingChanges().split("###");
+    check("A6 troca de dropdown: oldAddr com Mensal+Ana, newAddr com Anual",
+      pc.length === 1 && pc[0].split("§")[0].indexOf("[MENSAL]") !== -1 && pc[0].split("§")[0].indexOf("[ANA]") !== -1 && pc[0].split("§")[1].indexOf("[ANUAL]") !== -1, pc);
+
+    var inp = A.shadowRoot.querySelector('tr[data-row-index="1"] input');
+    inp.value = "1.234,5"; inp.dispatchEvent(new Event("change"));
+    pc = A.getPendingChanges().split("###");
+    check("A7 edição de medida pt-BR colapsa no mesmo registro (1234.5)", pc.length === 1 && pc[0].split("§")[2] === "1234.5", pc);
+
+    save(A); await tick();
+    var saved = A._events.filter(function(e) { return e.name === "onSaveRequested"; })[0];
+    check("A8 onSaveRequested traz C1 com Anual", saved && saved.detail.length === 1 && saved.detail[0].addrStr.indexOf("[ANUAL]") !== -1, saved && saved.detail);
+
+    A.clearPendingChanges();
+    save(A); await tick();
+    saved = A._events.filter(function(e) { return e.name === "onSaveRequested"; })[0];
+    check("A9 segundo save não reenvia linhas já salvas", saved && saved.detail.length === 0, saved && saved.detail);
+    check("A10 após o save C1 continua mostrando Anual", rowCells(A, 1)[1] === "Anual", rowCells(A, 1));
+
+    pick(A, 1, 1, "Bruno");
+    pc = A.getPendingChanges().split("###");
+    check("A11 próxima troca parte do valor salvo (oldAddr com Anual)", pc[0].split("§")[0].indexOf("[ANUAL]") !== -1, pc);
+
+    // ── B ─────────────────────────────────────────────────────────
+    var B = document.getElementById("wB");
+    setup(B, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE"], debugMode: false },
+      dataBindings: M.dataBindings()
+    });
+    await tick(60);
+    check("B1 só Periodicidade vira dropdown", B.shadowRoot.querySelectorAll('tr[data-row-index="1"] .cell-dropdown').length === 1);
+    var optsB = openOptions(B, 1, 0); B._closeDropdown();
+    check("B2 opções vêm do getMembers(), sem o nó pai", optsB.join(",") === "Mensal,Trimestral,Anual", optsB);
+
+    // ── C ─────────────────────────────────────────────────────────
+    var C = document.getElementById("wC");
+    setup(C, { childrenBinding: M.childrenBinding() });
+    C.setRowValues(JSON.stringify({ "[CONTA].[H1].&[C2]": "[CONTA].[H1].&[C2]|" + M.PER + "[MENSAL]|" + M.RESP + "[BRUNO]" }));
+    await tick();
+    check("C1 legado: setRowValues continua funcionando", rowCells(C, 2).join("|") === "Conta 2|MENSAL|BRUNO|50,00", rowCells(C, 2));
+    var optsLeg = openOptions(C, 2, 0); C._closeDropdown();
+    check("C2 legado: opções acham os filhos pelo nó do binding", optsLeg.join(",") === "Mensal,Anual", optsLeg);
+  } catch (e) {
+    check("Erro inesperado no teste", false, String(e && e.stack || e));
+  }
+
+  var failed = results.filter(function(r) { return !r.ok; }).length;
+  var summary = document.getElementById("summary");
+  summary.textContent = failed === 0 ? "Todos os " + results.length + " testes passaram" : failed + " de " + results.length + " testes falharam";
+  summary.className = failed === 0 ? "pass" : "fail";
+  window.__results = results;
+})();
+</script>
+</body>
+</html>

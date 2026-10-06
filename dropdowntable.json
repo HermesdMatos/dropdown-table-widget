@@ -6,7 +6,7 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.12.0",
+  "version": "2.13.0",
   "webcomponents": [
     {
       "kind": "main",
@@ -35,6 +35,11 @@
     "dropdownDimensions": {
       "type": "string",
       "description": "JSON array of dimension feed IDs to render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
+      "default": "[]"
+    },
+    "availableDimensions": {
+      "type": "string",
+      "description": "Publicado pelo widget: JSON [{key,id,label}] das dimensões do binding — usado pelo painel para montar os checkboxes de Dropdowns.",
       "default": "[]"
     },
     "lastAddMemberRequest": {
@@ -442,8 +447,22 @@
       "feeds": [
         {
           "id": "dimensions",
-          "description": "Dimensions at child level — used to populate dropdown options",
+          "description": "Opções do dropdown: dimensões de dropdown com seus membros-filho (sem medidas). Configure no Builder.",
           "type": "dimension"
+        }
+      ]
+    },
+    "valuesBinding": {
+      "feeds": [
+        {
+          "id": "dimensions",
+          "description": "Valores gravados (substitui a tabela espelho/setRowValues): 1ª dimensão = conta (igual ao binding principal), depois as dimensões de dropdown no nível folha",
+          "type": "dimension"
+        },
+        {
+          "id": "measures",
+          "description": "Medida usada para identificar a combinação gravada (maior valor por conta)",
+          "type": "mainStructureMember"
         }
       ]
     }
