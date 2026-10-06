@@ -9,7 +9,8 @@ const lib = require("./lib");
 
 async function main() {
   lib.assertCommitted([lib.MAIN_FILE, lib.STYLE_FILE]);
-  const sha = lib.resolveRef("HEAD");
+  // Último commit que alterou o widget/painel: o JSON não muda ao commitar só o próprio JSON
+  const sha = lib.git(["log", "-1", "--format=%H", "--", lib.MAIN_FILE, lib.STYLE_FILE]).toString().trim();
   const base = lib.readJson("dropdowntable.json");
 
   const dev = JSON.parse(JSON.stringify(base));
