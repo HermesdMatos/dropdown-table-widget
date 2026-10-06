@@ -84,6 +84,7 @@
             .dd-dims { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
             .dd-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
             .dd-empty { font-size: 11px; color: #999; font-style: italic; }
+            .rule-box { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 8px; }
         </style>
         <form id="form">
             <fieldset>
@@ -358,6 +359,20 @@
                 <label class="dd-check"><input type="checkbox" id="style_debug_mode"> Modo diagnóstico (logs no console)</label>
             </fieldset>
 
+            <fieldset>
+                <legend>Gravação (Salvar)</legend>
+                <div class="dd-hint">Hierarquias da tabela usada no setUserInput — uma por linha: DIMENSAO=HIERARQUIA</div>
+                <textarea id="style_write_hierarchies" class="rule-box" rows="4" placeholder="PERIODICIDADE=Periodos_H1"></textarea>
+                <div class="dd-hint">Membros que não recebem valor (gravam vazio) — DIMENSAO=MEMBRO1;MEMBRO2</div>
+                <textarea id="style_no_value_members" class="rule-box" rows="2" placeholder="RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL"></textarea>
+                <table>
+                    <tr>
+                        <td>Valor para apagar (vazio = null)</td>
+                        <td><input id="style_delete_value" type="text" placeholder="vazio"></td>
+                    </tr>
+                </table>
+            </fieldset>
+
             <button type="button" id="apply_styles" class="apply-button">✓ Aplicar</button>
             <input type="submit" style="display:none;">
         </form>
@@ -422,6 +437,9 @@
             this._ddDimsContainer = this._shadowRoot.getElementById("dd_dims");
             this._debugModeInput  = this._shadowRoot.getElementById("style_debug_mode");
             this._emptyDefaultInput = this._shadowRoot.getElementById("style_empty_default");
+            this._writeHierInput    = this._shadowRoot.getElementById("style_write_hierarchies");
+            this._noValueInput      = this._shadowRoot.getElementById("style_no_value_members");
+            this._deleteValueInput  = this._shadowRoot.getElementById("style_delete_value");
             this._availableDims   = [];  // [{key, id, label}] publicado pelo widget
             this._ddSelected      = [];  // IDs reais das dimensões marcadas
             this._renderDropdownDims();
@@ -509,7 +527,10 @@
                             titleAlign:        this._titleAlign,
                             dropdownDimensions: this._ddSelected.slice(),
                             debugMode:          this._debugModeInput.checked,
-                            emptyDefaultLabel:  this._emptyDefaultInput.value
+                            emptyDefaultLabel:  this._emptyDefaultInput.value,
+                            writeHierarchies:   this._writeHierInput.value,
+                            noValueMembers:     this._noValueInput.value,
+                            deleteValue:        this._deleteValueInput.value
                         })
                     }
                 }
@@ -559,6 +580,9 @@
                 if (Array.isArray(cfg.dropdownDimensions)) { this._ddSelected = cfg.dropdownDimensions.slice(); this._renderDropdownDims(); }
                 if (cfg.debugMode !== undefined) { this._debugModeInput.checked = !!cfg.debugMode; }
                 if (cfg.emptyDefaultLabel !== undefined) { this._emptyDefaultInput.value = cfg.emptyDefaultLabel; }
+                if (cfg.writeHierarchies !== undefined)  { this._writeHierInput.value = cfg.writeHierarchies; }
+                if (cfg.noValueMembers !== undefined)    { this._noValueInput.value = cfg.noValueMembers; }
+                if (cfg.deleteValue !== undefined)       { this._deleteValueInput.value = cfg.deleteValue; }
             } catch(ex) {}
         }
 

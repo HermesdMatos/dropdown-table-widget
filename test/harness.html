@@ -29,6 +29,8 @@
 <div class="widget-box"><dropdowntable-widget id="wF" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>G — conta sem valor inicia com NÃO APLICÁVEL</h2>
 <div class="widget-box"><dropdowntable-widget id="wG" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>H — lista de gravação (substitui o script de save)</h2>
+<div class="widget-box"><dropdowntable-widget id="wH" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -190,6 +192,46 @@
     check("G4 medida digitada nessa conta grava no endereço NÃO APLICÁVEL", G.getPendingChanges().indexOf("[NA]") !== -1, G.getPendingChanges());
     G.styleConfig = JSON.stringify({ emptyDefaultLabel: "" });
     check("G5 valor inicial vazio no painel volta para 'Selecionar...'", rowCells(G, 4)[1] === "Selecionar...", rowCells(G, 4));
+
+    // ── H ─────────────────────────────────────────────────────────
+    // Lista de gravação: substitui a lógica do script onSaveRequested
+    var H = document.getElementById("wH");
+    setup(H, {
+      styleConfig: {
+        writeHierarchies: "PERIODICIDADE=Periodos_H1\nRESPONSAVEL=H1_RESPONSABILIDADE",
+        noValueMembers: "RESPONSAVEL=CLIENTE;Ana"
+      },
+      mainBinding: M.mainBindingWithBookedLeaves()
+    });
+    await tick();
+    function writes(w) {
+      var n = w.getWriteCount(), out = [];
+      for (var i = 0; i < n; i++) {
+        var sel = {};
+        for (var d = 0; d < w.getWriteDimensionCount(i); d++) { sel[w.getWriteDimensionId(i, d)] = w.getWriteMemberId(i, d); }
+        out.push({ sel: sel, measure: w.getWriteMeasureId(i), value: w.getWriteValue(i) });
+      }
+      return out;
+    }
+    pick(H, 2, 0, "Anual");                       // Conta 2: Mensal → Anual (valor 50)
+    var hw = writes(H);
+    check("H1 troca de dropdown: apaga o endereço antigo (valor vazio = null) e grava 50 no novo", hw.length === 2
+      && hw[0].sel.PERIODICIDADE === "[PERIODICIDADE].[Periodos_H1].&[MENSAL]" && hw[0].value === ""
+      && hw[1].sel.PERIODICIDADE === "[PERIODICIDADE].[Periodos_H1].&[ANUAL]" && hw[1].value === "50"
+      && hw[1].sel.RESPONSAVEL === "[RESPONSAVEL].[H1_RESPONSABILIDADE].&[BRUNO]" && hw[1].measure === "CUSTO", hw);
+    var hIn = H.shadowRoot.querySelector('tr[data-row-index="2"] input');
+    hIn.value = ""; hIn.dispatchEvent(new Event("change"));
+    hw = writes(H);
+    check("H2 célula apagada grava vazio (null), sem duplicar o endereço", hw.length === 2 && hw[1].value === "", hw);
+    var hIn1 = H.shadowRoot.querySelector('tr[data-row-index="1"] input');
+    hIn1.value = "7"; hIn1.dispatchEvent(new Event("change"));
+    hw = writes(H);
+    check("H3 membro configurado como 'não recebe valor' (Ana) grava vazio", hw.length === 3 && hw[2].sel.RESPONSAVEL.indexOf("[ANA]") !== -1 && hw[2].value === "", hw);
+    var hIn3 = H.shadowRoot.querySelector('tr[data-row-index="3"] input');
+    hIn3.value = "9"; hIn3.dispatchEvent(new Event("change"));
+    check("H4 endereço incompleto (conta sem dimensões) fica fora da gravação", writes(H).length === 3, writes(H));
+    H.styleConfig = JSON.stringify({ deleteValue: "0" });
+    check("H5 valor para apagar configurável (ex: 0)", writes(H)[0].value === "0", writes(H));
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

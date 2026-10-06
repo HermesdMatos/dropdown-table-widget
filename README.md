@@ -21,21 +21,42 @@ Custom widget de planejamento: tabela com medidas editáveis e dimensões escolh
 
 ### Único script necessário: salvar
 
-No evento `onSaveRequested` do widget:
+O `setUserInput` só existe no planejamento de uma **Tabela** (a API de custom widget não grava), então a chamada de gravação continua na story. Toda a regra fica no widget e é configurada no **painel → Gravação**:
+
+- **Hierarquias** da tabela de gravação, uma por linha: `PERIODICIDADE=Periodos_H1`
+- **Membros que não recebem valor**: `RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL` (gravam "apagar")
+- **Valor para apagar**: vazio = null (padrão). Usado no endereço antigo quando a combinação muda, em células apagadas e nos membros acima.
+
+O widget também converte o número pt-BR, resolve o ID da medida, remove duplicatas e descarta endereços incompletos. No evento `onSaveRequested`:
 
 ```javascript
-var raw = dropdowntable_1.getPendingChanges();   // "oldAddr§newAddr§valor§medida###..."
-if (raw === "") { return; }
-var records = raw.split("###");
-for (var i = 0; i < records.length; i++) {
-    var f = records[i].split("§");               // f[0]=oldAddr f[1]=newAddr f[2]=valor f[3]=medida
-    // Endereço: "DIM|~|[DIM].[H].&[ID]|||DIM2|~|...". Se oldAddr != newAddr, a combinação mudou:
-    // zere o valor em oldAddr e grave f[2] em newAddr (mesma lógica de gravação usada hoje).
+Application.showBusyIndicator("Salvando os dados");
+var n = dropdowntable_1.getWriteCount();
+if (n === 0) {
+    Application.hideBusyIndicator();
+    Application.showMessage(ApplicationMessageType.Info, "Nenhuma alteração pendente.");
+    return;
 }
-dropdowntable_1.clearPendingChanges();           // só depois de gravar com sucesso
+var hasError = false;
+for (var i = 0; i < n; i++) {
+    var sel = {};
+    for (var d = 0; d < dropdowntable_1.getWriteDimensionCount(i); d++) {
+        sel[dropdowntable_1.getWriteDimensionId(i, d)] = dropdowntable_1.getWriteMemberId(i, d);
+    }
+    sel["@MeasureDimension"] = dropdowntable_1.getWriteMeasureId(i);
+    if (!Table_1.getPlanning().setUserInput(sel, dropdowntable_1.getWriteValue(i))) { hasError = true; }
+}
+Table_1.getPlanning().submitData();
+dropdowntable_1.clearPendingChanges();
+Application.hideBusyIndicator();
+if (hasError) {
+    Application.showMessage(ApplicationMessageType.Warning, "Salvo com avisos — verifique os valores na tabela");
+} else {
+    Application.showMessage(ApplicationMessageType.Success, "Alterações salvas com sucesso.");
+}
 ```
 
-`valor` vem canônico (`1593.95`); vazio = célula apagada.
+Com o **modo diagnóstico** ligado, o console mostra a lista montada (`[DropdownTable] Gravação`) e o que foi descartado.
 
 ## Desenvolvimento
 

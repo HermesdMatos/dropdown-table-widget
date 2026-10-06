@@ -386,6 +386,76 @@
       "description": "Retorna o índice da linha da última medida alterada.",
       "parameters": [],
       "body": "return this.measureChangeRowIndex || '';"
+    },
+    "getWriteCount": {
+      "returnType": "integer",
+      "description": "Monta a lista de gravação a partir das alterações pendentes (hierarquias, apagar endereço antigo, membros sem valor, sem duplicatas) e retorna quantos setUserInput fazer.",
+      "parameters": []
+    },
+    "getWriteDimensionCount": {
+      "returnType": "integer",
+      "description": "Quantidade de dimensões da gravação i.",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        }
+      ]
+    },
+    "getWriteDimensionId": {
+      "returnType": "string",
+      "description": "ID da dimensão d da gravação i (chave do objeto de seleção).",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        },
+        {
+          "name": "d",
+          "type": "integer",
+          "description": "Índice da dimensão"
+        }
+      ]
+    },
+    "getWriteMemberId": {
+      "returnType": "string",
+      "description": "ID do membro da dimensão d da gravação i, na hierarquia configurada no painel.",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        },
+        {
+          "name": "d",
+          "type": "integer",
+          "description": "Índice da dimensão"
+        }
+      ]
+    },
+    "getWriteMeasureId": {
+      "returnType": "string",
+      "description": "ID da medida da gravação i (para @MeasureDimension).",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        }
+      ]
+    },
+    "getWriteValue": {
+      "returnType": "string",
+      "description": "Valor da gravação i. Apagar = valor configurado no painel (padrão vazio = null).",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        }
+      ]
     }
   },
   "events": {

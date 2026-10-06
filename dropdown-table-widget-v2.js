@@ -442,6 +442,11 @@ class DropdownTableWidget extends HTMLElement {
     this._explicitDropdownDims = []; // styleConfig.dropdownDimensions (painel)
     this._debugMode = false;
     this._emptyDefaultLabel = "NÃO APLICAVEL"; // membro inicial quando a célula não tem valor
+    // Regras de gravação (painel → Gravação) — substituem a lógica do script onSaveRequested
+    this._writeHierarchies = {}; // {DIM: "HIERARQUIA"} da tabela usada no setUserInput
+    this._noValueMembers = {};   // {DIM: ["CLIENTE", ...]} membros que gravam "apagar"
+    this._deleteValue = "";      // valor enviado para apagar (null) a célula
+    this._writes = [];           // lista montada por getWriteCount()
     this._availableDimensions = "[]";
     this._dataFingerprint = undefined;
     this._oldRowAddrStr = "";
@@ -1061,6 +1066,9 @@ class DropdownTableWidget extends HTMLElement {
       }
       if (cfg.debugMode !== undefined) { this._debugMode = !!cfg.debugMode; }
       if (cfg.emptyDefaultLabel !== undefined) { this._emptyDefaultLabel = String(cfg.emptyDefaultLabel || ""); }
+      if (cfg.writeHierarchies !== undefined) { this._writeHierarchies = this._parseRuleLines(cfg.writeHierarchies, false); }
+      if (cfg.noValueMembers   !== undefined) { this._noValueMembers   = this._parseRuleLines(cfg.noValueMembers, true); }
+      if (cfg.deleteValue      !== undefined) { this._deleteValue      = String(cfg.deleteValue); }
       if (cfg.groupHeaderBg    !== undefined) { this.style.setProperty("--group-header-bg",    cfg.groupHeaderBg); }
       if (cfg.groupHeaderColor !== undefined) { this.style.setProperty("--group-header-color", cfg.groupHeaderColor); }
       if (cfg.subheaderBg      !== undefined) { this.style.setProperty("--subheader-bg",       cfg.subheaderBg); }
@@ -1156,6 +1164,120 @@ class DropdownTableWidget extends HTMLElement {
   getMeasureChangeRowIndex()  { return this._measureChangeRowIndex  || ""; }
   getMeasureChangeAddrStr()   { return this._measureChangeAddrStr   || ""; }
   getPendingChanges()         { return this._serializePendingChanges(this._pendingChanges); }
+
+  // ─── Gravação: lista pronta para Table.getPlanning().setUserInput() ──────────
+  // Substitui a lógica do script onSaveRequested. O script só percorre a lista:
+  //   var n = widget.getWriteCount();
+  //   for (i < n) { sel[widget.getWriteDimensionId(i, d)] = widget.getWriteMemberId(i, d) ...;
+  //                 sel["@MeasureDimension"] = widget.getWriteMeasureId(i);
+  //                 Table.getPlanning().setUserInput(sel, widget.getWriteValue(i)); }
+
+  // "DIM=VALOR" por linha. multi: VALOR com vários itens separados por ";"
+  _parseRuleLines(text, multi) {
+    var out = {};
+    var lines = String(text || "").split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      var eq = line.indexOf("=");
+      if (eq <= 0) { continue; }
+      var key = line.substring(0, eq).trim();
+      var val = line.substring(eq + 1).trim();
+      if (!key || !val) { continue; }
+      if (multi) {
+        var items = val.split(";");
+        out[key] = [];
+        for (var j = 0; j < items.length; j++) {
+          if (items[j].trim()) { out[key].push(items[j].trim()); }
+        }
+      } else {
+        out[key] = val;
+      }
+    }
+    return out;
+  }
+
+  // "DIM|~|[DIM].[H].&[ID]|||..." → [{dim, member}] com a hierarquia da tabela de gravação
+  _addrToPairs(addrStr) {
+    var pairs = [];
+    var parts = String(addrStr || "").split("|||");
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i].trim();
+      var sep = p.indexOf("|~|");
+      if (sep === -1) { continue; }
+      var dim = p.substring(0, sep).trim();
+      var mem = p.substring(sep + 3).trim();
+      if (!dim || !mem) { continue; }
+      var hier = this._writeHierarchies[dim];
+      if (hier && mem.indexOf(".&[") !== -1) {
+        mem = "[" + dim + "].[" + hier + "].&[" + this._cleanMemberId(mem) + "]";
+      }
+      pairs.push({ dim: dim, member: mem });
+    }
+    return pairs;
+  }
+
+  _pairsKey(pairs) {
+    var keys = [];
+    for (var i = 0; i < pairs.length; i++) { keys.push(pairs[i].dim + "=" + pairs[i].member); }
+    keys.sort();
+    return keys.join("|");
+  }
+
+  // Membro configurado como "não recebe valor" (ex: RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL)
+  _isNoValueAddress(pairs) {
+    for (var i = 0; i < pairs.length; i++) {
+      var rule = this._noValueMembers[pairs[i].dim];
+      if (!rule) { continue; }
+      var memNorm = this._normalizeLabel(this._cleanMemberId(pairs[i].member));
+      for (var j = 0; j < rule.length; j++) {
+        if (this._normalizeLabel(rule[j]) === memNorm) { return true; }
+      }
+    }
+    return false;
+  }
+
+  _buildWriteList() {
+    var writes = [];
+    var index = {};
+    var self = this;
+    var required = this._metadata && this._metadata.feeds ? this._metadata.feeds.dimensions.values.length : 0;
+    var skipped = [];
+
+    function put(pairs, measureId, value, onlyIfAbsent) {
+      if (pairs.length < required) { skipped.push({ pairs: pairs, measureId: measureId }); return; }
+      var key = measureId + "||" + self._pairsKey(pairs);
+      if (index[key] !== undefined) {
+        if (!onlyIfAbsent) { writes[index[key]].value = value; }
+        return;
+      }
+      index[key] = writes.length;
+      writes.push({ pairs: pairs, measureId: measureId, value: value });
+    }
+
+    for (var i = 0; i < (this._pendingChanges || []).length; i++) {
+      var ch = this._pendingChanges[i];
+      var mId = ch.measureId || "";
+      if (/^measures_\d+$/.test(mId)) { mId = this._getMeasureIdByKey(mId); }
+      var oldPairs = this._addrToPairs(ch.oldAddr);
+      var newPairs = this._addrToPairs(ch.newAddr);
+      // Combinação mudou: apaga o endereço antigo (sem sobrescrever um valor novo já gravado nele)
+      if (ch.oldAddr && ch.oldAddr !== ch.newAddr && oldPairs.length > 0) {
+        put(oldPairs, mId, this._deleteValue, true);
+      }
+      var value = ch.value === undefined || ch.value === null ? "" : String(ch.value).trim();
+      if (value === "" || this._isNoValueAddress(newPairs)) { value = this._deleteValue; }
+      put(newPairs, mId, value, false);
+    }
+    this._debugLog("Gravação", { writes: writes, ignoradasPorEnderecoIncompleto: skipped });
+    return writes;
+  }
+
+  getWriteCount()                 { this._writes = this._buildWriteList(); return this._writes.length; }
+  getWriteDimensionCount(i)       { var w = this._writes[i]; return w ? w.pairs.length : 0; }
+  getWriteDimensionId(i, d)       { var w = this._writes[i]; return w && w.pairs[d] ? w.pairs[d].dim : ""; }
+  getWriteMemberId(i, d)          { var w = this._writes[i]; return w && w.pairs[d] ? w.pairs[d].member : ""; }
+  getWriteMeasureId(i)            { var w = this._writes[i]; return w ? w.measureId : ""; }
+  getWriteValue(i)                { var w = this._writes[i]; return w ? w.value : ""; }
   clearPendingChanges() {
     this._pendingChanges = [];
     this._localData = {};
