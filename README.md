@@ -24,7 +24,7 @@ Custom widget de planejamento: tabela com medidas editáveis e dimensões escolh
 O `setUserInput` só existe no planejamento de uma **Tabela** (a API de custom widget não grava), então a chamada de gravação continua na story. Toda a regra fica no widget e é configurada no **painel → Gravação**:
 
 - **Hierarquias** da tabela de gravação, uma por linha: `PERIODICIDADE=Periodos_H1`
-- **Membros que não recebem valor**: `RESPONSABILIDADE=CLIENTE` — as medidas da linha travam mostrando 0 e gravam 0
+- **Membros que não recebem valor**: padrão `RESPONSABILIDADE=CLIENTE` (campo vazio = padrão) — todas as medidas da linha travam mostrando 0 e gravam 0, inclusive as que estavam vazias. Compara pelo ID e pela descrição do membro
 - **Valor para apagar**: `0` (padrão). Usado no endereço antigo quando a combinação muda, em células apagadas e nos membros acima. O `setUserInput` recusa vazio ("Preenchimento obrigatório"); para null de verdade seria preciso uma Data Action que apague os zeros depois do save.
 
 ### Regras de negócio aplicadas pelo widget

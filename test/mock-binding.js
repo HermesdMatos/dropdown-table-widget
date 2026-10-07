@@ -142,5 +142,39 @@
     return b;
   }
 
-  window.DTMock = { mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, mainBindingWithParentLevels: mainBindingWithParentLevels, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
+  // Como o modelo real: dimensão RESPONSABILIDADE, medidas QTDE e CUSTO; o membro CLIENTE tem
+  // ID técnico diferente da descrição ("CLI"). Conta 1 tem só QTDE preenchida.
+  function twoMeasuresScenario() {
+    var R = "[RESPONSABILIDADE].[H1].&";
+    var perNode = cell(PER + "[PER_ALL]", "Periodos");
+    var respNode = cell(R + "[RESP_ALL]", "RESPONSAVEL");
+    var c1 = cell(CONTA + "[C1]", "Conta 1", CONTA + "[ROOT]");
+    var binding = {
+      state: "success",
+      metadata: {
+        feeds: { dimensions: { values: ["dimensions_0", "dimensions_1", "dimensions_2"] }, measures: { values: ["measures_0", "measures_1"] } },
+        dimensions: { dimensions_0: { id: "CONTA" }, dimensions_1: { id: "PERIODICIDADE" }, dimensions_2: { id: "RESPONSABILIDADE" } },
+        mainStructureMembers: { measures_0: { id: "QTDE", label: "Quantidade" }, measures_1: { id: "CUSTO", label: "Custo" } }
+      },
+      data: [
+        { dimensions_0: cell(CONTA + "[ROOT]", "Contas"), dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(null, ""), measures_1: measure(null, "") },
+        { dimensions_0: c1, dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(2, "2"), measures_1: measure(null, "") },
+        { dimensions_0: c1, dimensions_1: cell(PER + "[MENSAL]", "Mensal", PER + "[PER_ALL]"), dimensions_2: cell(R + "[ANA]", "Ana", R + "[RESP_ALL]"), measures_0: measure(2, "2"), measures_1: measure(null, "") }
+      ]
+    };
+    var members = {
+      PERIODICIDADE: [{ id: PER + "[MENSAL]", description: "Mensal" }, { id: PER + "[NA]", description: "NÃO APLICÁVEL" }],
+      RESPONSABILIDADE: [{ id: R + "[ANA]", description: "Ana" }, { id: R + "[CLI]", description: "CLIENTE" }, { id: R + "[NA]", description: "NÃO APLICÁVEL" }]
+    };
+    var dbs = {
+      getDataBinding: function() {
+        return Promise.resolve({ getDataSource: function() {
+          return Promise.resolve({ getMembers: function(dimId) { return Promise.resolve(members[dimId] || []); } });
+        } });
+      }
+    };
+    return { binding: binding, dataBindings: dbs, R: R };
+  }
+
+  window.DTMock = { twoMeasuresScenario: twoMeasuresScenario, mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, mainBindingWithParentLevels: mainBindingWithParentLevels, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
 })();

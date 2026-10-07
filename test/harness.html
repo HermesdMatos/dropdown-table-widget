@@ -33,6 +33,8 @@
 <div class="widget-box"><dropdowntable-widget id="wH" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>I — regras de negócio (bloqueios, falha no save, avisos)</h2>
 <div class="widget-box"><dropdowntable-widget id="wI" style="display:block;width:900px;height:240px"></dropdowntable-widget></div>
+<h2>J — Responsabilidade CLIENTE com QTDE e CUSTO</h2>
+<div class="widget-box"><dropdowntable-widget id="wJ" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -279,6 +281,28 @@
     iNew.data[3].measures_0 = { raw: 555, formattedValue: "555,00" };
     I.myDataBinding = iNew; I.onCustomWidgetAfterUpdate({ myDataBinding: iNew });
     check("I9 troca de contexto com pendências: aviso de descarte", iNotice.textContent.indexOf("descartada") !== -1 && I._pendingChanges.length === 0, iNotice.textContent);
+
+    // ── J ─────────────────────────────────────────────────────────
+    // CLIENTE: regra padrão (sem painel), ID ≠ descrição, todas as medidas vão a 0
+    var J = document.getElementById("wJ");
+    var jS = M.twoMeasuresScenario();
+    setup(J, { mainBinding: jS.binding, dataBindings: jS.dataBindings });
+    await tick(80);
+    pick(J, 2, 1, "CLIENTE");
+    var jInputs = J.shadowRoot.querySelectorAll('tr[data-row-index="2"] input');
+    check("J1 CLIENTE (sem configurar painel): QTDE e CUSTO travados mostrando 0",
+      jInputs.length === 2 && jInputs[0].disabled && jInputs[1].disabled && jInputs[0].value === "0" && jInputs[1].value === "0",
+      Array.prototype.map.call(jInputs, function(i) { return i.value + (i.disabled ? "(trav)" : ""); }));
+    var jN = J.getWriteCount(), jW = [];
+    for (var jk = 0; jk < jN; jk++) {
+      var jResp = "";
+      for (var jd = 0; jd < J.getWriteDimensionCount(jk); jd++) {
+        if (J.getWriteDimensionId(jk, jd) === "RESPONSABILIDADE") { jResp = J.getWriteMemberId(jk, jd); }
+      }
+      jW.push(jResp.replace(jS.R, "") + ":" + J.getWriteMeasureId(jk) + "=" + J.getWriteValue(jk));
+    }
+    check("J2 grava 0 em QTDE e CUSTO no CLIENTE e zera só a QTDE que existia em Ana",
+      jW.length === 3 && jW.indexOf("[CLI]:QTDE=0") !== -1 && jW.indexOf("[CLI]:CUSTO=0") !== -1 && jW.indexOf("[ANA]:QTDE=0") !== -1, jW);
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

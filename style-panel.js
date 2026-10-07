@@ -363,8 +363,8 @@
                 <legend>Gravação (Salvar)</legend>
                 <div class="dd-hint">Hierarquias da tabela usada no setUserInput — uma por linha: DIMENSAO=HIERARQUIA</div>
                 <textarea id="style_write_hierarchies" class="rule-box" rows="4" placeholder="PERIODICIDADE=Periodos_H1"></textarea>
-                <div class="dd-hint">Membros que não recebem valor (gravam vazio) — DIMENSAO=MEMBRO1;MEMBRO2</div>
-                <textarea id="style_no_value_members" class="rule-box" rows="2" placeholder="RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL"></textarea>
+                <div class="dd-hint">Membros que gravam 0 em todas as medidas (trava a linha) — DIMENSAO=MEMBRO1;MEMBRO2. Vazio = RESPONSABILIDADE=CLIENTE</div>
+                <textarea id="style_no_value_members" class="rule-box" rows="2" placeholder="RESPONSABILIDADE=CLIENTE">RESPONSABILIDADE=CLIENTE</textarea>
                 <table>
                     <tr>
                         <td>Valor para apagar</td>

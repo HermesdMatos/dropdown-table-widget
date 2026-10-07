@@ -456,7 +456,8 @@ class DropdownTableWidget extends HTMLElement {
     this._emptyDefaultLabel = "NÃO APLICAVEL"; // membro inicial quando a célula não tem valor
     // Regras de gravação (painel → Gravação) — substituem a lógica do script onSaveRequested
     this._writeHierarchies = {}; // {DIM: "HIERARQUIA"} da tabela usada no setUserInput
-    this._noValueMembers = {};   // {DIM: ["CLIENTE", ...]} membros que gravam "apagar"
+    // {DIM: ["CLIENTE", ...]} membros que gravam 0 em todas as medidas (padrão: responsabilidade do cliente)
+    this._noValueMembers = { RESPONSABILIDADE: ["CLIENTE"] };
     this._deleteValue = "0";     // valor enviado para "apagar" — setUserInput recusa vazio (Preenchimento obrigatório)
     this._writes = [];           // lista montada por getWriteCount()
     this._availableDimensions = "[]";
@@ -1097,7 +1098,13 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.debugMode !== undefined) { this._debugMode = !!cfg.debugMode; }
       if (cfg.emptyDefaultLabel !== undefined) { this._emptyDefaultLabel = String(cfg.emptyDefaultLabel || ""); }
       if (cfg.writeHierarchies !== undefined) { this._writeHierarchies = this._parseRuleLines(cfg.writeHierarchies, false); }
-      if (cfg.noValueMembers   !== undefined) { this._noValueMembers   = this._parseRuleLines(cfg.noValueMembers, true); }
+      if (cfg.noValueMembers   !== undefined) {
+        var nvm = this._parseRuleLines(cfg.noValueMembers, true);
+        var nvmAny = false;
+        for (var nvk in nvm) { nvmAny = true; break; }
+        // Campo vazio no painel = regra padrão (responsabilidade do cliente grava 0)
+        this._noValueMembers = nvmAny ? nvm : { RESPONSABILIDADE: ["CLIENTE"] };
+      }
       if (cfg.deleteValue      !== undefined) { this._deleteValue      = String(cfg.deleteValue); }
       if (cfg.groupHeaderBg    !== undefined) { this.style.setProperty("--group-header-bg",    cfg.groupHeaderBg); }
       if (cfg.groupHeaderColor !== undefined) { this.style.setProperty("--group-header-color", cfg.groupHeaderColor); }
@@ -1256,19 +1263,54 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   // Membro configurado como "não recebe valor" (ex: RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL)
+  // Compara pelo ID e pela descrição do membro (o ID técnico pode não ser o texto "CLIENTE")
   _isNoValueAddress(pairs) {
     for (var i = 0; i < pairs.length; i++) {
       var rule = this._noValueMembers[pairs[i].dim];
       if (!rule) { continue; }
-      var memNorm = this._normalizeLabel(this._cleanMemberId(pairs[i].member));
+      var idNorm = this._normalizeLabel(this._cleanMemberId(pairs[i].member));
+      var labelNorm = this._normalizeLabel(this._memberLabel(pairs[i].dim, pairs[i].member));
       for (var j = 0; j < rule.length; j++) {
-        if (this._normalizeLabel(rule[j]) === memNorm) { return true; }
+        var ruleNorm = this._normalizeLabel(rule[j]);
+        if (ruleNorm === idNorm || (labelNorm && ruleNorm === labelNorm)) { return true; }
       }
     }
     return false;
   }
 
+  // Descrição de um membro (dimensão pelo ID real) a partir das opções e seleções conhecidas.
+  // Índice em cache por render; a hierarquia do ID é ignorada (compara o ID limpo).
+  _memberLabel(dimRealId, memberId) {
+    if (!this._memberLabelIndex) { this._memberLabelIndex = {}; }
+    var idx = this._memberLabelIndex[dimRealId];
+    if (!idx) {
+      idx = {};
+      var count = this._metadata && this._metadata.feeds ? this._metadata.feeds.dimensions.values.length : 0;
+      for (var i = 1; i < count; i++) {
+        var key = "dimensions_" + i;
+        if (this._dimRealId(key) !== dimRealId) { continue; }
+        var add = function(id, label) { if (id && label) { idx[this._cleanMemberId(id)] = label; } }.bind(this);
+        var opts = this._resolveDropdownOptions(key, [], null);
+        for (var o = 0; o < opts.length; o++) { add(opts[o].value, opts[o].label); }
+        var sources = [this._bindingLeaves && this._bindingLeaves[key], this._valuesLeaves && this._valuesLeaves[key]];
+        for (var s = 0; s < sources.length; s++) { for (var sid in (sources[s] || {})) { add(sid, sources[s][sid]); } }
+        var cfb = this._childrenFromBinding && this._childrenFromBinding[key];
+        for (var p in (cfb || {})) { for (var c = 0; c < cfb[p].length; c++) { add(cfb[p][c].value, cfb[p][c].label); } }
+        var selSets = [this._localSelections, this._savedSelections];
+        for (var ss = 0; ss < selSets.length; ss++) {
+          for (var acc in (selSets[ss] || {})) {
+            var sel = selSets[ss][acc][key];
+            if (sel) { add(sel.id, sel.label); }
+          }
+        }
+      }
+      this._memberLabelIndex[dimRealId] = idx;
+    }
+    return idx[this._cleanMemberId(memberId)] || "";
+  }
+
   _buildWriteList() {
+    this._memberLabelIndex = {}; // seleções novas desde o último render
     var writes = [];
     var index = {};
     var self = this;
@@ -2390,6 +2432,7 @@ class DropdownTableWidget extends HTMLElement {
   _render() {
     var self      = this;
     this._defaultMemberCache = {}; // opções podem ter mudado (binding, getMembers, painel)
+    this._memberLabelIndex = {};
     var headerRow = this.shadowRoot.getElementById("dt-header");
     var tbody     = this.shadowRoot.getElementById("dt-body");
     var emptyMsg  = this.shadowRoot.getElementById("dt-empty");
@@ -3186,6 +3229,12 @@ class DropdownTableWidget extends HTMLElement {
     // "apagar" na combinação nova para guardá-la) sem zerar a combinação antiga, que não existe.
     var movedAny = false;
     var firstMeasureId = "";
+    // Destino é um membro sem valor (ex: CLIENTE): todas as medidas gravam 0, inclusive as vazias
+    this._memberLabelIndex = {};
+    var targetObj = this._buildRowAddrObj(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
+    var targetPairs = [];
+    for (var tk in targetObj) { targetPairs.push({ dim: tk, member: targetObj[tk] }); }
+    var noValueTarget = this._isNoValueAddress(targetPairs);
     for (var pmk = 0; pmk < pendingMeasureKeys.length; pmk++) {
       var pendingMeasureKey = pendingMeasureKeys[pmk];
       var pendingMeasureId = this._getMeasureIdByKey(pendingMeasureKey);
@@ -3194,7 +3243,17 @@ class DropdownTableWidget extends HTMLElement {
       var currentValue = this._getRowMeasureValue(rowIndex, pendingMeasureKey);
       // Fallback: _originalData via oldRowAddrStr
       if (currentValue === "") { currentValue = this._toCanonicalNumber(this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId)); }
-      if (currentValue === "") { continue; }
+      if (currentValue === "") {
+        if (noValueTarget) {
+          this._addPendingChange({
+            type: "dropdown", rowIndex: rowIndex, noMove: true,
+            oldAddr: this._oldRowAddrStr, newAddr: this._newRowAddrStr,
+            value: "", measureId: pendingMeasureId
+          });
+          movedAny = true;
+        }
+        continue;
+      }
       this._setLocalCellValue(this._newRowAddrStr, pendingMeasureId, currentValue);
       this._addPendingChange({
         type: "dropdown",
