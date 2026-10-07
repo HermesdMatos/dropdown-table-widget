@@ -445,7 +445,7 @@ class DropdownTableWidget extends HTMLElement {
     // Regras de gravação (painel → Gravação) — substituem a lógica do script onSaveRequested
     this._writeHierarchies = {}; // {DIM: "HIERARQUIA"} da tabela usada no setUserInput
     this._noValueMembers = {};   // {DIM: ["CLIENTE", ...]} membros que gravam "apagar"
-    this._deleteValue = "";      // valor enviado para apagar (null) a célula
+    this._deleteValue = "0";     // valor enviado para "apagar" — setUserInput recusa vazio (Preenchimento obrigatório)
     this._writes = [];           // lista montada por getWriteCount()
     this._availableDimensions = "[]";
     this._dataFingerprint = undefined;

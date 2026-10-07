@@ -367,8 +367,8 @@
                 <textarea id="style_no_value_members" class="rule-box" rows="2" placeholder="RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL"></textarea>
                 <table>
                     <tr>
-                        <td>Valor para apagar (vazio = null)</td>
-                        <td><input id="style_delete_value" type="text" placeholder="vazio"></td>
+                        <td>Valor para apagar</td>
+                        <td><input id="style_delete_value" type="text" value="0" placeholder="0"></td>
                     </tr>
                 </table>
             </fieldset>

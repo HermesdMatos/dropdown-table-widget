@@ -25,7 +25,7 @@ O `setUserInput` só existe no planejamento de uma **Tabela** (a API de custom w
 
 - **Hierarquias** da tabela de gravação, uma por linha: `PERIODICIDADE=Periodos_H1`
 - **Membros que não recebem valor**: `RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL` (gravam "apagar")
-- **Valor para apagar**: vazio = null (padrão). Usado no endereço antigo quando a combinação muda, em células apagadas e nos membros acima.
+- **Valor para apagar**: `0` (padrão). Usado no endereço antigo quando a combinação muda, em células apagadas e nos membros acima. O `setUserInput` recusa vazio ("Preenchimento obrigatório"); para null de verdade seria preciso uma Data Action que apague os zeros depois do save.
 
 O widget também converte o número pt-BR, resolve o ID da medida, remove duplicatas e descarta endereços incompletos. No evento `onSaveRequested`:
 

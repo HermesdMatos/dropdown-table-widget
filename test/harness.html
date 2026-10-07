@@ -215,23 +215,23 @@
     }
     pick(H, 2, 0, "Anual");                       // Conta 2: Mensal → Anual (valor 50)
     var hw = writes(H);
-    check("H1 troca de dropdown: apaga o endereço antigo (valor vazio = null) e grava 50 no novo", hw.length === 2
-      && hw[0].sel.PERIODICIDADE === "[PERIODICIDADE].[Periodos_H1].&[MENSAL]" && hw[0].value === ""
+    check("H1 troca de dropdown: zera o endereço antigo e grava 50 no novo", hw.length === 2
+      && hw[0].sel.PERIODICIDADE === "[PERIODICIDADE].[Periodos_H1].&[MENSAL]" && hw[0].value === "0"
       && hw[1].sel.PERIODICIDADE === "[PERIODICIDADE].[Periodos_H1].&[ANUAL]" && hw[1].value === "50"
       && hw[1].sel.RESPONSAVEL === "[RESPONSAVEL].[H1_RESPONSABILIDADE].&[BRUNO]" && hw[1].measure === "CUSTO", hw);
     var hIn = H.shadowRoot.querySelector('tr[data-row-index="2"] input');
     hIn.value = ""; hIn.dispatchEvent(new Event("change"));
     hw = writes(H);
-    check("H2 célula apagada grava vazio (null), sem duplicar o endereço", hw.length === 2 && hw[1].value === "", hw);
+    check("H2 célula apagada grava 0, sem duplicar o endereço", hw.length === 2 && hw[1].value === "0", hw);
     var hIn1 = H.shadowRoot.querySelector('tr[data-row-index="1"] input');
     hIn1.value = "7"; hIn1.dispatchEvent(new Event("change"));
     hw = writes(H);
-    check("H3 membro configurado como 'não recebe valor' (Ana) grava vazio", hw.length === 3 && hw[2].sel.RESPONSAVEL.indexOf("[ANA]") !== -1 && hw[2].value === "", hw);
+    check("H3 membro configurado como 'não recebe valor' (Ana) grava 0", hw.length === 3 && hw[2].sel.RESPONSAVEL.indexOf("[ANA]") !== -1 && hw[2].value === "0", hw);
     var hIn3 = H.shadowRoot.querySelector('tr[data-row-index="3"] input');
     hIn3.value = "9"; hIn3.dispatchEvent(new Event("change"));
     check("H4 endereço incompleto (conta sem dimensões) fica fora da gravação", writes(H).length === 3, writes(H));
-    H.styleConfig = JSON.stringify({ deleteValue: "0" });
-    check("H5 valor para apagar configurável (ex: 0)", writes(H)[0].value === "0", writes(H));
+    H.styleConfig = JSON.stringify({ deleteValue: "-" });
+    check("H5 valor para apagar configurável no painel", writes(H)[0].value === "-", writes(H));
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

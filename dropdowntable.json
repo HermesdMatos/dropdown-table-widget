@@ -448,7 +448,7 @@
     },
     "getWriteValue": {
       "returnType": "string",
-      "description": "Valor da gravação i. Apagar = valor configurado no painel (padrão vazio = null).",
+      "description": "Valor da gravação i. Apagar = valor configurado no painel (padrão 0; o setUserInput recusa vazio).",
       "parameters": [
         {
           "name": "i",
