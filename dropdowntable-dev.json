@@ -1,6 +1,6 @@
 {
   "name": "Dropdown Table Widget (DEV)",
-  "description": "[DEV @ 75a42d8] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
+  "description": "[DEV @ 08cb117] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
   "newInstancePrefix": "dropdowntableDev",
   "eula": "",
   "vendor": "Custom",
@@ -11,14 +11,14 @@
     {
       "kind": "main",
       "tag": "dropdowntable-widget-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@75a42d8655fcbf0036ee56ab0d0b6546099d2caf/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
-      "integrity": "sha256-r9R5aUlupJwRtV/V5H05qcQBN5eLCXjHR2S36vvRXqg="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@08cb11797b1d5c03590dd8f2e977df7b3a1b9c67/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
+      "integrity": "sha256-mdvaN9hgC7dPODbbTXtdv7SNYYmfcKp6JXYkZnCQsiU="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@75a42d8655fcbf0036ee56ab0d0b6546099d2caf/style-panel.js?tag=dropdowntable-styling-dev",
-      "integrity": "sha256-qWqgNovas6YFT+lmNL9W2kgSIjJt48JtgBnKwnbP0nA="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@08cb11797b1d5c03590dd8f2e977df7b3a1b9c67/style-panel.js?tag=dropdowntable-styling-dev",
+      "integrity": "sha256-XbZOp2AkNnF0dHy4XHGuQV3Bm+9O+l2V7ai9LT/Z/aQ="
     }
   ],
   "properties": {
@@ -448,7 +448,7 @@
     },
     "getWriteValue": {
       "returnType": "string",
-      "description": "Valor da gravação i. Apagar = valor configurado no painel (padrão vazio = null).",
+      "description": "Valor da gravação i. Apagar = valor configurado no painel (padrão 0; o setUserInput recusa vazio).",
       "parameters": [
         {
           "name": "i",
