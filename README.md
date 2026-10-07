@@ -24,14 +24,25 @@ Custom widget de planejamento: tabela com medidas editáveis e dimensões escolh
 O `setUserInput` só existe no planejamento de uma **Tabela** (a API de custom widget não grava), então a chamada de gravação continua na story. Toda a regra fica no widget e é configurada no **painel → Gravação**:
 
 - **Hierarquias** da tabela de gravação, uma por linha: `PERIODICIDADE=Periodos_H1`
-- **Membros que não recebem valor**: `RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL` (gravam "apagar")
+- **Membros que não recebem valor**: `RESPONSABILIDADE=CLIENTE` — as medidas da linha travam mostrando 0 e gravam 0
 - **Valor para apagar**: `0` (padrão). Usado no endereço antigo quando a combinação muda, em células apagadas e nos membros acima. O `setUserInput` recusa vazio ("Preenchimento obrigatório"); para null de verdade seria preciso uma Data Action que apague os zeros depois do save.
+
+### Regras de negócio aplicadas pelo widget
+
+- **Tudo NÃO APLICÁVEL**: com as dimensões de dropdown todas em NÃO APLICÁVEL (ou sem valor), as medidas ficam bloqueadas — escolha as dimensões antes de informar valores.
+- **Membro sem valor** (ex: CLIENTE): medidas travadas mostrando 0; grava 0.
+- **Troca de dimensão** move só as medidas com valor (zera a combinação antiga). Linha sem valor nenhum só registra a escolha.
+- **Gravação que falha** (`setWriteResult(i, false)`) continua pendente e destacada em vermelho após `clearPendingChanges()`.
+- **Troca de contexto** (ex: cliente) com alterações não salvas: aviso no topo do widget e evento `onPendingChangesDiscarded`.
+- **Conta com mais de uma combinação gravada** (valor ≠ 0): alerta ⚠ ao lado da conta; a tabela mostra a de maior valor.
+- **Desempate** entre combinações com 0: prefere a salva por último nesta sessão (ao recarregar a story, só uma Data Action de limpeza resolve).
 
 O widget também converte o número pt-BR, resolve o ID da medida, remove duplicatas e descarta endereços incompletos. No evento `onSaveRequested`:
 
 ```javascript
 Application.showBusyIndicator("Salvando os dados");
 var n = dropdowntable_1.getWriteCount();
+var skipped = dropdowntable_1.getWriteSkippedCount();
 if (n === 0) {
     Application.hideBusyIndicator();
     Application.showMessage(ApplicationMessageType.Info, "Nenhuma alteração pendente.");
@@ -44,13 +55,17 @@ for (var i = 0; i < n; i++) {
         sel[dropdowntable_1.getWriteDimensionId(i, d)] = dropdowntable_1.getWriteMemberId(i, d);
     }
     sel["@MeasureDimension"] = dropdowntable_1.getWriteMeasureId(i);
-    if (!Table_1.getPlanning().setUserInput(sel, dropdowntable_1.getWriteValue(i))) { hasError = true; }
+    var ok = Table_1.getPlanning().setUserInput(sel, dropdowntable_1.getWriteValue(i));
+    dropdowntable_1.setWriteResult(i, ok);
+    if (!ok) { hasError = true; }
 }
 Table_1.getPlanning().submitData();
-dropdowntable_1.clearPendingChanges();
+dropdowntable_1.clearPendingChanges();   // mantém pendentes só as que falharam
 Application.hideBusyIndicator();
 if (hasError) {
-    Application.showMessage(ApplicationMessageType.Warning, "Salvo com avisos — verifique os valores na tabela");
+    Application.showMessage(ApplicationMessageType.Warning, "Algumas alterações não foram gravadas — as linhas destacadas continuam pendentes.");
+} else if (skipped > 0) {
+    Application.showMessage(ApplicationMessageType.Warning, "Salvo. " + skipped.toString() + " alteração(ões) sem todas as dimensões ficaram de fora.");
 } else {
     Application.showMessage(ApplicationMessageType.Success, "Alterações salvas com sucesso.");
 }

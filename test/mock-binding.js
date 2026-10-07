@@ -94,6 +94,7 @@
       // Grafias diferentes de propósito: o widget compara sem acento/caixa/espaços
       members.PERIODICIDADE.push({ id: PER + "[NA]", description: "NÃO APLICÁVEL" });
       members.RESPONSAVEL.push({ id: RESP + "[NAO_APLICAVEL]", description: "Nao Aplicavel" });
+      members.RESPONSAVEL.push({ id: RESP + "[CLIENTE]", description: "CLIENTE" });
     }
     return {
       getDataBinding: function() {

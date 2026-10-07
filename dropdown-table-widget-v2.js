@@ -195,6 +195,17 @@ TMPL.innerHTML = `
   .dt-save-btn:hover { background: var(--save-btn-hover-bg, #1557b0); }
   .dt-save-btn:active { background: #0e4191; }
   .dt-empty { padding: 16px; color: #888; text-align: center; font-size: 13px; }
+
+  /* Avisos de regra de negócio */
+  .dt-notice { margin: 0 12px 6px 12px; padding: 7px 12px; border-radius: 4px; font-size: 12px; flex-shrink: 0; }
+  .dt-notice.hidden { display: none; }
+  .dt-notice.warn  { background: #fff4e5; color: #8a4b00; border-left: 3px solid #f29900; }
+  .dt-notice.error { background: #fdecea; color: #a52714; border-left: 3px solid #e53935; }
+  .dt-notice.info  { background: #e8f0fe; color: #1a3a6e; border-left: 3px solid #1a73e8; }
+  tbody tr.dt-row-failed td { background: #fdecea !important; }
+  tbody tr.dt-row-failed td:first-child { box-shadow: inset 3px 0 0 #e53935; }
+  input.dt-locked { background: #f1f3f4 !important; color: #888 !important; cursor: not-allowed !important; }
+  .dt-multi-combo { color: #c26401; font-weight: 700; margin-left: 6px; cursor: help; }
   .dt-empty.hidden { display: none; }
   .dt-measure-cell-selected {
     outline: 2px solid #1a73e8 !important;
@@ -327,6 +338,7 @@ TMPL.innerHTML = `
 </style>
 <div class="dt-outer" id="dt-outer">
   <div class="dt-title hidden" id="dt-title"></div>
+  <div class="dt-notice hidden" id="dt-notice"></div>
   <div class="dt-toolbar hidden" id="dt-toolbar">
     <button class="dt-save-btn" id="dt-save-btn">Salvar</button>
   </div>
@@ -581,6 +593,17 @@ class DropdownTableWidget extends HTMLElement {
       if (this._dataFingerprint !== undefined && this._dataFingerprint !== newFingerprint) {
         if (!inSaveWindow) {
           // Troca real de contexto (ex: mudança de cliente) — limpa estado local
+          var discarded = (this._pendingChanges || []).length;
+          if (discarded > 0) {
+            this._showNotice(discarded + (discarded === 1 ? " alteração não salva foi descartada" : " alterações não salvas foram descartadas") + " na troca de contexto.", "warn");
+            var discardedSelf = this;
+            Promise.resolve().then(function() {
+              discardedSelf.dispatchEvent(new CustomEvent("onPendingChangesDiscarded", {
+                bubbles: true, composed: true, detail: { count: discarded }
+              }));
+            });
+          }
+          this._failedRows        = {};
           this._localSelections   = {};
           this._localMeasures     = {};
           this._pendingChanges    = [];
@@ -956,13 +979,20 @@ class DropdownTableWidget extends HTMLElement {
   _getDefaultMember(feedKey, ids, childrenByParent) {
     var target = this._normalizeLabel(this._emptyDefaultLabel);
     if (!target) { return null; }
+    // Cache por render (chamado por linha × dimensão); _render() o reinicia
+    var cacheKey = feedKey + "|" + target + "|" + (ids || []).join("|") + (childrenByParent ? "|cbp" : "");
+    if (!this._defaultMemberCache) { this._defaultMemberCache = {}; }
+    if (cacheKey in this._defaultMemberCache) { return this._defaultMemberCache[cacheKey]; }
+    var found = null;
     var opts = this._resolveDropdownOptions(feedKey, ids || [], childrenByParent);
     for (var i = 0; i < opts.length; i++) {
       if (this._normalizeLabel(opts[i].label) === target || this._normalizeLabel(this._cleanMemberId(opts[i].value)) === target) {
-        return opts[i];
+        found = opts[i];
+        break;
       }
     }
-    return null;
+    this._defaultMemberCache[cacheKey] = found;
+    return found;
   }
 
   // Lista de dimensões do binding para o painel montar os checkboxes (sem script)
@@ -1149,6 +1179,8 @@ class DropdownTableWidget extends HTMLElement {
     return this._serializePendingChanges(this._pendingChanges);
   }
   set pendingChanges(v) {
+    // Eco do próprio propertiesChanged: mantém os objetos (rowIndex/noMove não vão na string)
+    if (typeof v === "string" && v === this._serializePendingChanges(this._pendingChanges)) { return; }
     if (typeof v === "string") {
       this._pendingChanges = this._parsePendingChangesString(v);
     } else if (Array.isArray(v)) {
@@ -1243,15 +1275,18 @@ class DropdownTableWidget extends HTMLElement {
     var required = this._metadata && this._metadata.feeds ? this._metadata.feeds.dimensions.values.length : 0;
     var skipped = [];
 
-    function put(pairs, measureId, value, onlyIfAbsent) {
-      if (pairs.length < required) { skipped.push({ pairs: pairs, measureId: measureId }); return; }
+    // source = índice da alteração pendente que originou a gravação (para manter pendente se falhar)
+    function put(pairs, measureId, value, onlyIfAbsent, source) {
+      if (pairs.length < required) { skipped.push({ pairs: pairs, measureId: measureId, source: source }); return; }
       var key = measureId + "||" + self._pairsKey(pairs);
       if (index[key] !== undefined) {
-        if (!onlyIfAbsent) { writes[index[key]].value = value; }
+        var existing = writes[index[key]];
+        if (!onlyIfAbsent) { existing.value = value; }
+        if (existing.sources.indexOf(source) === -1) { existing.sources.push(source); }
         return;
       }
       index[key] = writes.length;
-      writes.push({ pairs: pairs, measureId: measureId, value: value });
+      writes.push({ pairs: pairs, measureId: measureId, value: value, sources: [source], failed: false });
     }
 
     for (var i = 0; i < (this._pendingChanges || []).length; i++) {
@@ -1260,37 +1295,74 @@ class DropdownTableWidget extends HTMLElement {
       if (/^measures_\d+$/.test(mId)) { mId = this._getMeasureIdByKey(mId); }
       var oldPairs = this._addrToPairs(ch.oldAddr);
       var newPairs = this._addrToPairs(ch.newAddr);
-      // Combinação mudou: apaga o endereço antigo (sem sobrescrever um valor novo já gravado nele)
-      if (ch.oldAddr && ch.oldAddr !== ch.newAddr && oldPairs.length > 0) {
-        put(oldPairs, mId, this._deleteValue, true);
+      // Combinação mudou: apaga o endereço antigo (sem sobrescrever um valor novo já gravado nele).
+      // noMove: a linha não tinha valor — não há o que apagar na combinação antiga.
+      if (!ch.noMove && ch.oldAddr && ch.oldAddr !== ch.newAddr && oldPairs.length > 0) {
+        put(oldPairs, mId, this._deleteValue, true, i);
       }
       var value = ch.value === undefined || ch.value === null ? "" : String(ch.value).trim();
       if (value === "" || this._isNoValueAddress(newPairs)) { value = this._deleteValue; }
-      put(newPairs, mId, value, false);
+      put(newPairs, mId, value, false, i);
     }
+    this._writeSkipped = skipped;
     this._debugLog("Gravação", { writes: writes, ignoradasPorEnderecoIncompleto: skipped });
     return writes;
   }
 
   getWriteCount()                 { this._writes = this._buildWriteList(); return this._writes.length; }
+  // Alterações que ficaram fora da gravação por endereço incompleto (falta dimensão)
+  getWriteSkippedCount()          { return (this._writeSkipped || []).length; }
+  // O script informa o retorno do setUserInput; o que falhar continua pendente após clearPendingChanges()
+  setWriteResult(i, ok)           { if (this._writes[i]) { this._writes[i].failed = !ok; } }
   getWriteDimensionCount(i)       { var w = this._writes[i]; return w ? w.pairs.length : 0; }
   getWriteDimensionId(i, d)       { var w = this._writes[i]; return w && w.pairs[d] ? w.pairs[d].dim : ""; }
   getWriteMemberId(i, d)          { var w = this._writes[i]; return w && w.pairs[d] ? w.pairs[d].member : ""; }
   getWriteMeasureId(i)            { var w = this._writes[i]; return w ? w.measureId : ""; }
   getWriteValue(i)                { var w = this._writes[i]; return w ? w.value : ""; }
   clearPendingChanges() {
-    this._pendingChanges = [];
-    this._localData = {};
-    this._originalData = {};
+    // Gravações que falharam (setWriteResult(i, false)) continuam pendentes e destacadas
+    var keepSources = {};
+    var writes = this._writes || [];
+    for (var wi = 0; wi < writes.length; wi++) {
+      if (!writes[wi].failed) { continue; }
+      for (var si = 0; si < writes[wi].sources.length; si++) { keepSources[writes[wi].sources[si]] = true; }
+    }
+    var kept = [];
+    var keptRows = {}; // chave da linha (id de dimensions_0) → true
+    for (var pi = 0; pi < (this._pendingChanges || []).length; pi++) {
+      if (!keepSources[pi]) { continue; }
+      var keptChange = this._pendingChanges[pi];
+      kept.push(keptChange);
+      var keptRowData = this._data && keptChange.rowIndex !== undefined ? this._data[keptChange.rowIndex] : null;
+      keptRows[keptRowData ? ((keptRowData["dimensions_0"] || {}).id || String(keptChange.rowIndex)) : String(keptChange.rowIndex)] = true;
+    }
+    this._writes = [];
+    this._failedRows = keptRows;
+    if (kept.length > 0) {
+      this._showNotice(kept.length + (kept.length === 1 ? " alteração não foi gravada" : " alterações não foram gravadas") + " — as linhas destacadas continuam pendentes. Corrija e salve de novo.", "error");
+    }
+
+    this._pendingChanges = kept;
+    if (kept.length === 0) {
+      this._localData = {};
+      this._originalData = {};
+    }
     // Save confirmado: seleções viram "salvas" (só visual/endereço até o modelo atualizar)
     // e saem do rastreio de alterações — o próximo save não reenvia estas linhas.
     if (!this._savedSelections) { this._savedSelections = {}; }
+    var stillLocal = {};
     for (var sk in this._localSelections) {
+      if (keptRows[sk]) { stillLocal[sk] = this._localSelections[sk]; continue; }
       if (!this._savedSelections[sk]) { this._savedSelections[sk] = {}; }
       for (var sd in this._localSelections[sk]) { this._savedSelections[sk][sd] = this._localSelections[sk][sd]; }
     }
-    this._localSelections = {};
-    this._localMeasures = {};
+    this._localSelections = stillLocal;
+    var stillMeasures = {};
+    for (var lm in this._localMeasures) {
+      var lmRow = this._data && this._data[lm] ? ((this._data[lm]["dimensions_0"] || {}).id || String(lm)) : String(lm);
+      if (keptRows[lmRow]) { stillMeasures[lm] = this._localMeasures[lm]; }
+    }
+    this._localMeasures = stillMeasures;
     this._selectionRowIndex = {};
     this._skipHighlightRenders = 2; // protege até 2 bindings após save...
     this._skipUntil = Date.now() + 15000; // ...dentro de 15s
@@ -1303,9 +1375,78 @@ class DropdownTableWidget extends HTMLElement {
     }
     this.dispatchEvent(new CustomEvent("propertiesChanged", {
       bubbles: true, composed: true,
-      detail: { properties: { pendingChanges: "" } }
+      detail: { properties: { pendingChanges: this._serializePendingChanges(this._pendingChanges) } }
     }));
     this._render();
+  }
+
+  // Aviso no topo do widget (regras de negócio): type = "warn" | "error" | "info"
+  _showNotice(text, type) {
+    var el = this.shadowRoot.getElementById("dt-notice");
+    if (!el) { return; }
+    el.textContent = text;
+    el.className = "dt-notice " + (type || "info");
+    if (this._noticeTimer) { clearTimeout(this._noticeTimer); }
+    this._noticeTimer = setTimeout(function() { el.classList.add("hidden"); }, type === "error" ? 15000 : 8000);
+  }
+
+  // Regras de bloqueio da linha (modo sem script):
+  //  "noValue"  → alguma dimensão num membro que não recebe valor (ex: RESPONSABILIDADE=CLIENTE):
+  //               medidas travadas mostrando 0 (é o que será gravado)
+  //  "noDims"   → todas as dimensões de dropdown em NÃO APLICÁVEL (ou sem valor): escolha as
+  //               dimensões antes de informar valores
+  _getRowLockState(rowIndex) {
+    if (!this._isExplicitDropdownMode() || !this._data || !this._data[rowIndex]) { return ""; }
+    var addr = this._buildRowAddrObj(rowIndex, null, true);
+    var pairs = [];
+    for (var ak in addr) { pairs.push({ dim: ak, member: addr[ak] }); }
+    if (this._isNoValueAddress(pairs)) { return "noValue"; }
+    var count = this._metadata.feeds.dimensions.values.length;
+    var dropdownDims = 0;
+    var notApplicable = 0;
+    var defaultNorm = this._normalizeLabel(this._emptyDefaultLabel);
+    for (var i = 1; i < count; i++) {
+      var key = "dimensions_" + i;
+      if (!this._isDropdownDimension(key)) { continue; }
+      dropdownDims++;
+      var member = addr[this._dimRealId(key)];
+      if (!member || (defaultNorm && this._normalizeLabel(this._cleanMemberId(member)) === defaultNorm)) {
+        notApplicable++;
+        continue;
+      }
+      var def = this._getDefaultMember(key, [(this._data[rowIndex][key] || {}).id], null);
+      if (def && def.value === member) { notApplicable++; }
+    }
+    return dropdownDims > 0 && notApplicable === dropdownDims ? "noDims" : "";
+  }
+
+  // Aplica o bloqueio nas células de medida da linha (render e após troca de dropdown)
+  _applyRowLock(rowIndex, trEl) {
+    var tr = trEl || this.shadowRoot.querySelector('tbody tr[data-row-index="' + rowIndex + '"]');
+    if (!tr) { return; }
+    var state = this._getRowLockState(rowIndex);
+    var inputs = tr.querySelectorAll("td.dt-mcell input");
+    for (var i = 0; i < inputs.length; i++) {
+      var inp = inputs[i];
+      if (state === "") {
+        if (inp.disabled) {
+          inp.disabled = false;
+          inp.classList.remove("dt-locked");
+          inp.title = "";
+          if (inp._valueBeforeLock !== undefined) { inp.value = inp._valueBeforeLock; inp._valueBeforeLock = undefined; }
+        }
+        continue;
+      }
+      if (!inp.disabled) { inp._valueBeforeLock = inp.value; }
+      inp.disabled = true;
+      inp.classList.add("dt-locked");
+      if (state === "noValue") {
+        inp.value = this._deleteValue === "" ? "0" : this._deleteValue;
+        inp.title = "Responsabilidade sem valor (ex: CLIENTE) — grava " + (this._deleteValue === "" ? "0" : this._deleteValue);
+      } else {
+        inp.title = "Escolha as dimensões antes de informar valores";
+      }
+    }
   }
   clearMeasureInput() {
     var rowIdx = parseInt(this._measureChangeRowIndex || "0", 10);
@@ -2248,6 +2389,7 @@ class DropdownTableWidget extends HTMLElement {
   // ─── Render ───────────────────────────────────────────────────
   _render() {
     var self      = this;
+    this._defaultMemberCache = {}; // opções podem ter mudado (binding, getMembers, painel)
     var headerRow = this.shadowRoot.getElementById("dt-header");
     var tbody     = this.shadowRoot.getElementById("dt-body");
     var emptyMsg  = this.shadowRoot.getElementById("dt-empty");
@@ -2365,6 +2507,7 @@ class DropdownTableWidget extends HTMLElement {
     // Pré-seleciona por dimensions_0.id a linha com maior soma de medidas
     // Evita exibir linha zerada (ex: CLIENTE=0) quando existe linha com valor real (ex: SAPORE=6)
     var bestRowByDim0 = {};
+    var combosByAccount = {};
     for (var br = 0; br < this._data.length; br++) {
       var brCell = this._data[br]["dimensions_0"] || {};
       if (!brCell.id) { continue; }
@@ -2379,23 +2522,52 @@ class DropdownTableWidget extends HTMLElement {
         }
       }
       // Com "Incluir níveis-pai" no Builder cada conta vem com a linha do nó (total >= folha) e
-      // linhas de folhas — inclusive sem valor. Prioridade: linha com dado → com mais folhas
-      // (o valor gravado) → maior valor. Sem dado nenhum: a de menos folhas (o nó).
+      // linhas de folhas — inclusive sem valor ou com 0 (o "apagar" grava 0). Prioridade:
+      // linha com dado → com valor ≠ 0 → com mais folhas (o valor gravado) → combinação salva
+      // nesta sessão → maior valor. Sem dado nenhum: a de menos folhas (o nó).
       var brLeaves = 0;
+      var brComboKey = "";
       for (var blk in this._data[br]) {
         if (blk.indexOf("dimensions_") !== 0 || blk === "dimensions_0") { continue; }
         var blCell = this._data[br][blk] || {};
-        if (blCell.id && !this._isNodeId(blk, blCell.id, null) && this._cleanMemberId(blCell.id) !== "#") { brLeaves++; }
+        if (blCell.id && !this._isNodeId(blk, blCell.id, null) && this._cleanMemberId(blCell.id) !== "#") {
+          brLeaves++;
+          brComboKey = brComboKey + blk + "=" + blCell.id + ";";
+        }
       }
       var brHasData = this._rowHasData(this._data[br]);
-      var brBest = bestRowByDim0[brCell.id];
-      var brWins = brBest === undefined
-        || (brHasData && !brBest.hasData)
-        || (brHasData && brBest.hasData && (brLeaves > brBest.leaves || (brLeaves === brBest.leaves && brVal > brBest.val)))
-        || (!brHasData && !brBest.hasData && brLeaves < brBest.leaves);
-      if (brWins) {
-        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal, leaves: brLeaves, hasData: brHasData };
+      var brNonZero = brVal > 0;
+      var brSaved = this._savedSelections && this._savedSelections[brCell.id];
+      var brMatchesSaved = false;
+      if (brSaved) {
+        brMatchesSaved = true;
+        for (var bsk in brSaved) {
+          if (!brSaved[bsk] || ((this._data[br][bsk] || {}).id !== brSaved[bsk].id)) { brMatchesSaved = false; break; }
+        }
       }
+      // Combinações completas com valor ≠ 0 por conta (mais de uma = dado inconsistente)
+      if (brNonZero && brLeaves === dimensions.length - 1) {
+        if (!combosByAccount[brCell.id]) { combosByAccount[brCell.id] = {}; }
+        combosByAccount[brCell.id][brComboKey] = true;
+      }
+      var brBest = bestRowByDim0[brCell.id];
+      var brWins;
+      if (brBest === undefined) { brWins = true; }
+      else if (brHasData !== brBest.hasData) { brWins = brHasData; }
+      else if (!brHasData) { brWins = brLeaves < brBest.leaves; }
+      else if (brNonZero !== brBest.nonZero) { brWins = brNonZero; }
+      else if (brLeaves !== brBest.leaves) { brWins = brLeaves > brBest.leaves; }
+      else if (brMatchesSaved !== brBest.matchesSaved) { brWins = brMatchesSaved; }
+      else { brWins = brVal > brBest.val; }
+      if (brWins) {
+        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal, leaves: brLeaves, hasData: brHasData, nonZero: brNonZero, matchesSaved: brMatchesSaved };
+      }
+    }
+    this._multiComboAccounts = {};
+    for (var mca in combosByAccount) {
+      var mcaCount = 0;
+      for (var mck in combosByAccount[mca]) { mcaCount++; }
+      if (mcaCount > 1) { this._multiComboAccounts[mca] = mcaCount; }
     }
 
     for (var rl = 0; rl < this._data.length; rl++) {
@@ -2540,6 +2712,15 @@ class DropdownTableWidget extends HTMLElement {
           var sp = document.createElement("span");
           sp.className = "cell-plain";
           sp.textContent = cLbl;
+          // Conta com mais de uma combinação gravada (valor ≠ 0): só uma aparece aqui
+          var multiCombo = di2 === 0 && self2._multiComboAccounts ? self2._multiComboAccounts[cId] : 0;
+          if (multiCombo) {
+            var badge = document.createElement("span");
+            badge.className = "dt-multi-combo";
+            badge.textContent = "⚠";
+            badge.title = "Esta conta tem " + multiCombo + " combinações de dimensões com valor gravado; só uma aparece na tabela. Verifique e zere as demais.";
+            sp.appendChild(badge);
+          }
           sp.style.cursor    = "context-menu";
           sp.style.textAlign = self2._cellAlign || "left";
           sp.title = "Clique direito para opções";
@@ -2677,6 +2858,7 @@ class DropdownTableWidget extends HTMLElement {
             self2._newRowAddrStr          = addrStr;
             self2._addPendingChange({
               type: "measure",
+              rowIndex: rowIdx,
               oldAddr: addrStr,
               newAddr: addrStr,
               value: pendingVal,
@@ -2716,6 +2898,11 @@ class DropdownTableWidget extends HTMLElement {
         tdm.appendChild(input);
         tr.appendChild(tdm);
       }
+
+      // Gravação que falhou no último save: linha destacada até salvar de novo
+      if (self2._failedRows && self2._failedRows[firstDimCell.id || String(ri)]) { tr.classList.add("dt-row-failed"); }
+      // Bloqueio por regra de negócio (CLIENTE → 0; tudo NÃO APLICÁVEL → sem valores)
+      self2._applyRowLock(ri, tr);
 
       tbody.appendChild(tr);
     };
@@ -2995,26 +3182,49 @@ class DropdownTableWidget extends HTMLElement {
     } else {
       pendingMeasureKeys.push(changedMeasureKey);
     }
+    // Move só as medidas que têm valor. Linha sem nenhum valor: registra só a escolha (grava o
+    // "apagar" na combinação nova para guardá-la) sem zerar a combinação antiga, que não existe.
+    var movedAny = false;
+    var firstMeasureId = "";
     for (var pmk = 0; pmk < pendingMeasureKeys.length; pmk++) {
       var pendingMeasureKey = pendingMeasureKeys[pmk];
       var pendingMeasureId = this._getMeasureIdByKey(pendingMeasureKey);
+      if (pmk === 0) { firstMeasureId = pendingMeasureId; }
       // Usa _getRowMeasureValue como fonte primária (binding direto) — mais confiável que _originalData
       var currentValue = this._getRowMeasureValue(rowIndex, pendingMeasureKey);
       // Fallback: _originalData via oldRowAddrStr
       if (currentValue === "") { currentValue = this._toCanonicalNumber(this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId)); }
+      if (currentValue === "") { continue; }
       this._setLocalCellValue(this._newRowAddrStr, pendingMeasureId, currentValue);
       this._addPendingChange({
         type: "dropdown",
+        rowIndex: rowIndex,
         oldAddr: this._oldRowAddrStr,
         newAddr: this._newRowAddrStr,
         value: currentValue,
         measureId: pendingMeasureId
       });
-      if (pmk === 0) {
+      if (!movedAny) {
         this._changedValue = currentValue;
         changedMeasureId = pendingMeasureId;
       }
+      movedAny = true;
     }
+    if (!movedAny && firstMeasureId) {
+      this._addPendingChange({
+        type: "dropdown",
+        rowIndex: rowIndex,
+        noMove: true,
+        oldAddr: this._oldRowAddrStr,
+        newAddr: this._newRowAddrStr,
+        value: "",
+        measureId: firstMeasureId
+      });
+      this._changedValue = "";
+      changedMeasureId = firstMeasureId;
+    }
+    // Responsabilidade CLIENTE trava/mostra 0; sair de tudo NÃO APLICÁVEL libera as medidas
+    this._applyRowLock(rowIndex);
     this._measureChangeValue = String(this._changedValue || "");
     this._measureChangeMeasureId = changedMeasureId;
     this._measureChangeRowIndex = String(rowIndex);

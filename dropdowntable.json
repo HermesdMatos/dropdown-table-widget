@@ -456,6 +456,26 @@
           "description": "Índice da gravação"
         }
       ]
+    },
+    "getWriteSkippedCount": {
+      "returnType": "integer",
+      "description": "Quantas alterações ficaram fora da gravação por endereço incompleto (falta dimensão). Chamar depois de getWriteCount().",
+      "parameters": []
+    },
+    "setWriteResult": {
+      "description": "Informa o retorno do setUserInput da gravação i. As que falharem continuam pendentes e destacadas após clearPendingChanges().",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        },
+        {
+          "name": "ok",
+          "type": "boolean",
+          "description": "Retorno do setUserInput"
+        }
+      ]
     }
   },
   "events": {
@@ -482,6 +502,9 @@
     },
     "onCellsDeleteRequested": {
       "description": "Fired when user presses Delete with measure cells selected. Detail: {cells: [{rowIndex, measureKey}]}"
+    },
+    "onPendingChangesDiscarded": {
+      "description": "Disparado quando alterações não salvas são descartadas por troca de contexto (ex: troca de cliente). Detail: {count}."
     }
   },
   "dataBindings": {
