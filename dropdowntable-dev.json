@@ -1,6 +1,6 @@
 {
   "name": "Dropdown Table Widget (DEV)",
-  "description": "[DEV @ 08cb117] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
+  "description": "[DEV @ 452d1db] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
   "newInstancePrefix": "dropdowntableDev",
   "eula": "",
   "vendor": "Custom",
@@ -11,13 +11,13 @@
     {
       "kind": "main",
       "tag": "dropdowntable-widget-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@08cb11797b1d5c03590dd8f2e977df7b3a1b9c67/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
-      "integrity": "sha256-mdvaN9hgC7dPODbbTXtdv7SNYYmfcKp6JXYkZnCQsiU="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@452d1dbeedb64866d4e2e8dbd1239091026d9b9c/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
+      "integrity": "sha256-e55wY7k9hifVZnprpaOvug1u6sJ9LoyoTb8KaYOlX9s="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@08cb11797b1d5c03590dd8f2e977df7b3a1b9c67/style-panel.js?tag=dropdowntable-styling-dev",
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@452d1dbeedb64866d4e2e8dbd1239091026d9b9c/style-panel.js?tag=dropdowntable-styling-dev",
       "integrity": "sha256-XbZOp2AkNnF0dHy4XHGuQV3Bm+9O+l2V7ai9LT/Z/aQ="
     }
   ],
@@ -456,6 +456,26 @@
           "description": "Índice da gravação"
         }
       ]
+    },
+    "getWriteSkippedCount": {
+      "returnType": "integer",
+      "description": "Quantas alterações ficaram fora da gravação por endereço incompleto (falta dimensão). Chamar depois de getWriteCount().",
+      "parameters": []
+    },
+    "setWriteResult": {
+      "description": "Informa o retorno do setUserInput da gravação i. As que falharem continuam pendentes e destacadas após clearPendingChanges().",
+      "parameters": [
+        {
+          "name": "i",
+          "type": "integer",
+          "description": "Índice da gravação"
+        },
+        {
+          "name": "ok",
+          "type": "boolean",
+          "description": "Retorno do setUserInput"
+        }
+      ]
     }
   },
   "events": {
@@ -482,6 +502,9 @@
     },
     "onCellsDeleteRequested": {
       "description": "Fired when user presses Delete with measure cells selected. Detail: {cells: [{rowIndex, measureKey}]}"
+    },
+    "onPendingChangesDiscarded": {
+      "description": "Disparado quando alterações não salvas são descartadas por troca de contexto (ex: troca de cliente). Detail: {count}."
     }
   },
   "dataBindings": {
