@@ -6,19 +6,19 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.14.0",
+  "version": "2.11.25",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.14.0/dropdown-table-widget-v2.js",
-      "integrity": "sha256-EciWSV8af8hfMZZRJ06424VzrN12BhYNDHRJeX/emDw="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.11.25/dropdown-table-widget-v2.js",
+      "integrity": "sha256-eyZAJSjQv29UPcpIa38XjiWc+zEgqAzGyu8S+hvRAFY="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.14.0/style-panel.js",
-      "integrity": "sha256-14UMdirm8fIcbwytxKeSuTee1e5sTwl3AL+cTdl80eM="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.11.25/style-panel.js",
+      "integrity": "sha256-WHm6a3fUFI58Zau+N1y7ihzqxcfs2ehHcsZ21U/IzV4="
     }
   ],
   "properties": {
@@ -35,11 +35,6 @@
     "dropdownDimensions": {
       "type": "string",
       "description": "JSON array of dimension feed IDs to render as dropdown e.g. [\"dimensions_1\",\"dimensions_2\"]",
-      "default": "[]"
-    },
-    "availableDimensions": {
-      "type": "string",
-      "description": "Publicado pelo widget: JSON [{key,id,label}] das dimensões do binding — usado pelo painel para montar os checkboxes de Dropdowns.",
       "default": "[]"
     },
     "lastAddMemberRequest": {
@@ -82,9 +77,14 @@
       "description": "Valor alterado/usado na ultima edicao de medida ou dropdown",
       "default": ""
     },
+    "memberTechnicalMap": {
+      "type": "string",
+      "description": "JSON string mapping dimension names to member descriptions and their technical IDs. Example: {\"RESPONSABILIDADE\": {\"SAPORE\": \"[RESPONSABILIDADE].[H1].[&SAPORE]\"}}.  Populated from metadata during data binding.",
+      "default": "{}"
+    },
     "pendingChanges": {
       "type": "string",
-      "description": "Delimited string with pending changes. Format: oldAddr§newAddr§value§measureId###... (§ separates fields, ### separates records). Addresses use DIM|~|MEMBER_ID|||... ; value is canonical (e.g. 1593.95) or empty when the cell was cleared.",
+      "description": "Delimited string with pending changes. Format: dimensionId§technicalMemberId§value§measureId###... (§ separates fields, ### separates records). Technical IDs are resolved from _memberTechnicalMap cache during _selectValue().",
       "default": ""
     },
     "measureChangeMeasureId": {
@@ -120,37 +120,37 @@
     "headerColor": {
       "type": "string",
       "description": "Background color of the header row",
-      "default": "#ffffff"
+      "default": "#1a73e8"
     },
     "headerTextColor": {
       "type": "string",
       "description": "Text color for table headers",
-      "default": "#1d2d3e"
+      "default": "#ffffff"
     },
     "selectedRowColor": {
       "type": "string",
       "description": "Background color of selected rows",
-      "default": "#ebf8ff"
+      "default": "#e8f0fe"
     },
     "hoverRowColor": {
       "type": "string",
       "description": "Background color of hovered rows",
-      "default": "#eaecee"
+      "default": "#f5f5f5"
     },
     "tableTextColor": {
       "type": "string",
       "description": "Text color for table content",
-      "default": "#1d2d3e"
+      "default": "#333333"
     },
     "dropdownHighlightColor": {
       "type": "string",
       "description": "Highlight color for selected dropdown item",
-      "default": "#ebf8ff"
+      "default": "#e8f0fe"
     },
     "rowHeight": {
       "type": "integer",
       "description": "Height of each row in pixels",
-      "default": 32
+      "default": 36
     },
     "colWidth": {
       "type": "string",
@@ -160,12 +160,12 @@
     "fontFamily": {
       "type": "string",
       "description": "Font family for table content",
-      "default": "'72', '72full', Arial, Helvetica, sans-serif"
+      "default": "Arial, sans-serif"
     },
     "fontSize": {
       "type": "string",
       "description": "Font size for table content",
-      "default": "14px"
+      "default": "13px"
     },
     "width": {
       "type": "integer",
@@ -192,7 +192,7 @@
       "returnType": "string",
       "description": "Retorna o buffer de alteracoes pendentes.",
       "parameters": [],
-      "body": "return this.pendingChanges || '';"
+      "body": "return this.pendingChanges || '[]';"
     },
     "clearPendingChanges": {
       "description": "Limpa o buffer de alteracoes pendentes.",
@@ -295,7 +295,8 @@
     "getActiveFilters": {
       "returnType": "string",
       "description": "Get all active dropdown filters as JSON string",
-      "parameters": []
+      "parameters": [],
+      "body": "return this.selectedCellData || '{}';"
     },
     "setDimensionFilter": {
       "description": "Aplica filtro de dimensão. Ex: setDimensionFilter(\"Date\", \"[Date].[YM].&[202606]\")",
@@ -355,132 +356,6 @@
       "returnType": "string",
       "description": "Retorna o addrStr da linha apos a ultima troca de dropdown.",
       "parameters": []
-    },
-    "setMeasureLabels": {
-      "description": "Define rótulos das colunas de medida. Ex: setMeasureLabels('[\"Custo\",\"Quantidade\"]')",
-      "parameters": [
-        {
-          "name": "v",
-          "type": "string",
-          "description": "JSON array de rótulos, na ordem das medidas"
-        }
-      ]
-    },
-    "getMeasureLabels": {
-      "returnType": "string",
-      "description": "Retorna os rótulos de medida definidos via setMeasureLabels (JSON array).",
-      "parameters": []
-    },
-    "getNewMemberDimensionId": {
-      "returnType": "string",
-      "description": "Retorna o ID real da dimensão do membro criado no modal Adicionar membro.",
-      "parameters": []
-    },
-    "getMeasureChangeRowIndex": {
-      "returnType": "string",
-      "description": "Retorna o índice da linha da última medida alterada.",
-      "parameters": [],
-      "body": "return this.measureChangeRowIndex || '';"
-    },
-    "getWriteCount": {
-      "returnType": "integer",
-      "description": "Monta a lista de gravação a partir das alterações pendentes (hierarquias, apagar endereço antigo, membros sem valor, sem duplicatas) e retorna quantos setUserInput fazer.",
-      "parameters": []
-    },
-    "getWriteDimensionCount": {
-      "returnType": "integer",
-      "description": "Quantidade de dimensões da gravação i.",
-      "parameters": [
-        {
-          "name": "i",
-          "type": "integer",
-          "description": "Índice da gravação"
-        }
-      ]
-    },
-    "getWriteDimensionId": {
-      "returnType": "string",
-      "description": "ID da dimensão d da gravação i (chave do objeto de seleção).",
-      "parameters": [
-        {
-          "name": "i",
-          "type": "integer",
-          "description": "Índice da gravação"
-        },
-        {
-          "name": "d",
-          "type": "integer",
-          "description": "Índice da dimensão"
-        }
-      ]
-    },
-    "getWriteMemberId": {
-      "returnType": "string",
-      "description": "ID do membro da dimensão d da gravação i, na hierarquia configurada no painel.",
-      "parameters": [
-        {
-          "name": "i",
-          "type": "integer",
-          "description": "Índice da gravação"
-        },
-        {
-          "name": "d",
-          "type": "integer",
-          "description": "Índice da dimensão"
-        }
-      ]
-    },
-    "getWriteMeasureId": {
-      "returnType": "string",
-      "description": "ID da medida da gravação i (para @MeasureDimension).",
-      "parameters": [
-        {
-          "name": "i",
-          "type": "integer",
-          "description": "Índice da gravação"
-        }
-      ]
-    },
-    "getWriteValue": {
-      "returnType": "string",
-      "description": "Valor da gravação i. Apagar = valor configurado no painel (padrão 0; o setUserInput recusa vazio).",
-      "parameters": [
-        {
-          "name": "i",
-          "type": "integer",
-          "description": "Índice da gravação"
-        }
-      ]
-    },
-    "getWriteSkippedCount": {
-      "returnType": "integer",
-      "description": "Quantas alterações ficaram fora da gravação por endereço incompleto (falta dimensão). Chamar depois de getWriteCount().",
-      "parameters": []
-    },
-    "setWriteResult": {
-      "description": "Informa o retorno do setUserInput da gravação i. As que falharem continuam pendentes e destacadas após clearPendingChanges().",
-      "parameters": [
-        {
-          "name": "i",
-          "type": "integer",
-          "description": "Índice da gravação"
-        },
-        {
-          "name": "ok",
-          "type": "boolean",
-          "description": "Retorno do setUserInput"
-        }
-      ]
-    },
-    "setMemberResult": {
-      "description": "Informa o retorno do createMembers/deleteMembers; o widget mostra o aviso de sucesso ou falha.",
-      "parameters": [
-        {
-          "name": "ok",
-          "type": "boolean",
-          "description": "Retorno do createMembers/deleteMembers"
-        }
-      ]
     }
   },
   "events": {
@@ -491,10 +366,10 @@
       "description": "Fired when a dropdown value is selected. Read selectedCellData for {row, dimensionId, memberId, memberLabel}."
     },
     "onAddMemberRequested": {
-      "description": "Disparado após validação no diálogo do widget (ID/descrição em maiúsculas, formato, duplicidade). Leia getNewMemberId/Description/ParentId e chame createMembers; depois setMemberResult(ok)."
+      "description": "Fired when user confirms 'Adicionar membro'. Detail: {dimensionId, dimensionName, newMemberId, newMemberDescription, parentId, rowIndex, contextMemberId, contextMemberLabel}. Connect to: PlanningModel_X.createMembers(dimensionName, [{id: newMemberId, description: newMemberDescription}])"
     },
     "onDeleteMemberRequested": {
-      "description": "Disparado só depois da confirmação no diálogo do widget (contas com valores ou com subcontas são bloqueadas). Leia getDeleteMemberId() e chame deleteMembers; depois setMemberResult(ok)."
+      "description": "Fired when user clicks 'Excluir membro'. Detail: {action:'excludeMember', dimensionId, dimensionName, memberId, memberLabel, rowIndex}. Connect to: PlanningModel_X.deleteMembers(dimensionName, [memberId])"
     },
     "onFilterMemberRequested": {
       "description": "Fired when user clicks 'Filtrar membro' or 'Filtrar'. Detail: {action:'filterMember'|'filter', dimensionId, dimensionName, memberId, memberLabel, rowIndex}."
@@ -507,9 +382,6 @@
     },
     "onCellsDeleteRequested": {
       "description": "Fired when user presses Delete with measure cells selected. Detail: {cells: [{rowIndex, measureKey}]}"
-    },
-    "onPendingChangesDiscarded": {
-      "description": "Disparado quando alterações não salvas são descartadas por troca de contexto (ex: troca de cliente). Detail: {count}."
     }
   },
   "dataBindings": {
@@ -545,22 +417,8 @@
       "feeds": [
         {
           "id": "dimensions",
-          "description": "Opções do dropdown: dimensões de dropdown com seus membros-filho (sem medidas). Configure no Builder.",
+          "description": "Dimensions at child level — used to populate dropdown options",
           "type": "dimension"
-        }
-      ]
-    },
-    "valuesBinding": {
-      "feeds": [
-        {
-          "id": "dimensions",
-          "description": "Valores gravados (substitui a tabela espelho/setRowValues): 1ª dimensão = conta (igual ao binding principal), depois as dimensões de dropdown no nível folha",
-          "type": "dimension"
-        },
-        {
-          "id": "measures",
-          "description": "Medida usada para identificar a combinação gravada (maior valor por conta)",
-          "type": "mainStructureMember"
         }
       ]
     }
