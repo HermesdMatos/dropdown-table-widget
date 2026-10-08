@@ -37,6 +37,8 @@
 <div class="widget-box"><dropdowntable-widget id="wJ" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
 <h2>K — visual SAP Horizon (compacto) e cores do painel</h2>
 <div class="widget-box"><dropdowntable-widget id="wK" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>L — adicionar/excluir membro (validação e bloqueio no widget)</h2>
+<div class="widget-box"><dropdowntable-widget id="wL" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -327,6 +329,55 @@
     check("K3 cores e altura do painel prevalecem sobre o tema",
       getComputedStyle(kTh).backgroundColor === "rgb(26, 115, 232)" && Math.round(kTd.getBoundingClientRect().height) >= 44,
       { bg: getComputedStyle(kTh).backgroundColor, altura: kTd.getBoundingClientRect().height });
+
+    // ── L ─────────────────────────────────────────────────────────
+    // Adicionar/excluir membro: regras no widget, script só chama createMembers/deleteMembers
+    var Lw = document.getElementById("wL");
+    setup(Lw, { mainBinding: M.mainBindingWithBookedLeaves() });
+    await tick();
+    var lEvents = [];
+    ["onAddMemberRequested", "onDeleteMemberRequested"].forEach(function(n) {
+      Lw.addEventListener(n, function(e) { lEvents.push({ name: n, detail: e.detail }); });
+    });
+    var lSR = Lw.shadowRoot;
+    function ctxOn(row) {
+      var sp = lSR.querySelector('tr[data-row-index="' + row + '"] .cell-plain');
+      sp.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 20 }));
+    }
+    function clickItem(id) { lSR.getElementById(id).dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); }
+
+    // Excluir conta com valores → bloqueado
+    ctxOn(1); clickItem("ctx-exclude-member");
+    var lOk = lSR.getElementById("dt-confirm-ok");
+    check("L1 excluir conta com valores: bloqueado (sem botão Excluir)",
+      !lSR.getElementById("dt-confirm-backdrop").classList.contains("hidden") && lOk.classList.contains("hidden")
+      && lSR.getElementById("dt-confirm-strip").textContent.indexOf("valores lançados") !== -1);
+    lSR.getElementById("dt-confirm-cancel").click();
+
+    // Excluir conta sem valores → confirmação → evento com ID limpo
+    ctxOn(3); clickItem("ctx-exclude-member");
+    check("L2 conta sem valores: só dispara depois de confirmar", lEvents.length === 0 && !lOk.classList.contains("hidden"));
+    lOk.click(); await tick();
+    var lDel = lEvents.filter(function(e) { return e.name === "onDeleteMemberRequested"; })[0];
+    check("L3 confirmação dispara onDeleteMemberRequested com ID limpo", lDel && lDel.detail.memberId === "C3" && Lw.getDeleteMemberId() === "C3", lDel && lDel.detail);
+
+    // Adicionar: maiúsculas, formato, duplicidade, lista de grupos
+    ctxOn(1); clickItem("ctx-add-member");
+    var lId = lSR.getElementById("dt-input-id"), lDesc = lSR.getElementById("dt-input-desc"), lPar = lSR.getElementById("dt-input-parent");
+    var lGroups = Array.prototype.map.call(lSR.querySelectorAll("#dt-parent-list option"), function(o) { return o.value; });
+    check("L4 lista de grupos existentes no campo Grupo (pai já preenchido)", lGroups.indexOf("ROOT") !== -1 && lPar.value === "ROOT", { grupos: lGroups, pai: lPar.value });
+    lId.value = "c1"; lDesc.value = "x"; lSR.getElementById("dt-modal-confirm").click(); await tick();
+    check("L5 ID duplicado é recusado no diálogo", lSR.getElementById("dt-error-id").textContent.indexOf("Já existe") !== -1 && lEvents.length === 1);
+    lId.value = "nova conta"; lSR.getElementById("dt-modal-confirm").click(); await tick();
+    check("L6 ID com espaço é recusado", lSR.getElementById("dt-error-id").textContent.indexOf("sem espaços") !== -1 && lEvents.length === 1);
+    lId.value = "nova_conta"; lDesc.value = "manutenção de câmeras"; lPar.value = "root";
+    lSR.getElementById("dt-modal-confirm").click(); await tick();
+    var lAdd = lEvents.filter(function(e) { return e.name === "onAddMemberRequested"; })[0];
+    check("L7 válido: evento com ID, descrição e pai em maiúsculas",
+      lAdd && Lw.getNewMemberId() === "NOVA_CONTA" && Lw.getNewMemberDescription() === "MANUTENÇÃO DE CÂMERAS" && Lw.getNewMemberParentId() === "ROOT",
+      { id: Lw.getNewMemberId(), desc: Lw.getNewMemberDescription(), pai: Lw.getNewMemberParentId() });
+    Lw.setMemberResult(true);
+    check("L8 setMemberResult mostra o resultado no widget", lSR.getElementById("dt-notice").textContent.indexOf("NOVA_CONTA criado com sucesso") !== -1, lSR.getElementById("dt-notice").textContent);
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

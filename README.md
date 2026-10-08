@@ -73,6 +73,31 @@ if (hasError) {
 
 Com o **modo diagnóstico** ligado, o console mostra a lista montada (`[DropdownTable] Gravação`) e o que foi descartado.
 
+### Adicionar e excluir membros
+
+`createMembers`/`deleteMembers` só existem no objeto de planejamento do modelo (script da story). As regras ficam no widget:
+
+- **Adicionar**: ID, descrição e grupo em maiúsculas; ID obrigatório, sem espaços/acentos e sem duplicidade; campo **Grupo** com a lista dos grupos existentes (aceita digitar um pai novo, com aviso). Erros aparecem no próprio diálogo.
+- **Excluir**: diálogo de confirmação. **Bloqueado** se a conta tem valores lançados no cliente atual ou se é um grupo com subcontas — a exclusão remove a conta do modelo para todos os clientes.
+
+```javascript
+// onAddMemberRequested
+var ok = MODEL_CAP_DESPESAS.createMembers("DESCRICAO_DA_CONTA", {
+    id: dropdowntable_1.getNewMemberId(),
+    description: dropdowntable_1.getNewMemberDescription(),
+    hierarchies: {Hierarquia_DESC_CONTA: {parentId: dropdowntable_1.getNewMemberParentId()}}
+});
+dropdowntable_1.setMemberResult(ok);
+if (ok) { Application.refreshData(); }
+```
+
+```javascript
+// onDeleteMemberRequested
+var ok = MODEL_CAP_DESPESAS.deleteMembers("DESCRICAO_DA_CONTA", dropdowntable_1.getDeleteMemberId());
+dropdowntable_1.setMemberResult(ok);
+if (ok) { Application.refreshData(); }
+```
+
 ## Visual
 
 Padrão **SAP Horizon (Fiori), densidade compacta**: fonte 72, cabeçalho branco, linhas de 32px, números à direita, select/input/popover/diálogo no estilo Fiori. As cores, a fonte e a altura continuam editáveis no **painel de estilo**. Stories que já tinham cores salvas (ex: cabeçalho azul) continuam com elas até clicar em **Restaurar padrão SAP Horizon** → **Aplicar**.

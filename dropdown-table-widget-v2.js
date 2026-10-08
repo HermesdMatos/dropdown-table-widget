@@ -437,6 +437,17 @@ TMPL.innerHTML = `
   .dt-btn-confirm { background: var(--sap-brand); border-color: var(--sap-brand); color: #ffffff; }
   .dt-btn-confirm:hover { background: var(--sap-brand-hover); border-color: var(--sap-brand-hover); }
   .dt-btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* Botão negativo (Reject) e faixas de aviso do diálogo de exclusão */
+  .dt-btn-reject { background: var(--sap-error); border-color: var(--sap-error); color: #ffffff; }
+  .dt-btn-reject:hover { background: #8a0606; border-color: #8a0606; }
+  .dt-btn-reject.hidden { display: none; }
+  .dt-modal-header-negative svg { color: var(--sap-error); }
+  .dt-confirm-member { font-size: 14px; margin-bottom: 12px; }
+  .dt-confirm-member b { font-weight: 700; }
+  .dt-modal-strip { padding: 8px 12px; font-size: 14px; border-radius: 8px; border: 1px solid; }
+  .dt-modal-strip.warn  { background: var(--sap-warning-bg); border-color: var(--sap-warning); }
+  .dt-modal-strip.error { background: var(--sap-error-bg); border-color: var(--sap-error); }
+  #dt-input-id, #dt-input-desc, #dt-input-parent { text-transform: uppercase; }
 </style>
 <div class="dt-outer" id="dt-outer">
   <div class="dt-toolbar" id="dt-toolbar">
@@ -484,6 +495,24 @@ TMPL.innerHTML = `
 </div>
 </div><!-- /dt-outer -->
 
+<!-- Confirmação de exclusão de membro -->
+<div class="dt-modal-backdrop hidden" id="dt-confirm-backdrop">
+  <div class="dt-modal" role="alertdialog" aria-labelledby="dt-confirm-title">
+    <div class="dt-modal-header dt-modal-header-negative" id="dt-confirm-title">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Excluir membro
+    </div>
+    <div class="dt-modal-body">
+      <div class="dt-confirm-member" id="dt-confirm-member"></div>
+      <div class="dt-modal-strip" id="dt-confirm-strip"></div>
+    </div>
+    <div class="dt-modal-footer">
+      <button class="dt-btn dt-btn-cancel" id="dt-confirm-cancel">Cancelar</button>
+      <button class="dt-btn dt-btn-reject" id="dt-confirm-ok">Excluir</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Member Modal -->
 <div class="dt-modal-backdrop hidden" id="dt-modal-backdrop">
   <div class="dt-modal" id="dt-modal">
@@ -506,9 +535,10 @@ TMPL.innerHTML = `
         <div class="dt-modal-error" id="dt-error-desc">Descrição é obrigatória.</div>
       </div>
       <div class="dt-modal-field">
-        <label for="dt-input-parent">Hierarquia (parentId)</label>
-        <input id="dt-input-parent" type="text" placeholder="Ex: MULTAS_CONTRATUAIS" autocomplete="off" />
-        <div class="dt-modal-hint">ID do nó pai na hierarquia. Deixe vazio para raiz.</div>
+        <label for="dt-input-parent">Grupo (pai na hierarquia)</label>
+        <input id="dt-input-parent" type="text" list="dt-parent-list" placeholder="Escolha um grupo ou digite um ID" autocomplete="off" />
+        <datalist id="dt-parent-list"></datalist>
+        <div class="dt-modal-hint" id="dt-parent-hint">Escolha um grupo existente ou digite o ID de um pai novo. Vazio = raiz.</div>
       </div>
     </div>
     <div class="dt-modal-footer">
@@ -606,6 +636,7 @@ class DropdownTableWidget extends HTMLElement {
     this._applyDynamicStyles();
     this._bindContextMenu();
     this._bindModal();
+    this._bindDeleteConfirm();
     this._bindSelectionKeys();
     this._bindSaveButton();
   }
@@ -2163,55 +2194,11 @@ class DropdownTableWidget extends HTMLElement {
       }
     });
 
+    // Excluir membro: abre a confirmação (com bloqueio por regra de negócio); o evento só sai no "Excluir"
     this.shadowRoot.getElementById("ctx-exclude-member").addEventListener("mousedown", function(e) {
       e.stopPropagation();
       self._closeCtxMenu();
-      if (self._ctxTarget) {
-        var target = self._ctxTarget;
-        var rawId = target.memberId || "";
-        // Extrai ID limpo do formato [DIM].[HIER].&[ID]
-        var cleanId = rawId;
-        var match = rawId.match(/\.&\[([^\]]+)\]$/);
-        if (match) { cleanId = match[1]; }
-
-        // Extrai ID real da dimensão do metadata
-        var dimRealId = target.dimensionRealId || "";
-        if (!dimRealId || dimRealId.indexOf("dimensions_") !== -1) {
-          try {
-            var dimMeta2 = self._metadata && self._metadata.dimensions
-              ? self._metadata.dimensions[target.dimensionId] : null;
-            if (dimMeta2 && dimMeta2.id) { dimRealId = dimMeta2.id; }
-          } catch(ex2) {}
-        }
-
-        self._deleteMemberId          = cleanId;
-        self._deleteMemberDimensionId = dimRealId;
-
-        self.dispatchEvent(new CustomEvent("propertiesChanged", {
-          bubbles: true, composed: true,
-          detail: {
-            properties: {
-              deleteMemberId:          self._deleteMemberId,
-              deleteMemberDimensionId: self._deleteMemberDimensionId
-            }
-          }
-        }));
-
-        Promise.resolve().then(function() {
-          self.dispatchEvent(new CustomEvent("onDeleteMemberRequested", {
-            bubbles: true, composed: true,
-            detail: {
-              action:          "excludeMember",
-              rowIndex:        target.rowIndex,
-              dimensionId:     target.dimensionId,
-              dimensionRealId: target.dimensionRealId,
-              dimensionName:   target.dimensionName,
-              memberId:        cleanId,
-              memberLabel:     target.memberLabel
-            }
-          }));
-        });
-      }
+      if (self._ctxTarget) { self._openDeleteConfirm(self._ctxTarget); }
     });
 
     this.shadowRoot.getElementById("ctx-exclude").addEventListener("mousedown", function(e) {
@@ -2333,15 +2320,25 @@ class DropdownTableWidget extends HTMLElement {
     });
 
     btnConfirm.addEventListener("click", function() {
-      var idVal     = inputId.value.trim();
-      var descVal   = inputDesc.value.trim();
-      var parentVal = inputParent.value.trim();
+      // Regras que antes ficavam no script: maiúsculas, obrigatórios, formato e duplicidade do ID
+      var upper     = function(s) { return String(s || "").trim().toLocaleUpperCase("pt-BR"); };
+      var idVal     = upper(inputId.value);
+      var descVal   = upper(inputDesc.value);
+      var parentVal = upper(inputParent.value);
       var valid     = true;
-
-      if (idVal === "") {
+      var showIdError = function(msg) {
+        errorId.textContent = msg;
         inputId.classList.add("error");
         errorId.classList.add("visible");
         valid = false;
+      };
+
+      if (idVal === "") {
+        showIdError("ID do membro é obrigatório.");
+      } else if (!/^[A-Z0-9_.\-]+$/.test(idVal)) {
+        showIdError("Use só letras sem acento, números, _ . ou - (sem espaços).");
+      } else if (self._accountIndex().ids[idVal]) {
+        showIdError("Já existe uma conta com o ID " + idVal + ".");
       }
       if (descVal === "") {
         inputDesc.classList.add("error");
@@ -2349,6 +2346,7 @@ class DropdownTableWidget extends HTMLElement {
         valid = false;
       }
       if (!valid) { return; }
+      self._lastMemberAction = { type: "add", id: idVal };
 
       var target = self._ctxTarget || {};
 
@@ -2414,6 +2412,15 @@ class DropdownTableWidget extends HTMLElement {
     inputId.addEventListener("keydown", function(e) {
       if (e.key === "Enter") { inputDesc.focus(); }
     });
+    // Pai digitado que não está na lista de grupos: avisa (é permitido, mas precisa existir no modelo)
+    var parentHint = this.shadowRoot.getElementById("dt-parent-hint");
+    var defaultHint = parentHint.textContent;
+    inputParent.addEventListener("input", function() {
+      var v = String(inputParent.value || "").trim().toLocaleUpperCase("pt-BR");
+      var known = !v || self._accountGroups().some(function(g) { return g.id.toUpperCase() === v; });
+      parentHint.textContent = known ? defaultHint : "Pai novo (fora da lista): o ID " + v + " precisa existir na hierarquia do modelo.";
+      parentHint.style.color = known ? "" : "var(--sap-warning)";
+    });
   }
 
   _openAddMemberModal() {
@@ -2446,6 +2453,19 @@ class DropdownTableWidget extends HTMLElement {
     errorId.classList.remove("visible");
     errorDesc.classList.remove("visible");
 
+    // Lista de grupos existentes (o campo continua aceitando um pai novo digitado)
+    var dl = this.shadowRoot.getElementById("dt-parent-list");
+    dl.innerHTML = "";
+    this._accountGroups().forEach(function(g) {
+      var opt = document.createElement("option");
+      opt.value = g.id;
+      if (g.label && g.label !== g.id) { opt.label = g.label; opt.textContent = g.label; }
+      dl.appendChild(opt);
+    });
+    var parentHint = this.shadowRoot.getElementById("dt-parent-hint");
+    parentHint.textContent = "Escolha um grupo existente ou digite o ID de um pai novo. Vazio = raiz.";
+    parentHint.style.color = "";
+
     backdrop.classList.remove("hidden");
     setTimeout(function() { inputId.focus(); }, 50);
   }
@@ -2453,6 +2473,134 @@ class DropdownTableWidget extends HTMLElement {
   _closeModal() {
     var backdrop = this.shadowRoot.getElementById("dt-modal-backdrop");
     backdrop.classList.add("hidden");
+  }
+
+  // ─── Contas (dimensions_0): IDs, grupos e valores — base das regras de adicionar/excluir ───
+  _accountIndex() {
+    var ids = {};      // ID limpo (maiúsculo) → true, para checar duplicidade
+    var labels = {};   // ID completo → descrição
+    var parents = {};  // ID completo do pai → true
+    var withValues = {}; // ID completo → true se alguma linha tem medida ≠ 0
+    for (var r = 0; r < (this._data || []).length; r++) {
+      var row = this._data[r];
+      var c = row["dimensions_0"] || {};
+      if (!c.id) { continue; }
+      ids[this._cleanMemberId(c.id).toUpperCase()] = true;
+      if (c.label) { labels[c.id] = c.label; }
+      if (c.parentId) { parents[c.parentId] = true; }
+      for (var k in row) {
+        if (k.indexOf("measures_") !== 0 || !row[k]) { continue; }
+        var n = parseFloat(row[k].raw);
+        if (!isNaN(n) && n !== 0) { withValues[c.id] = true; }
+      }
+    }
+    return { ids: ids, labels: labels, parents: parents, withValues: withValues };
+  }
+
+  // Grupos existentes (contas que são pai de outras) para a lista do campo "Grupo"
+  _accountGroups() {
+    var idx = this._accountIndex();
+    var list = [];
+    for (var pid in idx.parents) {
+      list.push({ id: this._cleanMemberId(pid), label: idx.labels[pid] || this._cleanMemberId(pid) });
+    }
+    list.sort(function(a, b) { return String(a.label).localeCompare(String(b.label), "pt-BR"); });
+    return list;
+  }
+
+  // ─── Exclusão de membro: confirmação com bloqueio ─────────────
+  _openDeleteConfirm(target) {
+    var rawId = target.memberId || "";
+    var cleanId = this._cleanMemberId(rawId);
+    var dimRealId = target.dimensionRealId || "";
+    if (!dimRealId || dimRealId.indexOf("dimensions_") !== -1) { dimRealId = this._dimRealId(target.dimensionId); }
+
+    var idx = this._accountIndex();
+    var blockReason = "";
+    if (idx.withValues[rawId]) {
+      blockReason = "Esta conta tem valores lançados neste cliente. Zere os valores e salve antes de excluir.";
+    } else if (idx.parents[rawId]) {
+      blockReason = "Esta conta é um grupo com subcontas. Exclua ou mova as subcontas antes.";
+    }
+
+    this._pendingDelete = blockReason ? null : { target: target, cleanId: cleanId, dimRealId: dimRealId };
+    this.shadowRoot.getElementById("dt-confirm-member").innerHTML = "";
+    var memberEl = this.shadowRoot.getElementById("dt-confirm-member");
+    memberEl.appendChild(document.createTextNode("Conta: "));
+    var b = document.createElement("b");
+    b.textContent = (target.memberLabel || cleanId) + (target.memberLabel && target.memberLabel !== cleanId ? " (" + cleanId + ")" : "");
+    memberEl.appendChild(b);
+
+    var strip = this.shadowRoot.getElementById("dt-confirm-strip");
+    var okBtn = this.shadowRoot.getElementById("dt-confirm-ok");
+    var cancelBtn = this.shadowRoot.getElementById("dt-confirm-cancel");
+    if (blockReason) {
+      strip.className = "dt-modal-strip error";
+      strip.textContent = blockReason;
+      okBtn.classList.add("hidden");
+      cancelBtn.textContent = "Fechar";
+    } else {
+      strip.className = "dt-modal-strip warn";
+      strip.textContent = "A conta será removida do modelo para todos os clientes, versões e períodos. Esta ação não pode ser desfeita.";
+      okBtn.classList.remove("hidden");
+      cancelBtn.textContent = "Cancelar";
+    }
+    this.shadowRoot.getElementById("dt-confirm-backdrop").classList.remove("hidden");
+    setTimeout(function() { (blockReason ? cancelBtn : okBtn).focus(); }, 50);
+  }
+
+  _closeDeleteConfirm() {
+    this.shadowRoot.getElementById("dt-confirm-backdrop").classList.add("hidden");
+  }
+
+  _bindDeleteConfirm() {
+    var self = this;
+    var backdrop = this.shadowRoot.getElementById("dt-confirm-backdrop");
+    this.shadowRoot.getElementById("dt-confirm-cancel").addEventListener("click", function() { self._pendingDelete = null; self._closeDeleteConfirm(); });
+    backdrop.addEventListener("click", function(e) { if (e.target === backdrop) { self._pendingDelete = null; self._closeDeleteConfirm(); } });
+    backdrop.addEventListener("keydown", function(e) { if (e.key === "Escape") { self._pendingDelete = null; self._closeDeleteConfirm(); } });
+    this.shadowRoot.getElementById("dt-confirm-ok").addEventListener("click", function() {
+      var pd = self._pendingDelete;
+      self._pendingDelete = null;
+      self._closeDeleteConfirm();
+      if (pd) { self._dispatchDeleteMember(pd.target, pd.cleanId, pd.dimRealId); }
+    });
+  }
+
+  _dispatchDeleteMember(target, cleanId, dimRealId) {
+    var self = this;
+    this._deleteMemberId          = cleanId;
+    this._deleteMemberDimensionId = dimRealId;
+    this._lastMemberAction = { type: "delete", id: cleanId };
+    this.dispatchEvent(new CustomEvent("propertiesChanged", {
+      bubbles: true, composed: true,
+      detail: { properties: { deleteMemberId: cleanId, deleteMemberDimensionId: dimRealId } }
+    }));
+    Promise.resolve().then(function() {
+      self.dispatchEvent(new CustomEvent("onDeleteMemberRequested", {
+        bubbles: true, composed: true,
+        detail: {
+          action:          "excludeMember",
+          rowIndex:        target.rowIndex,
+          dimensionId:     target.dimensionId,
+          dimensionRealId: dimRealId,
+          dimensionName:   target.dimensionName,
+          memberId:        cleanId,
+          memberLabel:     target.memberLabel
+        }
+      }));
+    });
+  }
+
+  // O script informa o retorno do createMembers/deleteMembers; o widget mostra o aviso
+  setMemberResult(ok) {
+    var a = this._lastMemberAction || { type: "", id: "" };
+    var what = a.type === "delete" ? "excluído" : "criado";
+    if (ok) {
+      this._showNotice("Membro " + a.id + " " + what + " com sucesso.", "info");
+    } else {
+      this._showNotice("Falha: o membro " + a.id + " não foi " + what + ". Verifique permissões" + (a.type === "delete" ? "." : " e se o grupo pai existe no modelo."), "error");
+    }
   }
 
   // ─── Save Button ──────────────────────────────────────────────
