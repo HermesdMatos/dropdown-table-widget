@@ -201,6 +201,10 @@ TMPL.innerHTML = `
   tbody tr.dt-row-failed td { background: var(--sap-error-bg) !important; }
   tbody tr.dt-row-failed td:first-child { box-shadow: inset 3px 0 0 var(--sap-error); }
   .dt-multi-combo { color: var(--sap-warning); font-weight: 700; margin-left: 6px; cursor: help; }
+  /* Linha do subgrupo de netos: recuo sob o título do subgrupo */
+  .dt-subgroup-inner { display: flex; align-items: center; padding-left: 16px; }
+  .dt-subgroup-inner .cell-dropdown { flex: 1; min-width: 0; }
+  .dt-subgroup-warn { margin: 0 8px 0 4px; }
 
   /* ── Lista do dropdown = Popover Horizon ─────────────────────── */
   .dt-dropdown-list {
@@ -2893,6 +2897,38 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
 
+    // Subgrupos de netos (ex: FINANCEIRO > MÁQUINA DE CARTÃO > máquinas): em vez de uma linha por
+    // filho, uma linha só com um dropdown para escolher qual filho visualizar (modo sem script)
+    if (this._isExplicitDropdownMode()) {
+      var sgChildren = {};
+      var sgNested = {};
+      for (var sgi = 0; sgi < renderList.length; sgi++) {
+        var sgItem = renderList[sgi];
+        var sgCell = this._data[sgItem.rowIndex]["dimensions_0"] || {};
+        if (!sgCell.parentId) { continue; }
+        if (sgItem.type === "row") {
+          if (!sgChildren[sgCell.parentId]) { sgChildren[sgCell.parentId] = []; }
+          sgChildren[sgCell.parentId].push(sgItem.rowIndex);
+        } else if (sgItem.type === "subheader") {
+          sgNested[sgCell.parentId] = true;
+        }
+      }
+      var sgConsumed = {};
+      var sgList = [];
+      for (var sgj = 0; sgj < renderList.length; sgj++) {
+        var sgIt = renderList[sgj];
+        if (sgIt.type === "row" && sgConsumed[sgIt.rowIndex]) { continue; }
+        sgList.push(sgIt);
+        if (sgIt.type !== "subheader") { continue; }
+        var sgId = (this._data[sgIt.rowIndex]["dimensions_0"] || {}).id;
+        var sgKids = sgChildren[sgId];
+        if (!sgKids || sgKids.length < 2 || sgNested[sgId]) { continue; }
+        for (var sgk = 0; sgk < sgKids.length; sgk++) { sgConsumed[sgKids[sgk]] = true; }
+        sgList.push({ type: "subgroupSelect", parentId: sgId, children: sgKids });
+      }
+      renderList = sgList;
+    }
+
     var totalCols = dimensions.length + measures.length;
     var self2 = this;
 
@@ -3213,14 +3249,85 @@ class DropdownTableWidget extends HTMLElement {
         tdSH.textContent = item.label;
         trSH.appendChild(tdSH);
         tbody.appendChild(trSH);
+      } else if (item.type === "subgroupSelect") {
+        self2._renderSubgroupSelect(item, renderRow, bestRowByDim0);
       } else {
         renderRow(item.rowIndex);
       }
     }
   }
 
+  // Linha única do subgrupo de netos: a coluna da conta vira dropdown dos filhos e o restante
+  // da linha mostra dimensões e medidas do filho escolhido (só troca a visualização; nada é movido)
+  _renderSubgroupSelect(item, renderRow, bestRowByDim0) {
+    var self = this;
+    var kids = item.children;
+    if (!this._subgroupSelection) { this._subgroupSelection = {}; }
+
+    // Filhos com valor ≠ 0 (para o padrão, o rótulo da lista e o alerta)
+    var withValue = {};
+    var withValueLabels = [];
+    for (var i = 0; i < kids.length; i++) {
+      var kCell = this._data[kids[i]]["dimensions_0"] || {};
+      var best = bestRowByDim0[kCell.id];
+      if (best && best.nonZero) { withValue[kids[i]] = true; withValueLabels.push(kCell.label || kCell.id); }
+    }
+
+    // Escolhido: o da sessão → o que tem valor → o primeiro
+    var selRi = -1;
+    var savedId = this._subgroupSelection[item.parentId];
+    for (var s = 0; s < kids.length && selRi === -1; s++) {
+      if (((this._data[kids[s]]["dimensions_0"] || {}).id) === savedId) { selRi = kids[s]; }
+    }
+    for (var v = 0; v < kids.length && selRi === -1; v++) {
+      if (withValue[kids[v]]) { selRi = kids[v]; }
+    }
+    if (selRi === -1) { selRi = kids[0]; }
+
+    renderRow(selRi);
+    var tbody = this.shadowRoot.getElementById("dt-body");
+    var tr = tbody.lastElementChild;
+    if (!tr) { return; }
+    tr.classList.add("dt-subgroup-row");
+
+    var selCell = this._data[selRi]["dimensions_0"] || {};
+    var options = [];
+    for (var o = 0; o < kids.length; o++) {
+      var oc = this._data[kids[o]]["dimensions_0"] || {};
+      options.push({ value: oc.id, label: (oc.label || oc.id) + (withValue[kids[o]] && kids[o] !== selRi ? "  — com valor" : "") });
+    }
+
+    var td0 = tr.firstElementChild;
+    td0.innerHTML = "";
+    var inner = document.createElement("div");
+    inner.className = "dt-subgroup-inner";
+    td0.appendChild(inner);
+    var wrapper = this._buildDropdownCell(inner, selRi, "dimensions_0", selCell.label || selCell.id, selCell.id, options, function(opt) {
+      self._subgroupSelection[item.parentId] = opt.value;
+      self._render();
+    });
+    wrapper.title = "Escolha qual conta deste grupo visualizar";
+    // Menu de contexto (adicionar/excluir membro) continua valendo para a conta escolhida
+    wrapper.addEventListener("contextmenu", function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      self._closeDropdown();
+      self._openCtxMenu(e, selRi, "dimensions_0", selCell.id, selCell.label || selCell.id, self._dimRealId("dimensions_0"), wrapper);
+    });
+
+    // Mais de um filho com valor: alerta (o esperado é um só)
+    if (withValueLabels.length > 1) {
+      var badge = document.createElement("span");
+      badge.className = "dt-multi-combo dt-subgroup-warn";
+      badge.textContent = "⚠";
+      badge.title = "Mais de uma conta deste grupo tem valor: " + withValueLabels.join(", ");
+      inner.appendChild(badge);
+    }
+  }
+
   // ─── Dropdown cell ────────────────────────────────────────────
-  _buildDropdownCell(td, rowIndex, dimensionId, currentLabel, currentId, options) {
+  // onPick (opcional): ação ao escolher um item; sem ele, troca o valor da dimensão (_selectValue)
+  _buildDropdownCell(td, rowIndex, dimensionId, currentLabel, currentId, options, onPick) {
     var self    = this;
     var wrapper = document.createElement("div");
     wrapper.className = "cell-dropdown";
@@ -3247,7 +3354,7 @@ class DropdownTableWidget extends HTMLElement {
     wrapper.addEventListener("click", function(e) {
       e.stopPropagation();
       var effectiveId = wrapper._currentId !== undefined ? wrapper._currentId : currentId;
-      self._openDropdown(wrapper, rowIndex, dimensionId, effectiveId, options);
+      self._openDropdown(wrapper, rowIndex, dimensionId, effectiveId, options, onPick);
     });
     wrapper.addEventListener("keydown", function(e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); wrapper.click(); }
@@ -3273,9 +3380,10 @@ class DropdownTableWidget extends HTMLElement {
     });
 
     td.appendChild(wrapper);
+    return wrapper;
   }
 
-  _openDropdown(cellEl, rowIndex, dimensionId, currentId, options) {
+  _openDropdown(cellEl, rowIndex, dimensionId, currentId, options, onPick) {
     var self = this;
     this._closeDropdown();
     if (!options) { options = []; }
@@ -3319,6 +3427,7 @@ class DropdownTableWidget extends HTMLElement {
         item.textContent = opt.label;
         item.addEventListener("mousedown", function(e) {
           e.preventDefault();
+          if (onPick) { self._closeDropdown(); onPick(opt); return; }
           self._selectValue(rowIndex, dimensionId, opt.value, opt.label);
           self._closeDropdown();
         });

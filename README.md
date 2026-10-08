@@ -35,6 +35,7 @@ O `setUserInput` só existe no planejamento de uma **Tabela** (a API de custom w
 - **Gravação que falha** (`setWriteResult(i, false)`) continua pendente e destacada em vermelho após `clearPendingChanges()`.
 - **Troca de contexto** (ex: cliente) com alterações não salvas: aviso no topo do widget e evento `onPendingChangesDiscarded`.
 - **Conta com mais de uma combinação gravada** (valor ≠ 0): alerta ⚠ ao lado da conta; a tabela mostra a de maior valor.
+- **Subgrupo de netos** (ex: FINANCEIRO > MÁQUINA DE CARTÃO > máquinas): uma linha só, com dropdown dos filhos na coluna da conta. Mostra por padrão o filho com valor; trocar só muda a visualização (nada é movido). Mais de um filho com valor: alerta ⚠.
 - **Desempate** entre combinações com 0: prefere a salva por último nesta sessão (ao recarregar a story, só uma Data Action de limpeza resolve).
 
 O widget também converte o número pt-BR, resolve o ID da medida, remove duplicatas e descarta endereços incompletos. No evento `onSaveRequested`:

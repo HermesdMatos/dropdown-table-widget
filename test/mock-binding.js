@@ -176,5 +176,29 @@
     return { binding: binding, dataBindings: dbs, R: R };
   }
 
-  window.DTMock = { twoMeasuresScenario: twoMeasuresScenario, mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, mainBindingWithParentLevels: mainBindingWithParentLevels, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
+  // FINANCEIRO > SEGUROS (conta) e FINANCEIRO > MÁQUINA DE CARTÃO > 3 máquinas (netos).
+  // Só a "Máquina simples" tem valor (ou duas, com twoWithValues).
+  function grandchildrenScenario(twoWithValues) {
+    var b = mainBinding(0);
+    var perNode = cell(PER + "[PER_ALL]", "Periodos");
+    var respNode = cell(RESP + "[RESP_ALL]", "RESPONSAVEL");
+    var FIN = CONTA + "[FIN]", MAQ = CONTA + "[MAQ]";
+    function row(id, label, parent, per, resp, raw) {
+      return { dimensions_0: cell(CONTA + "[" + id + "]", label, parent),
+        dimensions_1: per ? cell(PER + "[" + per + "]", per, PER + "[PER_ALL]") : perNode,
+        dimensions_2: resp ? cell(RESP + "[" + resp + "]", resp, RESP + "[RESP_ALL]") : respNode,
+        measures_0: measure(raw, raw === null ? "" : String(raw)) };
+    }
+    b.data = [
+      { dimensions_0: cell(FIN, "FINANCEIRO"), dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(null, "") },
+      row("SEG", "SEGUROS", FIN, "MENSAL", "ANA", 50),
+      { dimensions_0: cell(MAQ, "MÁQUINA DE CARTÃO", FIN), dimensions_1: perNode, dimensions_2: respNode, measures_0: measure(null, "") },
+      row("M_DIF", "MÁQ. IMPRIME CUPOM DIFÍCIL", MAQ, null, null, twoWithValues ? 30 : null),
+      row("M_FAC", "MÁQ. IMPRIME CUPOM FÁCIL", MAQ, null, null, null),
+      row("M_SIM", "MÁQUINA SIMPLES", MAQ, "ANUAL", "ANA", 71.98)
+    ];
+    return b;
+  }
+
+  window.DTMock = { grandchildrenScenario: grandchildrenScenario, twoMeasuresScenario: twoMeasuresScenario, mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, mainBindingWithParentLevels: mainBindingWithParentLevels, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
 })();

@@ -39,6 +39,8 @@
 <div class="widget-box"><dropdowntable-widget id="wK" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>L — adicionar/excluir membro (validação e bloqueio no widget)</h2>
 <div class="widget-box"><dropdowntable-widget id="wL" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>N — netos: uma linha com dropdown dos filhos do subgrupo</h2>
+<div class="widget-box"><dropdowntable-widget id="wN" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -378,6 +380,35 @@
       { id: Lw.getNewMemberId(), desc: Lw.getNewMemberDescription(), pai: Lw.getNewMemberParentId() });
     Lw.setMemberResult(true);
     check("L8 setMemberResult mostra o resultado no widget", lSR.getElementById("dt-notice").textContent.indexOf("NOVA_CONTA criado com sucesso") !== -1, lSR.getElementById("dt-notice").textContent);
+
+    // ── N ─────────────────────────────────────────────────────────
+    // Netos (FINANCEIRO > MÁQUINA DE CARTÃO > máquinas): uma linha com dropdown dos filhos
+    var Nw = document.getElementById("wN");
+    setup(Nw, { mainBinding: M.grandchildrenScenario(false) });
+    await tick();
+    var nSR = Nw.shadowRoot;
+    var nRows = nSR.querySelectorAll("tr.dt-subgroup-row");
+    var nSub = Array.prototype.map.call(nSR.querySelectorAll("tr.dt-subheader"), function(t) { return t.textContent.trim(); });
+    check("N1 subgrupo de netos vira uma linha só (título do subgrupo mantido)",
+      nRows.length === 1 && nSub.join() === "MÁQUINA DE CARTÃO" && nSR.querySelectorAll("tr[data-row-index]").length === 2,
+      { linhas: nSR.querySelectorAll("tr[data-row-index]").length, sub: nSub });
+    var nCells = Array.prototype.map.call(nRows[0].querySelectorAll("td"), function(td) { var i = td.querySelector("input"); return i ? i.value : td.textContent.trim(); });
+    check("N2 por padrão mostra a máquina com valor (Máquina simples) e seus valores", nCells.join("|") === "MÁQUINA SIMPLES|ANUAL|ANA|71.98", nCells);
+    var nOpts = openOptions(Nw, 5, 0); Nw._closeDropdown();
+    check("N3 dropdown lista as 3 máquinas", nOpts.length === 3 && nOpts.indexOf("MÁQ. IMPRIME CUPOM FÁCIL") !== -1, nOpts);
+    var nDd = nSR.querySelector("tr.dt-subgroup-row .cell-dropdown");
+    nDd.click();
+    Array.prototype.find.call(nSR.querySelectorAll(".dt-dropdown-item"), function(i) { return i.textContent === "MÁQ. IMPRIME CUPOM FÁCIL"; })
+      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    var nRow2 = nSR.querySelector("tr.dt-subgroup-row");
+    check("N4 escolher outra máquina só troca a visualização (sem alteração pendente)",
+      nRow2.getAttribute("data-row-index") === "4" && nRow2.querySelector(".cell-value").textContent === "MÁQ. IMPRIME CUPOM FÁCIL" && Nw.getPendingChanges() === "",
+      { linha: nRow2.getAttribute("data-row-index"), pend: Nw.getPendingChanges() });
+    var nOpts2 = openOptions(Nw, 4, 0); Nw._closeDropdown();
+    check("N5 a máquina com valor aparece marcada na lista", nOpts2.indexOf("MÁQUINA SIMPLES  — com valor") !== -1, nOpts2);
+    setup(Nw, { mainBinding: M.grandchildrenScenario(true) });
+    await tick();
+    check("N6 duas máquinas com valor: alerta ⚠ na linha", !!nSR.querySelector("tr.dt-subgroup-row .dt-subgroup-warn"));
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");
