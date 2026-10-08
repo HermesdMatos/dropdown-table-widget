@@ -35,6 +35,8 @@
 <div class="widget-box"><dropdowntable-widget id="wI" style="display:block;width:900px;height:240px"></dropdowntable-widget></div>
 <h2>J — Responsabilidade CLIENTE com QTDE e CUSTO</h2>
 <div class="widget-box"><dropdowntable-widget id="wJ" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<h2>K — visual SAP Horizon (compacto) e cores do painel</h2>
+<div class="widget-box"><dropdowntable-widget id="wK" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
@@ -303,6 +305,28 @@
     }
     check("J2 grava 0 em QTDE e CUSTO no CLIENTE e zera só a QTDE que existia em Ana",
       jW.length === 3 && jW.indexOf("[CLI]:QTDE=0") !== -1 && jW.indexOf("[CLI]:CUSTO=0") !== -1 && jW.indexOf("[ANA]:QTDE=0") !== -1, jW);
+
+    // ── K ─────────────────────────────────────────────────────────
+    // Visual SAP Horizon (compacto) por padrão; cores do painel continuam prevalecendo
+    var K = document.getElementById("wK");
+    setup(K, { mainBinding: M.mainBindingWithBookedLeaves() });
+    await tick();
+    var kTh = K.shadowRoot.querySelector("thead th");
+    var kTd = K.shadowRoot.querySelector('tr[data-row-index="1"] td');
+    var kInput = K.shadowRoot.querySelector('tr[data-row-index="1"] input');
+    check("K1 Horizon: cabeçalho branco com texto #1d2d3e",
+      getComputedStyle(kTh).backgroundColor === "rgb(255, 255, 255)" && getComputedStyle(kTh).color === "rgb(29, 45, 62)",
+      { bg: getComputedStyle(kTh).backgroundColor, color: getComputedStyle(kTh).color });
+    check("K2 Horizon compacto: linha de 32px e números à direita",
+      Math.round(kTd.getBoundingClientRect().height) <= 33 && getComputedStyle(kInput).textAlign === "right",
+      { altura: kTd.getBoundingClientRect().height, alinhamento: getComputedStyle(kInput).textAlign });
+    K.headerColor = "#1a73e8";
+    K.styleConfig = JSON.stringify({ rowHeight: 44 });
+    kTh = K.shadowRoot.querySelector("thead th");
+    kTd = K.shadowRoot.querySelector('tr[data-row-index="1"] td');
+    check("K3 cores e altura do painel prevalecem sobre o tema",
+      getComputedStyle(kTh).backgroundColor === "rgb(26, 115, 232)" && Math.round(kTd.getBoundingClientRect().height) >= 44,
+      { bg: getComputedStyle(kTh).backgroundColor, altura: kTd.getBoundingClientRect().height });
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

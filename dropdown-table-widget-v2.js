@@ -35,228 +35,317 @@ try {
 var TMPL = document.createElement("template");
 TMPL.innerHTML = `
 <style>
-  :host { display: block; font-family: Arial, sans-serif; position: relative; box-sizing: border-box; }
-  .dt-wrapper { width: 100%; height: 100%; overflow: auto; box-sizing: border-box; position: relative; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  /* ── Tokens SAP Horizon (Fiori) ─────────────────────────────────
+     As variáveis sem prefixo --sap- são as cores editáveis no painel de estilo. */
+  :host {
+    --sap-font: '72', '72full', Arial, Helvetica, sans-serif;
+    --sap-text: #1d2d3e;
+    --sap-label: #556b82;
+    --sap-brand: #0070f2;
+    --sap-brand-hover: #0064d9;
+    --sap-border: #e5e5e5;
+    --sap-header-border: #a8b2bd;
+    --sap-field-border: #556b81;
+    --sap-shell-bg: #f5f6f7;
+    --sap-readonly-bg: #f5f6f7;
+    --sap-warning: #e76500;
+    --sap-warning-bg: #fff8d6;
+    --sap-error: #aa0808;
+    --sap-error-bg: #ffeaf4;
+    --sap-info-bg: #ebf8ff;
+    --sap-popover-shadow: 0 0 0.125rem 0 rgba(34,53,72,0.16), 0 0.5rem 1rem 0 rgba(34,53,72,0.16);
+    --dt-row-height: 32px;
+    display: block;
+    font-family: var(--sap-font);
+    font-size: 14px;
+    color: var(--sap-text);
+    position: relative;
+    box-sizing: border-box;
+    background: #ffffff;
+  }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
 
-  thead tr { background: var(--header-color, #1a73e8); }
-
-  .dt-group-header td { background: var(--group-header-bg, #f0f4ff) !important; color: var(--group-header-color, #1a3a6e) !important; }
-  .dt-subheader td { background: var(--subheader-bg, #e8f0fe) !important; color: var(--subheader-color, #1a3a6e) !important; }
+  /* ── Cabeçalho de colunas (sap.m.Table) ───────────────────────── */
   thead th {
-    color: var(--header-text-color, #ffffff);
-    background: var(--header-color, #1a73e8);
-    padding: 8px 12px;
+    color: var(--header-text-color, var(--sap-text));
+    background: var(--header-color, #ffffff);
+    padding: 0 8px;
+    height: var(--dt-row-height);
     text-align: left;
-    font-weight: 600;
-    border: 1px solid rgba(255,255,255,0.2);
+    font-weight: 700;
+    font-size: 14px;
+    border-bottom: 1px solid var(--sap-header-border);
+    border-right: 1px solid var(--sap-border);
     white-space: nowrap;
     position: sticky;
     top: 0;
     z-index: 2;
   }
+  thead th:last-child { border-right: none; }
 
-  tbody tr { border-bottom: 1px solid #e0e0e0; }
-  tbody tr:hover td { background: var(--hover-row-color, #f5f5f5); }
+  /* ── Linhas ───────────────────────────────────────────────────── */
   tbody td {
     padding: 0;
-    color: var(--table-text-color, #333333);
-    border-right: 1px solid #e0e0e0;
-    height: 36px;
+    color: var(--table-text-color, var(--sap-text));
+    border-bottom: 1px solid var(--sap-border);
+    border-right: 1px solid var(--sap-border);
+    height: var(--dt-row-height);
     vertical-align: middle;
-    background: #fff;
+    background: #ffffff;
+  }
+  tbody td:last-child { border-right: none; }
+  tbody tr:hover td { background: var(--hover-row-color, #eaecee); }
+  tbody tr.dt-parent-row td { font-weight: 700; }
+
+  /* Grupo (ex: ASSESSORIAS) e subgrupo */
+  .dt-group-cell, .dt-subgroup-cell {
+    padding: 0 8px;
+    height: var(--dt-row-height);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .dt-group-header td, .dt-group-header:hover td {
+    background: var(--group-header-bg, var(--sap-shell-bg)) !important;
+    color: var(--group-header-color, var(--sap-text)) !important;
+    font-weight: 700;
+  }
+  .dt-subheader td, .dt-subheader:hover td {
+    background: var(--subheader-bg, #ffffff) !important;
+    color: var(--subheader-color, var(--sap-text)) !important;
+    font-weight: 700;
+    padding-left: 24px;
   }
 
   .cell-plain {
-    padding: 0 12px;
+    padding: 0 8px;
     display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 36px;
+    line-height: var(--dt-row-height);
   }
 
+  /* ── Célula dropdown = Select do Fiori ───────────────────────── */
   .cell-dropdown {
     position: relative;
     display: flex;
     align-items: center;
-    height: 36px;
+    height: calc(var(--dt-row-height) - 6px);
+    margin: 0 4px;
+    border-radius: 4px;
     cursor: pointer;
     user-select: none;
     box-sizing: border-box;
+    outline: none;
   }
-  .cell-dropdown:hover { background: rgba(26,115,232,0.06); }
-  .cell-dropdown.active { outline: 2px solid #1a73e8; outline-offset: -2px; }
+  .cell-dropdown:hover { box-shadow: inset 0 0 0 1px var(--sap-brand-hover); background: #ffffff; }
+  .cell-dropdown:focus, .cell-dropdown.active { box-shadow: inset 0 0 0 2px var(--sap-brand); background: #ffffff; }
   .cell-value {
     flex: 1;
-    padding: 0 28px 0 12px;
-    font-size: 13px;
+    padding: 0 28px 0 6px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--table-text-color, #333333);
+    color: var(--table-text-color, var(--sap-text));
   }
-  .cell-value.empty { color: #aaa; font-style: italic; }
+  .cell-value.empty { color: var(--sap-label); font-style: italic; }
   .cell-arrow {
     position: absolute;
     right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     pointer-events: none;
-    color: #888;
+    color: var(--sap-label);
+  }
+  .cell-arrow svg { width: 12px; height: 12px; display: block; }
+
+  /* ── Célula de medida = Input do Fiori (números à direita) ───── */
+  .dt-measure-input {
+    width: 100%;
+    height: var(--dt-row-height);
+    border: none;
+    background: transparent;
+    text-align: right;
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--table-text-color, var(--sap-text));
+    box-sizing: border-box;
+    outline: none;
+    cursor: text;
+  }
+  .dt-measure-input:hover { box-shadow: inset 0 -1px 0 0 var(--sap-field-border); }
+  .dt-measure-input:focus {
+    background: var(--editable-cell-color, #ffffff);
+    box-shadow: inset 0 0 0 2px var(--sap-brand);
+    border-radius: 4px;
+  }
+  input.dt-locked, input.dt-locked:hover {
+    background: var(--sap-readonly-bg) !important;
+    color: var(--sap-label) !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
   }
 
+  /* Seleção de células, alterada, falha */
+  .dt-measure-cell-selected {
+    background: var(--selected-row-color, var(--sap-info-bg)) !important;
+    box-shadow: inset 0 0 0 1px var(--sap-brand);
+  }
+  .changed-cell, .changed-cell input, .changed-cell .cell-dropdown, .changed-cell .cell-plain {
+    background: var(--sap-warning-bg) !important;
+  }
+  .changed-cell { box-shadow: inset 3px 0 0 var(--sap-warning); }
+  tbody tr.dt-row-failed td { background: var(--sap-error-bg) !important; }
+  tbody tr.dt-row-failed td:first-child { box-shadow: inset 3px 0 0 var(--sap-error); }
+  .dt-multi-combo { color: var(--sap-warning); font-weight: 700; margin-left: 6px; cursor: help; }
+
+  /* ── Lista do dropdown = Popover Horizon ─────────────────────── */
   .dt-dropdown-list {
     position: absolute;
     background: #ffffff;
-    border: 1px solid #dadce0;
-    border-radius: 4px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    border-radius: 8px;
+    box-shadow: var(--sap-popover-shadow);
     z-index: 99999;
     min-width: 160px;
-    max-height: 220px;
+    max-height: 264px;
     overflow-y: auto;
     padding: 4px 0;
   }
   .dt-dropdown-list.hidden { display: none; }
   .dt-dropdown-item {
-    padding: 8px 16px;
-    font-size: 13px;
+    height: 32px;
+    line-height: 32px;
+    padding: 0 16px;
+    font-size: 14px;
     cursor: pointer;
-    color: #333;
+    color: var(--sap-text);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .dt-dropdown-item:hover { background: #f1f3f4; }
+  .dt-dropdown-item:hover { background: #eaecee; }
   .dt-dropdown-item.selected {
-    background: var(--dropdown-highlight-color, #e8f0fe);
-    color: #1a73e8;
-    font-weight: 600;
+    background: var(--dropdown-highlight-color, var(--sap-info-bg));
+    color: var(--sap-brand-hover);
+    font-weight: 700;
   }
+  .dt-dropdown-empty, .dt-dropdown-empty:hover { color: var(--sap-label); font-style: italic; cursor: default; background: transparent; }
 
+  /* ── Carregando = BusyIndicator do Fiori ─────────────────────── */
   .dt-loading-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(255,255,255,0.75);
+    background: rgba(255,255,255,0.72);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 9999;
-    gap: 12px;
+    gap: 10px;
   }
   .dt-loading-overlay.hidden { display: none; }
-  .dt-spinner {
-    width: 36px;
-    height: 36px;
-    border: 4px solid #e0e0e0;
-    border-top-color: #1a73e8;
+  .dt-busy { display: flex; gap: 6px; }
+  .dt-busy span {
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    animation: dt-spin 0.7s linear infinite;
+    background: var(--sap-brand);
+    animation: dt-busy 1.2s infinite ease-in-out;
   }
-  @keyframes dt-spin {
-    to { transform: rotate(360deg); }
+  .dt-busy span:nth-child(2) { animation-delay: 0.2s; }
+  .dt-busy span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dt-busy {
+    0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
   }
-  .dt-loading-text {
-    font-size: 13px;
-    color: #555;
-    font-family: Arial, sans-serif;
-  }
-  .dt-title {
-    padding: 8px 12px 6px 12px;
-    font-weight: 700;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-shrink: 0;
-  }
-  .dt-title.hidden { display: none; }
+  .dt-loading-text { font-size: 14px; color: var(--sap-label); }
 
+  /* ── Toolbar da tabela: título à esquerda, Salvar à direita ──── */
   .dt-toolbar {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    padding: 6px 12px;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 8px 0 12px;
+    border-bottom: 1px solid var(--sap-border);
     flex-shrink: 0;
   }
   .dt-toolbar.hidden { display: none; }
+  .dt-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--sap-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dt-title.hidden { visibility: hidden; }
   .dt-save-btn {
-    background: var(--save-btn-bg, #1a73e8);
-    color: var(--save-btn-color, #fff);
-    border: none;
-    border-radius: 4px;
-    padding: 7px 18px;
-    font-size: 13px;
-    font-weight: 600;
+    background: var(--save-btn-bg, var(--sap-brand));
+    color: var(--save-btn-color, #ffffff);
+    border: 1px solid var(--save-btn-bg, var(--sap-brand));
+    border-radius: 8px;
+    height: 32px;
+    padding: 0 14px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
-    font-family: Arial, sans-serif;
   }
-  .dt-save-btn:hover { background: var(--save-btn-hover-bg, #1557b0); }
-  .dt-save-btn:active { background: #0e4191; }
-  .dt-empty { padding: 16px; color: #888; text-align: center; font-size: 13px; }
+  .dt-save-btn:hover { background: var(--save-btn-hover-bg, var(--sap-brand-hover)); border-color: var(--save-btn-hover-bg, var(--sap-brand-hover)); }
+  .dt-save-btn:active { filter: brightness(0.9); }
+  .dt-save-btn:focus-visible { outline: 2px solid var(--sap-brand); outline-offset: 2px; }
+  .dt-save-btn.hidden { display: none; }
 
-  /* Avisos de regra de negócio */
-  .dt-notice { margin: 0 12px 6px 12px; padding: 7px 12px; border-radius: 4px; font-size: 12px; flex-shrink: 0; }
-  .dt-notice.hidden { display: none; }
-  .dt-notice.warn  { background: #fff4e5; color: #8a4b00; border-left: 3px solid #f29900; }
-  .dt-notice.error { background: #fdecea; color: #a52714; border-left: 3px solid #e53935; }
-  .dt-notice.info  { background: #e8f0fe; color: #1a3a6e; border-left: 3px solid #1a73e8; }
-  tbody tr.dt-row-failed td { background: #fdecea !important; }
-  tbody tr.dt-row-failed td:first-child { box-shadow: inset 3px 0 0 #e53935; }
-  input.dt-locked { background: #f1f3f4 !important; color: #888 !important; cursor: not-allowed !important; }
-  .dt-multi-combo { color: #c26401; font-weight: 700; margin-left: 6px; cursor: help; }
+  .dt-empty { padding: 16px; color: var(--sap-label); text-align: center; font-size: 14px; }
   .dt-empty.hidden { display: none; }
-  .dt-measure-cell-selected {
-    outline: 2px solid #1a73e8 !important;
-    outline-offset: -2px;
-    background: #e8f0fe !important;
-  }
-  .changed-cell {
-    background: #fff3cd !important;
-    border: 1px solid #ffc107 !important;
-  }
-  .changed-cell input,
-  .changed-cell .cell-dropdown,
-  .changed-cell .cell-plain {
-    background: #fff3cd !important;
-  }
+
+  /* ── Avisos = MessageStrip ───────────────────────────────────── */
+  .dt-notice { margin: 8px 12px 4px 12px; padding: 8px 12px; border-radius: 8px; font-size: 14px; flex-shrink: 0; border: 1px solid; }
+  .dt-notice.hidden { display: none; }
+  .dt-notice.warn  { background: var(--sap-warning-bg); color: var(--sap-text); border-color: var(--sap-warning); }
+  .dt-notice.error { background: var(--sap-error-bg); color: var(--sap-text); border-color: var(--sap-error); }
+  .dt-notice.info  { background: var(--sap-info-bg); color: var(--sap-text); border-color: var(--sap-brand); }
 
   .dt-outer { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box; }
-  .dt-wrapper { width: 100%; flex: 1; overflow: auto; box-sizing: border-box; position: relative; }
+  .dt-wrapper { width: 100%; flex: 1; overflow: auto; box-sizing: border-box; position: relative; outline: none; }
 
-  /* ── Context Menu ─────────────────────────────────────────────── */
+  /* ── Menu de contexto = Menu Fiori (claro) ───────────────────── */
   .dt-ctx-menu {
     position: absolute;
-    background: #1e2530;
-    border: 1px solid #3a4250;
-    border-radius: 4px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: var(--sap-popover-shadow);
     z-index: 999999;
     min-width: 200px;
     padding: 4px 0;
-    font-size: 13px;
+    font-size: 14px;
   }
   .dt-ctx-menu.hidden { display: none; }
   .dt-ctx-item {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 9px 16px;
-    color: #e8eaf0;
+    height: 32px;
+    padding: 0 16px;
+    color: var(--sap-text);
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
   }
-  .dt-ctx-item:hover { background: #1a73e8; color: #fff; }
-  .dt-ctx-item svg { flex-shrink: 0; opacity: 0.85; }
-  .dt-ctx-separator { height: 1px; background: #3a4250; margin: 4px 0; }
+  .dt-ctx-item:hover { background: #eaecee; }
+  .dt-ctx-item svg { flex-shrink: 0; color: var(--sap-label); }
+  .dt-ctx-separator { height: 1px; background: var(--sap-border); margin: 4px 0; }
 
-  /* ── Add Member Modal ─────────────────────────────────────────── */
+  /* ── Diálogo "Adicionar membro" = Dialog Horizon ─────────────── */
   .dt-modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.45);
+    background: rgba(0,0,0,0.6);
     z-index: 9999998;
     display: flex;
     align-items: center;
@@ -264,84 +353,97 @@ TMPL.innerHTML = `
   }
   .dt-modal-backdrop.hidden { display: none; }
   .dt-modal {
-    background: #fff;
-    border-radius: 6px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.28);
-    width: 420px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 0 0.125rem 0 rgba(34,53,72,0.2), 0 1rem 2rem 0 rgba(34,53,72,0.2);
+    width: 440px;
     max-width: 95vw;
-    font-family: Arial, sans-serif;
+    font-family: var(--sap-font);
+    color: var(--sap-text);
     overflow: hidden;
   }
   .dt-modal-header {
-    background: #1a73e8;
-    color: #fff;
-    padding: 14px 20px;
-    font-size: 15px;
-    font-weight: 600;
+    background: #ffffff;
+    color: var(--sap-text);
+    height: 48px;
+    padding: 0 16px;
+    font-size: 16px;
+    font-weight: 700;
     display: flex;
     align-items: center;
     gap: 10px;
+    border-bottom: 1px solid var(--sap-border);
   }
-  .dt-modal-body { padding: 20px; }
+  .dt-modal-header svg { color: var(--sap-brand); }
+  .dt-modal-body { padding: 16px; }
   .dt-modal-info {
-    background: #e8f0fe;
-    border-left: 3px solid #1a73e8;
-    padding: 9px 13px;
-    font-size: 12px;
-    color: #1a3a6e;
-    border-radius: 3px;
+    background: var(--sap-info-bg);
+    border: 1px solid var(--sap-brand);
+    padding: 8px 12px;
+    font-size: 14px;
+    color: var(--sap-text);
+    border-radius: 8px;
     margin-bottom: 16px;
   }
-  .dt-modal-field { margin-bottom: 14px; }
+  .dt-modal-field { margin-bottom: 12px; }
   .dt-modal-field label {
     display: block;
-    font-size: 12px;
-    font-weight: 600;
-    color: #555;
-    margin-bottom: 5px;
+    font-size: 14px;
+    color: var(--sap-label);
+    margin-bottom: 4px;
   }
+  .dt-required { color: var(--sap-error); }
   .dt-modal-field input {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #ccc;
+    height: 36px;
+    padding: 0 10px;
+    border: none;
     border-radius: 4px;
-    font-size: 13px;
+    background: #ffffff;
+    box-shadow: inset 0 0 0 1px #bcc3ca, inset 0 -1px 0 0 var(--sap-field-border);
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--sap-text);
     box-sizing: border-box;
     outline: none;
-    transition: border-color 0.15s;
   }
-  .dt-modal-field input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
-  .dt-modal-field input.error { border-color: #e53935; }
-  .dt-modal-error { font-size: 11px; color: #e53935; margin-top: 4px; display: none; }
+  .dt-modal-field input:hover { box-shadow: inset 0 0 0 1px var(--sap-brand-hover); }
+  .dt-modal-field input:focus { box-shadow: inset 0 0 0 2px var(--sap-brand); }
+  .dt-modal-field input.error { background: var(--sap-error-bg); box-shadow: inset 0 0 0 1px var(--sap-error), inset 0 -2px 0 0 var(--sap-error); }
+  .dt-modal-hint { font-size: 12px; color: var(--sap-label); margin-top: 4px; }
+  .dt-modal-error { font-size: 12px; color: var(--sap-error); margin-top: 4px; display: none; }
   .dt-modal-error.visible { display: block; }
   .dt-modal-footer {
-    padding: 12px 20px;
-    border-top: 1px solid #e0e0e0;
+    padding: 8px 16px;
+    border-top: 1px solid var(--sap-border);
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
   }
   .dt-btn {
-    padding: 8px 18px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 600;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
-    border: none;
+    border: 1px solid transparent;
     outline: none;
   }
-  .dt-btn-cancel { background: #f1f3f4; color: #444; }
-  .dt-btn-cancel:hover { background: #e2e5e9; }
-  .dt-btn-confirm { background: #1a73e8; color: #fff; }
-  .dt-btn-confirm:hover { background: #1557b0; }
-  .dt-btn-confirm:disabled { background: #b0c8f5; cursor: not-allowed; }
+  .dt-btn:focus-visible { outline: 2px solid var(--sap-brand); outline-offset: 2px; }
+  .dt-btn-cancel { background: transparent; color: var(--sap-brand-hover); }
+  .dt-btn-cancel:hover { background: #eaecee; }
+  .dt-btn-confirm { background: var(--sap-brand); border-color: var(--sap-brand); color: #ffffff; }
+  .dt-btn-confirm:hover { background: var(--sap-brand-hover); border-color: var(--sap-brand-hover); }
+  .dt-btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
 <div class="dt-outer" id="dt-outer">
-  <div class="dt-title hidden" id="dt-title"></div>
-  <div class="dt-notice hidden" id="dt-notice"></div>
-  <div class="dt-toolbar hidden" id="dt-toolbar">
+  <div class="dt-toolbar" id="dt-toolbar">
+    <div class="dt-title hidden" id="dt-title"></div>
     <button class="dt-save-btn" id="dt-save-btn">Salvar</button>
   </div>
+  <div class="dt-notice hidden" id="dt-notice"></div>
   <div class="dt-wrapper" id="dt-wrapper">
   <table id="dt-table">
     <thead><tr id="dt-header"></tr></thead>
@@ -349,7 +451,7 @@ TMPL.innerHTML = `
   </table>
   <div class="dt-empty hidden" id="dt-empty">Nenhum dado disponível</div>
   <div class="dt-loading-overlay hidden" id="dt-loading-overlay">
-    <div class="dt-spinner"></div>
+    <div class="dt-busy"><span></span><span></span><span></span></div>
     <div class="dt-loading-text">Carregando...</div>
   </div>
   <div class="dt-dropdown-list hidden" id="dt-dropdown"></div>
@@ -386,7 +488,7 @@ TMPL.innerHTML = `
 <div class="dt-modal-backdrop hidden" id="dt-modal-backdrop">
   <div class="dt-modal" id="dt-modal">
     <div class="dt-modal-header">
-      <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="white" stroke-width="1.5"/><path d="M5 8h6M8 5v6" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       Adicionar membro
     </div>
     <div class="dt-modal-body">
@@ -394,19 +496,19 @@ TMPL.innerHTML = `
         O novo membro será criado permanentemente na dimensão do modelo de planejamento.
       </div>
       <div class="dt-modal-field">
-        <label for="dt-input-id">ID do membro <span style="color:#e53935">*</span></label>
+        <label for="dt-input-id">ID do membro <span class="dt-required">*</span></label>
         <input id="dt-input-id" type="text" placeholder="Ex: CONTA_001" autocomplete="off" />
         <div class="dt-modal-error" id="dt-error-id">ID do membro é obrigatório.</div>
       </div>
       <div class="dt-modal-field">
-        <label for="dt-input-desc">Descrição <span style="color:#e53935">*</span></label>
+        <label for="dt-input-desc">Descrição <span class="dt-required">*</span></label>
         <input id="dt-input-desc" type="text" placeholder="Ex: Nova conta de despesa" autocomplete="off" />
         <div class="dt-modal-error" id="dt-error-desc">Descrição é obrigatória.</div>
       </div>
       <div class="dt-modal-field">
         <label for="dt-input-parent">Hierarquia (parentId)</label>
         <input id="dt-input-parent" type="text" placeholder="Ex: MULTAS_CONTRATUAIS" autocomplete="off" />
-        <div style="font-size:11px;color:#888;margin-top:3px;">ID do nó pai na hierarquia. Deixe vazio para raiz.</div>
+        <div class="dt-modal-hint">ID do nó pai na hierarquia. Deixe vazio para raiz.</div>
       </div>
     </div>
     <div class="dt-modal-footer">
@@ -470,17 +572,18 @@ class DropdownTableWidget extends HTMLElement {
     this._originalData = {};
 
     // Style properties
-    this._rowHeight        = 36;
+    // Padrões SAP Horizon (compacto); o painel de estilo sobrescreve
+    this._rowHeight        = 32;
     this._colWidth         = "auto";
-    this._fontFamily       = "Arial, sans-serif";
-    this._fontSize         = "13px";
+    this._fontFamily       = "'72', '72full', Arial, Helvetica, sans-serif";
+    this._fontSize         = "14px";
     this._fontWeight       = "normal";
     this._fontStyle        = "normal";
     this._textDecoration   = "none";
-    this._editableCellColor = "#fffbe6";
+    this._editableCellColor = "#ffffff";
     this._showUnit         = "none";
     this._tableTitle       = "";
-    this._titleColor       = "#1a73e8";
+    this._titleColor       = "#1d2d3e";
     this._titleSize        = "16px";
     this._headerAlign      = "left";
     this._cellAlign        = "left";
@@ -500,6 +603,7 @@ class DropdownTableWidget extends HTMLElement {
     document.addEventListener("click", this._onDocClick);
     document.addEventListener("click", this._onDocCtxClose);
     document.addEventListener("mouseup", this._onDocMouseUp);
+    this._applyDynamicStyles();
     this._bindContextMenu();
     this._bindModal();
     this._bindSelectionKeys();
@@ -1076,8 +1180,8 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.headerTextColor)   { this.style.setProperty("--header-text-color", cfg.headerTextColor); }
       if (cfg.hoverRowColor)     { this.style.setProperty("--hover-row-color", cfg.hoverRowColor); }
       if (cfg.tableTextColor)    { this.style.setProperty("--table-text-color", cfg.tableTextColor); }
-      if (cfg.editableCellColor) { this._editableCellColor = cfg.editableCellColor; }
-      if (cfg.rowHeight)         { this._rowHeight = cfg.rowHeight; }
+      if (cfg.editableCellColor) { this._editableCellColor = cfg.editableCellColor; this.style.setProperty("--editable-cell-color", cfg.editableCellColor); }
+      if (cfg.rowHeight)         { this._rowHeight = parseInt(cfg.rowHeight, 10) || 32; }
       if (cfg.colWidth)          { this._colWidth = cfg.colWidth; }
       if (cfg.fontFamily)        { this._fontFamily = cfg.fontFamily; }
       if (cfg.fontSize)          { this._fontSize = cfg.fontSize; }
@@ -1525,7 +1629,7 @@ class DropdownTableWidget extends HTMLElement {
   set hoverRowColor(v) { this.style.setProperty("--hover-row-color", v); }
   set tableTextColor(v) { this.style.setProperty("--table-text-color", v); }
   set dropdownHighlightColor(v) { this.style.setProperty("--dropdown-highlight-color", v); }
-  set rowHeight(v) { this._rowHeight = parseInt(v, 10) || 36; this._render(); }
+  set rowHeight(v) { this._rowHeight = parseInt(v, 10) || 32; this._applyDynamicStyles(); this._render(); }
   set colWidth(v) { this._colWidth = v; this._render(); }
   set fontFamily(v) { this._fontFamily = v; this._applyDynamicStyles(); }
   set fontSize(v) { this._fontSize = v; this._applyDynamicStyles(); }
@@ -2418,6 +2522,8 @@ class DropdownTableWidget extends HTMLElement {
 
   // ─── Dynamic Styles ───────────────────────────────────────────
   _applyDynamicStyles() {
+    // Altura da linha via variável CSS (cabeçalho, células, dropdown e input usam --dt-row-height)
+    this.style.setProperty("--dt-row-height", (parseInt(this._rowHeight, 10) || 32) + "px");
     var wrapper = this.shadowRoot.getElementById("dt-wrapper");
     if (wrapper) {
       wrapper.style.fontFamily    = this._fontFamily;
@@ -2442,7 +2548,7 @@ class DropdownTableWidget extends HTMLElement {
     if (titleEl) {
       if (this._tableTitle) {
         titleEl.textContent    = this._tableTitle;
-        titleEl.style.color    = this._titleColor  || "#1a73e8";
+        titleEl.style.color    = this._titleColor  || "#1d2d3e";
         titleEl.style.fontSize = this._titleSize   || "16px";
         titleEl.style.textAlign = this._titleAlign || "left";
         titleEl.classList.remove("hidden");
@@ -2452,9 +2558,12 @@ class DropdownTableWidget extends HTMLElement {
     }
 
     // Renderiza toolbar
+    // Toolbar Fiori: título à esquerda e Salvar à direita; some só se não houver nenhum dos dois
     var toolbarEl = this.shadowRoot.getElementById("dt-toolbar");
+    var saveBtnEl = this.shadowRoot.getElementById("dt-save-btn");
+    if (saveBtnEl) { saveBtnEl.classList.toggle("hidden", !this._showSaveButton); }
     if (toolbarEl) {
-      if (this._showSaveButton) { toolbarEl.classList.remove("hidden"); }
+      if (this._showSaveButton || this._tableTitle) { toolbarEl.classList.remove("hidden"); }
       else { toolbarEl.classList.add("hidden"); }
     }
 
@@ -2674,14 +2783,10 @@ class DropdownTableWidget extends HTMLElement {
       var rowData = self2._data[ri];
       var tr = document.createElement("tr");
       tr.dataset.rowIndex = ri;
-      tr.style.height = self2._rowHeight + "px";
 
       var firstDimCell = rowData["dimensions_0"] || {};
       var isParentRow = firstDimCell.isCollapsed === true;
-      if (isParentRow) {
-        tr.style.background = "#e8f0fe";
-        tr.style.fontWeight = "600";
-      }
+      if (isParentRow) { tr.classList.add("dt-parent-row"); }
 
       for (var di2 = 0; di2 < dimensions.length; di2++) {
         var dim2  = dimensions[di2];
@@ -2817,18 +2922,8 @@ class DropdownTableWidget extends HTMLElement {
         var input = document.createElement("input");
         input.type = "text";
         input.value = mvVal;
-        input.style.cssText = "width:100%;height:" + self2._rowHeight + "px;border:none;background:transparent;text-align:center;padding:0 12px;font-size:13px;color:var(--table-text-color,#333);box-sizing:border-box;outline:none;cursor:pointer;";
-
-        input.addEventListener("focus", function(e) {
-          e.target.style.background = self2._editableCellColor || "#fffbe6";
-          e.target.style.outline = "2px solid #1a73e8";
-          e.target.style.cursor = "text";
-        });
-        input.addEventListener("blur", function(e) {
-          e.target.style.background = "transparent";
-          e.target.style.outline = "none";
-          e.target.style.cursor = "pointer";
-        });
+        // Input do Fiori: hover/foco pelo CSS (.dt-measure-input); fundo do foco = cor de edição do painel
+        input.className = "dt-measure-input";
         input.addEventListener("keydown", function(e) {
           // Delete com células selecionadas — dispara evento e não apaga o input focado
           if (e.key === "Delete" && self2._selectedCells && self2._selectedCells.length > 1) {
@@ -2956,7 +3051,7 @@ class DropdownTableWidget extends HTMLElement {
         var trH = document.createElement("tr");
         var tdH = document.createElement("td");
         tdH.colSpan = totalCols;
-        tdH.style.cssText = "font-weight:700;padding:0 16px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;letter-spacing:0.5px;";
+        tdH.className = "dt-group-cell";
         trH.classList.add("dt-group-header");
         tdH.textContent = item.label;
         trH.appendChild(tdH);
@@ -2965,7 +3060,7 @@ class DropdownTableWidget extends HTMLElement {
         var trSH = document.createElement("tr");
         var tdSH = document.createElement("td");
         tdSH.colSpan = totalCols;
-        tdSH.style.cssText = "font-weight:600;padding:0 24px;line-height:" + self2._rowHeight + "px;font-size:12px;text-transform:uppercase;border-bottom:1px solid #d0d8f0;";
+        tdSH.className = "dt-subgroup-cell";
         trSH.classList.add("dt-subheader");
         tdSH.textContent = item.label;
         trSH.appendChild(tdSH);
@@ -2995,7 +3090,8 @@ class DropdownTableWidget extends HTMLElement {
 
     var arrow = document.createElement("span");
     arrow.className = "cell-arrow";
-    arrow.innerHTML = '<svg viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // Chevron fino (slim-arrow-down do Fiori)
+    arrow.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
     wrapper.appendChild(valueSpan);
     wrapper.appendChild(arrow);
@@ -3057,8 +3153,7 @@ class DropdownTableWidget extends HTMLElement {
     }
     if (filteredOptions.length === 0) {
       var emptyItem = document.createElement("div");
-      emptyItem.className = "dt-dropdown-item";
-      emptyItem.style.cssText = "color:#999;font-style:italic;cursor:default;";
+      emptyItem.className = "dt-dropdown-item dt-dropdown-empty";
       emptyItem.textContent = "Sem opções — configure o childrenBinding ou o valuesBinding";
       list.appendChild(emptyItem);
     }
@@ -3091,7 +3186,7 @@ class DropdownTableWidget extends HTMLElement {
     var left  = cellRect.left - wrapperRect.left + wrapper.scrollLeft;
     var top   = cellRect.bottom - wrapperRect.top + wrapper.scrollTop;
 
-    var listH = Math.min(Math.max(filteredOptions.length, 1) * 36 + 8, 220);
+    var listH = Math.min(Math.max(filteredOptions.length, 1) * 32 + 8, 264); // itens de 32px (popover Fiori)
     if (cellRect.bottom + listH > window.innerHeight - 8) {
       top = cellRect.top - wrapperRect.top + wrapper.scrollTop - listH - 2;
     }

@@ -73,6 +73,10 @@ if (hasError) {
 
 Com o **modo diagnóstico** ligado, o console mostra a lista montada (`[DropdownTable] Gravação`) e o que foi descartado.
 
+## Visual
+
+Padrão **SAP Horizon (Fiori), densidade compacta**: fonte 72, cabeçalho branco, linhas de 32px, números à direita, select/input/popover/diálogo no estilo Fiori. As cores, a fonte e a altura continuam editáveis no **painel de estilo**. Stories que já tinham cores salvas (ex: cabeçalho azul) continuam com elas até clicar em **Restaurar padrão SAP Horizon** → **Aplicar**.
+
 ## Desenvolvimento
 
 ```bash

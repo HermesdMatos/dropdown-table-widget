@@ -10,81 +10,98 @@
     var template = document.createElement("template");
     template.innerHTML = `
         <style>
-            :host { display: block; padding: 1em; font-family: Arial, sans-serif; font-size: 13px; }
+            /* Painel no visual SAP Horizon */
+            :host {
+                display: block; padding: 12px;
+                font-family: '72', '72full', Arial, Helvetica, sans-serif; font-size: 14px; color: #1d2d3e;
+            }
             fieldset {
-                border: 1px solid #ccc;
-                border-radius: 5px;
+                border: 1px solid #e5e5e5;
+                border-radius: 12px;
                 padding: 12px;
-                margin-bottom: 12px;
+                margin: 0 0 12px 0;
+                background: #ffffff;
             }
-            legend { font-weight: bold; font-size: 14px; }
+            legend { font-weight: 700; font-size: 14px; padding: 0 6px; color: #1d2d3e; }
             table { width: 100%; border-collapse: collapse; }
-            td { padding: 6px; vertical-align: middle; }
-            input[type="text"], select {
+            td { padding: 4px; vertical-align: middle; font-size: 14px; color: #556b82; }
+            input[type="text"], select, textarea {
                 width: 100%;
-                padding: 5px;
-                border: 1px solid #ccc;
+                height: 32px;
+                padding: 0 8px;
+                border: none;
                 border-radius: 4px;
+                background: #ffffff;
+                box-shadow: inset 0 0 0 1px #bcc3ca, inset 0 -1px 0 0 #556b81;
                 box-sizing: border-box;
-                font-size: 12px;
+                font-family: inherit;
+                font-size: 14px;
+                color: #1d2d3e;
+                outline: none;
             }
+            input[type="text"]:hover, select:hover, textarea:hover { box-shadow: inset 0 0 0 1px #0064d9; }
+            input[type="text"]:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 2px #0070f2; }
             input[type="color"] {
-                width: 40px;
-                height: 26px;
-                padding: 0;
-                border: 1px solid #ccc;
+                width: 36px;
+                height: 32px;
+                padding: 2px;
+                border: 1px solid #bcc3ca;
                 border-radius: 4px;
+                background: #ffffff;
                 cursor: pointer;
             }
-            select { height: 30px; }
             .color-row { display: flex; align-items: center; gap: 6px; }
             .color-input { flex-grow: 1; }
-            .apply-button {
-                background-color: #1a73e8;
-                color: white;
-                border: none;
-                padding: 8px 15px;
-                border-radius: 4px;
-                cursor: pointer;
-                margin-top: 10px;
+            .apply-button, .reset-button {
                 width: 100%;
-                font-size: 13px;
-                font-weight: 600;
+                height: 36px;
+                margin-top: 8px;
+                border-radius: 8px;
+                font-family: inherit;
+                font-size: 14px;
+                font-weight: 700;
+                cursor: pointer;
             }
-            .apply-button:hover { background-color: #1557b0; }
+            .apply-button { background: #0070f2; border: 1px solid #0070f2; color: #ffffff; }
+            .apply-button:hover { background: #0064d9; border-color: #0064d9; }
+            .reset-button { background: #ffffff; border: 1px solid #bcc3ca; color: #0064d9; }
+            .reset-button:hover { background: #eaecee; }
 
-            /* Alignment buttons */
+            /* Alignment buttons = SegmentedButton */
             .align-group { margin-top: 4px; }
-            .align-label { font-size: 11px; color: #666; margin-bottom: 4px; display: block; }
+            .align-label { font-size: 12px; color: #556b82; margin-bottom: 4px; display: block; }
             .align-btns {
-                display: grid;
-                grid-template-columns: repeat(3, 32px);
-                gap: 4px;
+                display: inline-grid;
+                grid-template-columns: repeat(3, 36px);
+                border: 1px solid #bcc3ca;
+                border-radius: 8px;
+                overflow: hidden;
             }
             .align-btn {
-                width: 32px;
-                height: 28px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                background: #f8f8f8;
+                width: 36px;
+                height: 30px;
+                border: none;
+                border-right: 1px solid #bcc3ca;
+                background: #ffffff;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 0;
-                transition: background 0.15s, border-color 0.15s;
             }
-            .align-btn:hover { background: #e8f0fe; border-color: #1a73e8; }
-            .align-btn.active { background: #1a73e8; border-color: #1a73e8; }
-            .align-btn.active svg { stroke: #fff; }
-            .align-btn svg { stroke: #555; }
+            .align-btn:last-child { border-right: none; }
+            .align-btn:hover { background: #eaecee; }
+            .align-btn.active { background: #ebf8ff; }
+            .align-btn.active svg { stroke: #0064d9; }
+            .align-btn svg { stroke: #556b82; }
 
             /* Dropdowns */
-            .dd-hint { font-size: 11px; color: #666; margin-bottom: 8px; }
+            .dd-hint { font-size: 12px; color: #556b82; margin-bottom: 8px; }
             .dd-dims { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-            .dd-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-            .dd-empty { font-size: 11px; color: #999; font-style: italic; }
-            .rule-box { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 8px; }
+            .dd-check { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #1d2d3e; }
+            .dd-check input { width: 16px; height: 16px; accent-color: #0070f2; }
+            .dd-empty { font-size: 12px; color: #556b82; font-style: italic; }
+            .rule-box { height: auto; padding: 6px 8px; font-family: monospace; font-size: 12px; margin-bottom: 8px; resize: vertical; }
         </style>
         <form id="form">
             <fieldset>
@@ -97,8 +114,8 @@
                     <tr>
                         <td>Cor do título</td>
                         <td class="color-row">
-                            <input id="style_title_color" type="text" class="color-input" value="#1a73e8">
-                            <input id="style_title_color_picker" type="color" value="#1a73e8">
+                            <input id="style_title_color" type="text" class="color-input" value="#1d2d3e">
+                            <input id="style_title_color_picker" type="color" value="#1d2d3e">
                         </td>
                     </tr>
                     <tr>
@@ -176,101 +193,101 @@
             </fieldset>
 
             <fieldset>
-                <legend>Table Appearance</legend>
+                <legend>Cores (padrão SAP Horizon)</legend>
                 <table>
                     <tr>
-                        <td>Header Background Color</td>
+                        <td>Fundo do cabeçalho</td>
                         <td class="color-row">
-                            <input id="style_header_color" type="text" class="color-input" value="#1a73e8">
-                            <input id="style_header_color_picker" type="color" value="#1a73e8">
+                            <input id="style_header_color" type="text" class="color-input" value="#ffffff">
+                            <input id="style_header_color_picker" type="color" value="#ffffff">
                         </td>
                     </tr>
                     <tr>
-                        <td>Header Text Color</td>
+                        <td>Texto do cabeçalho</td>
                         <td class="color-row">
-                            <input id="style_header_text_color" type="text" class="color-input" value="#ffffff">
-                            <input id="style_header_text_color_picker" type="color" value="#ffffff">
+                            <input id="style_header_text_color" type="text" class="color-input" value="#1d2d3e">
+                            <input id="style_header_text_color_picker" type="color" value="#1d2d3e">
                         </td>
                     </tr>
                     <tr>
-                        <td>Selected Row Color</td>
+                        <td>Células selecionadas</td>
                         <td class="color-row">
-                            <input id="style_selected_row_color" type="text" class="color-input" value="#e8f0fe">
-                            <input id="style_selected_row_color_picker" type="color" value="#e8f0fe">
+                            <input id="style_selected_row_color" type="text" class="color-input" value="#ebf8ff">
+                            <input id="style_selected_row_color_picker" type="color" value="#ebf8ff">
                         </td>
                     </tr>
                     <tr>
-                        <td>Hover Row Color</td>
+                        <td>Linha sob o mouse</td>
                         <td class="color-row">
-                            <input id="style_hover_row_color" type="text" class="color-input" value="#f5f5f5">
-                            <input id="style_hover_row_color_picker" type="color" value="#f5f5f5">
+                            <input id="style_hover_row_color" type="text" class="color-input" value="#eaecee">
+                            <input id="style_hover_row_color_picker" type="color" value="#eaecee">
                         </td>
                     </tr>
                     <tr>
-                        <td>Table Text Color</td>
+                        <td>Texto da tabela</td>
                         <td class="color-row">
-                            <input id="style_table_text_color" type="text" class="color-input" value="#333333">
-                            <input id="style_table_text_color_picker" type="color" value="#333333">
+                            <input id="style_table_text_color" type="text" class="color-input" value="#1d2d3e">
+                            <input id="style_table_text_color_picker" type="color" value="#1d2d3e">
                         </td>
                     </tr>
                     <tr>
-                        <td>Editable Cell Color</td>
+                        <td>Célula em edição</td>
                         <td class="color-row">
-                            <input id="style_editable_color" type="text" class="color-input" value="#fffbe6">
-                            <input id="style_editable_color_picker" type="color" value="#fffbe6">
+                            <input id="style_editable_color" type="text" class="color-input" value="#ffffff">
+                            <input id="style_editable_color_picker" type="color" value="#ffffff">
                         </td>
                     </tr>
                     <tr>
-                        <td>Group Header Background</td>
+                        <td>Fundo do grupo</td>
                         <td class="color-row">
-                            <input id="style_group_header_bg" type="text" class="color-input" value="#f0f4ff">
-                            <input id="style_group_header_bg_picker" type="color" value="#f0f4ff">
+                            <input id="style_group_header_bg" type="text" class="color-input" value="#f5f6f7">
+                            <input id="style_group_header_bg_picker" type="color" value="#f5f6f7">
                         </td>
                     </tr>
                     <tr>
-                        <td>Group Header Text</td>
+                        <td>Texto do grupo</td>
                         <td class="color-row">
-                            <input id="style_group_header_color" type="text" class="color-input" value="#1a3a6e">
-                            <input id="style_group_header_color_picker" type="color" value="#1a3a6e">
+                            <input id="style_group_header_color" type="text" class="color-input" value="#1d2d3e">
+                            <input id="style_group_header_color_picker" type="color" value="#1d2d3e">
                         </td>
                     </tr>
                     <tr>
-                        <td>Subheader Background</td>
+                        <td>Fundo do subgrupo</td>
                         <td class="color-row">
-                            <input id="style_subheader_bg" type="text" class="color-input" value="#e8f0fe">
-                            <input id="style_subheader_bg_picker" type="color" value="#e8f0fe">
+                            <input id="style_subheader_bg" type="text" class="color-input" value="#ffffff">
+                            <input id="style_subheader_bg_picker" type="color" value="#ffffff">
                         </td>
                     </tr>
                     <tr>
-                        <td>Subheader Text</td>
+                        <td>Texto do subgrupo</td>
                         <td class="color-row">
-                            <input id="style_subheader_color" type="text" class="color-input" value="#1a3a6e">
-                            <input id="style_subheader_color_picker" type="color" value="#1a3a6e">
+                            <input id="style_subheader_color" type="text" class="color-input" value="#1d2d3e">
+                            <input id="style_subheader_color_picker" type="color" value="#1d2d3e">
                         </td>
                     </tr>
                     <tr>
-                        <td>Save Button Background</td>
+                        <td>Botão Salvar</td>
                         <td class="color-row">
-                            <input id="style_save_btn_bg" type="text" class="color-input" value="#1a73e8">
-                            <input id="style_save_btn_bg_picker" type="color" value="#1a73e8">
+                            <input id="style_save_btn_bg" type="text" class="color-input" value="#0070f2">
+                            <input id="style_save_btn_bg_picker" type="color" value="#0070f2">
                         </td>
                     </tr>
                     <tr>
-                        <td>Save Button Text</td>
+                        <td>Texto do botão Salvar</td>
                         <td class="color-row">
                             <input id="style_save_btn_color" type="text" class="color-input" value="#ffffff">
                             <input id="style_save_btn_color_picker" type="color" value="#ffffff">
                         </td>
                     </tr>
                     <tr>
-                        <td>Save Button Hover</td>
+                        <td>Botão Salvar (mouse)</td>
                         <td class="color-row">
-                            <input id="style_save_btn_hover_bg" type="text" class="color-input" value="#1557b0">
-                            <input id="style_save_btn_hover_bg_picker" type="color" value="#1557b0">
+                            <input id="style_save_btn_hover_bg" type="text" class="color-input" value="#0064d9">
+                            <input id="style_save_btn_hover_bg_picker" type="color" value="#0064d9">
                         </td>
                     </tr>
                     <tr>
-                        <td>Save Button Label</td>
+                        <td>Rótulo do botão Salvar</td>
                         <td><input id="style_save_btn_label" type="text" placeholder="Salvar"></td>
                     </tr>
                 </table>
@@ -283,9 +300,9 @@
                         <td>Fonte</td>
                         <td>
                             <select id="style_font_family">
+                                <option value="'72', '72full', Arial, Helvetica, sans-serif" selected>72 (SAP Fiori)</option>
                                 <option value="Arial, sans-serif">Arial</option>
                                 <option value="'Helvetica Neue', sans-serif">Helvetica</option>
-                                <option value="'72', Arial, sans-serif">72-Web</option>
                                 <option value="'Roboto', sans-serif">Roboto</option>
                                 <option value="'Open Sans', sans-serif">Open Sans</option>
                             </select>
@@ -297,8 +314,8 @@
                             <select id="style_font_size">
                                 <option value="11px">11</option>
                                 <option value="12px">12</option>
-                                <option value="13px" selected>13</option>
-                                <option value="14px">14</option>
+                                <option value="13px">13</option>
+                                <option value="14px" selected>14</option>
                                 <option value="15px">15</option>
                                 <option value="16px">16</option>
                                 <option value="18px">18</option>
@@ -324,9 +341,9 @@
                         <td>Altura da linha</td>
                         <td>
                             <select id="style_row_height">
-                                <option value="32">Compacta (32px)</option>
-                                <option value="36" selected>Padrão (36px)</option>
-                                <option value="44">Confortável (44px)</option>
+                                <option value="32" selected>Compacta — Fiori (32px)</option>
+                                <option value="36">Média (36px)</option>
+                                <option value="44">Confortável — Fiori Cozy (44px)</option>
                                 <option value="52">Espaçosa (52px)</option>
                             </select>
                         </td>
@@ -373,6 +390,7 @@
                 </table>
             </fieldset>
 
+            <button type="button" id="reset_horizon" class="reset-button">Restaurar padrão SAP Horizon</button>
             <button type="button" id="apply_styles" class="apply-button">✓ Aplicar</button>
             <input type="submit" style="display:none;">
         </form>
@@ -446,6 +464,7 @@
 
             this._connectColorPickers();
             this._connectAlignButtons();
+            this._shadowRoot.getElementById("reset_horizon").addEventListener("click", this._restoreHorizon.bind(this));
             this._form.addEventListener("submit", this._submit.bind(this));
             this._applyButton.addEventListener("click", this._submit.bind(this));
         }
@@ -492,6 +511,36 @@
                     else                    { self._titleAlign  = align; }
                 });
             });
+        }
+
+        // Preenche cores, fonte e densidade com o padrão SAP Horizon (compacto).
+        // Não mexe em Dropdowns nem Gravação. O usuário confirma com "Aplicar".
+        _restoreHorizon() {
+            var self = this;
+            var colors = [
+                [this._titleColorInput,       this._titleColorPicker,       "#1d2d3e"],
+                [this._headerColorInput,      this._headerColorPicker,      "#ffffff"],
+                [this._headerTextColorInput,  this._headerTextColorPicker,  "#1d2d3e"],
+                [this._selectedRowColorInput, this._selectedRowColorPicker, "#ebf8ff"],
+                [this._hoverRowColorInput,    this._hoverRowColorPicker,    "#eaecee"],
+                [this._tableTextColorInput,   this._tableTextColorPicker,   "#1d2d3e"],
+                [this._editableColorInput,    this._editableColorPicker,    "#ffffff"],
+                [this._groupHeaderBgInput,    this._groupHeaderBgPicker,    "#f5f6f7"],
+                [this._groupHeaderColorInput, this._groupHeaderColorPicker, "#1d2d3e"],
+                [this._subheaderBgInput,      this._subheaderBgPicker,      "#ffffff"],
+                [this._subheaderColorInput,   this._subheaderColorPicker,   "#1d2d3e"],
+                [this._saveBtnBgInput,        this._saveBtnBgPicker,        "#0070f2"],
+                [this._saveBtnColorInput,     this._saveBtnColorPicker,     "#ffffff"],
+                [this._saveBtnHoverBgInput,   this._saveBtnHoverBgPicker,   "#0064d9"]
+            ];
+            colors.forEach(function(c) { c[0].value = c[2]; c[1].value = c[2]; });
+            this._fontFamilySelect.value = "'72', '72full', Arial, Helvetica, sans-serif";
+            this._fontSizeSelect.value   = "14px";
+            this._fontWeightSelect.value = "normal";
+            this._rowHeightSelect.value  = "32";
+            this._colWidthSelect.value   = "auto";
+            this._titleSizeSelect.value  = "16px";
+            ["header", "cell", "title"].forEach(function(g) { self._setAlignActive(g, "left"); });
         }
 
         _submit(e) {
