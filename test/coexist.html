@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Dropdown Table — PROD + DEV na mesma página</title>
+<script>window.errs = []; window.addEventListener("error", function(e) { window.errs.push(e.message); });</script>
+<!-- Mesma situação de uma story com o widget de produção e o DEV juntos -->
+<script src="/prod/dropdown-table-widget-v2.js"></script>
+<script src="/prod/style-panel.js"></script>
+<script src="/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev"></script>
+<script src="/style-panel.js?tag=dropdowntable-styling-dev"></script>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 16px">
+<div id="out">Verificando…</div>
+<dropdowntable-widget id="p"></dropdowntable-widget>
+<dropdowntable-widget-dev id="d"></dropdowntable-widget-dev>
+<script>
+  var ok = window.errs.length === 0
+    && !!customElements.get("dropdowntable-widget") && !!customElements.get("dropdowntable-widget-dev")
+    && !!customElements.get("dropdowntable-styling") && !!customElements.get("dropdowntable-styling-dev")
+    && typeof document.getElementById("d")._parseLocaleNumber === "function";
+  var out = document.getElementById("out");
+  out.textContent = ok ? "PASSOU — PROD e DEV convivem sem erro" : "FALHOU — " + JSON.stringify(window.errs);
+  out.style.color = ok ? "#1b7f3a" : "#c62828";
+  window.__coexistOk = ok;
+</script>
+</body>
+</html>

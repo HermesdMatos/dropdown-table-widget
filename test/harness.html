@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Dropdown Table — testes</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 16px; color: #222; }
+  h1 { font-size: 18px; } h2 { font-size: 14px; margin-top: 24px; }
+  #results li { margin: 2px 0; font-size: 13px; }
+  .pass { color: #1b7f3a; } .fail { color: #c62828; font-weight: bold; }
+  #summary { font-weight: bold; margin: 8px 0; }
+  .widget-box { border: 1px solid #ddd; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>Dropdown Table Widget — testes no navegador</h1>
+<div id="summary">Rodando…</div>
+<ul id="results"></ul>
+
+<h2>A — modo explícito (painel) + childrenBinding + valuesBinding</h2>
+<div class="widget-box"><dropdowntable-widget id="wA" style="display:block;width:900px;height:260px"></dropdowntable-widget></div>
+<h2>B — modo explícito só com getMembers() (sem childrenBinding/valuesBinding)</h2>
+<div class="widget-box"><dropdowntable-widget id="wB" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+<h2>D — valores gravados no próprio binding principal (sem childrenBinding/valuesBinding)</h2>
+<div class="widget-box"><dropdowntable-widget id="wD" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+<h2>E — Builder com "Nível 2" + "Incluir níveis-pai"</h2>
+<div class="widget-box"><dropdowntable-widget id="wE" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>F — sem nada marcado no painel e sem script (padrão novo)</h2>
+<div class="widget-box"><dropdowntable-widget id="wF" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>G — conta sem valor inicia com NÃO APLICÁVEL</h2>
+<div class="widget-box"><dropdowntable-widget id="wG" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>H — lista de gravação (substitui o script de save)</h2>
+<div class="widget-box"><dropdowntable-widget id="wH" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>I — regras de negócio (bloqueios, falha no save, avisos)</h2>
+<div class="widget-box"><dropdowntable-widget id="wI" style="display:block;width:900px;height:240px"></dropdowntable-widget></div>
+<h2>J — Responsabilidade CLIENTE com QTDE e CUSTO</h2>
+<div class="widget-box"><dropdowntable-widget id="wJ" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<h2>K — visual SAP Horizon (compacto) e cores do painel</h2>
+<div class="widget-box"><dropdowntable-widget id="wK" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>L — adicionar/excluir membro (validação e bloqueio no widget)</h2>
+<div class="widget-box"><dropdowntable-widget id="wL" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<h2>N — netos: uma linha com dropdown dos filhos do subgrupo</h2>
+<div class="widget-box"><dropdowntable-widget id="wN" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+<h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
+<div class="widget-box"><dropdowntable-widget id="wR" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wR2" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
+
+<script src="/mock-binding.js"></script>
+<script src="/dropdown-table-widget-v2.js"></script>
+<script>
+(async function() {
+  var results = [];
+  function check(name, ok, info) {
+    results.push({ name: name, ok: !!ok, info: info });
+    var li = document.createElement("li");
+    li.className = ok ? "pass" : "fail";
+    li.textContent = (ok ? "PASSOU  " : "FALHOU  ") + name + (ok || info === undefined ? "" : "  → " + JSON.stringify(info));
+    document.getElementById("results").appendChild(li);
+  }
+  var tick = function(ms) { return new Promise(function(r) { setTimeout(r, ms || 20); }); };
+  var M = window.DTMock;
+
+  function setup(w, opts) {
+    w._events = [];
+    w._props = {};
+    ["onSaveRequested", "onDropdownChanged", "onMeasureChanged"].forEach(function(n) {
+      w.addEventListener(n, function(e) { w._events.push({ name: n, detail: e.detail }); });
+    });
+    w.addEventListener("propertiesChanged", function(e) { Object.assign(w._props, e.detail.properties); });
+    if (opts.styleConfig) { w.styleConfig = JSON.stringify(opts.styleConfig); }
+    if (opts.dataBindings) { w.dataBindings = opts.dataBindings; }
+    if (opts.childrenBinding) { w.childrenBinding = opts.childrenBinding; }
+    if (opts.valuesBinding) { w.valuesBinding = opts.valuesBinding; }
+    w.myDataBinding = opts.mainBinding || M.mainBinding(1593.95);
+    w.onCustomWidgetAfterUpdate({ myDataBinding: w.myDataBinding });
+  }
+  function rowCells(w, rowIndex) {
+    return Array.prototype.map.call(
+      w.shadowRoot.querySelectorAll('tr[data-row-index="' + rowIndex + '"] td'),
+      function(td) { var i = td.querySelector("input"); return i ? i.value : td.textContent.trim(); });
+  }
+  function dropdown(w, rowIndex, col) {
+    return w.shadowRoot.querySelectorAll('tr[data-row-index="' + rowIndex + '"] .cell-dropdown')[col];
+  }
+  function openOptions(w, rowIndex, col) {
+    dropdown(w, rowIndex, col).click();
+    return Array.prototype.map.call(w.shadowRoot.querySelectorAll(".dt-dropdown-item"), function(i) { return i.textContent; });
+  }
+  function pick(w, rowIndex, col, label) {
+    dropdown(w, rowIndex, col).click();
+    var item = Array.prototype.find.call(w.shadowRoot.querySelectorAll(".dt-dropdown-item"), function(i) { return i.textContent === label; });
+    item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+  }
+  function save(w) {
+    w._events = [];
+    w.shadowRoot.getElementById("dt-save-btn").click();
+  }
+
+  try {
+    // ── A ─────────────────────────────────────────────────────────
+    var A = document.getElementById("wA");
+    setup(A, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE", "RESPONSAVEL"] },
+      childrenBinding: M.childrenBinding(),
+      valuesBinding: M.valuesBinding()
+    });
+    await tick();
+    check("A1 dt-empty oculto com dados", getComputedStyle(A.shadowRoot.getElementById("dt-empty")).display === "none");
+    var avail = JSON.parse(A._props.availableDimensions || "[]");
+    check("A2 availableDimensions publicado para o painel", avail.length === 3 && avail[1].id === "PERIODICIDADE", avail);
+    check("A3 C1 mostra valores gravados do valuesBinding (sem setRowValues)", rowCells(A, 1).join("|") === "Conta 1|Mensal|Ana|1.593,95", rowCells(A, 1));
+    check("A4 C3 sem valor gravado mostra 'Selecionar...'", rowCells(A, 3).join("|") === "Conta 3|Selecionar...|Selecionar...|0,00", rowCells(A, 3));
+    var optsC3 = openOptions(A, 3, 0); A._closeDropdown();
+    check("A5 opções de Periodicidade = filhos do childrenBinding", optsC3.join(",") === "Mensal,Anual", optsC3);
+
+    pick(A, 1, 0, "Anual");
+    var pc = A.getPendingChanges().split("###");
+    check("A6 troca de dropdown: oldAddr com Mensal+Ana, newAddr com Anual",
+      pc.length === 1 && pc[0].split("§")[0].indexOf("[MENSAL]") !== -1 && pc[0].split("§")[0].indexOf("[ANA]") !== -1 && pc[0].split("§")[1].indexOf("[ANUAL]") !== -1, pc);
+
+    var inp = A.shadowRoot.querySelector('tr[data-row-index="1"] input');
+    inp.value = "1.234,5"; inp.dispatchEvent(new Event("change"));
+    pc = A.getPendingChanges().split("###");
+    check("A7 edição de medida pt-BR colapsa no mesmo registro (1234.5)", pc.length === 1 && pc[0].split("§")[2] === "1234.5", pc);
+
+    save(A); await tick();
+    var saved = A._events.filter(function(e) { return e.name === "onSaveRequested"; })[0];
+    check("A8 onSaveRequested traz C1 com Anual", saved && saved.detail.length === 1 && saved.detail[0].addrStr.indexOf("[ANUAL]") !== -1, saved && saved.detail);
+
+    A.clearPendingChanges();
+    save(A); await tick();
+    saved = A._events.filter(function(e) { return e.name === "onSaveRequested"; })[0];
+    check("A9 segundo save não reenvia linhas já salvas", saved && saved.detail.length === 0, saved && saved.detail);
+    check("A10 após o save C1 continua mostrando Anual", rowCells(A, 1)[1] === "Anual", rowCells(A, 1));
+
+    pick(A, 1, 1, "Bruno");
+    pc = A.getPendingChanges().split("###");
+    check("A11 próxima troca parte do valor salvo (oldAddr com Anual)", pc[0].split("§")[0].indexOf("[ANUAL]") !== -1, pc);
+
+    // ── B ─────────────────────────────────────────────────────────
+    var B = document.getElementById("wB");
+    setup(B, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE"], debugMode: false },
+      dataBindings: M.dataBindings()
+    });
+    await tick(60);
+    check("B1 só Periodicidade vira dropdown", B.shadowRoot.querySelectorAll('tr[data-row-index="1"] .cell-dropdown').length === 1);
+    var optsB = openOptions(B, 1, 0); B._closeDropdown();
+    check("B2 opções vêm do getMembers(), sem o nó pai", optsB.join(",") === "Mensal,Trimestral,Anual", optsB);
+
+    // ── D ─────────────────────────────────────────────────────────
+    var D = document.getElementById("wD");
+    setup(D, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE", "RESPONSAVEL"] },
+      mainBinding: M.mainBindingWithBookedLeaves()
+    });
+    await tick();
+    check("D1 valor gravado do binding principal aparece com dropdown", rowCells(D, 1).slice(1, 3).join("|") === "Anual|Ana" && D.shadowRoot.querySelectorAll('tr[data-row-index="1"] .cell-dropdown').length === 2, rowCells(D, 1));
+    var optsD = openOptions(D, 1, 0); D._closeDropdown();
+    check("D2 opções = membros gravados vistos no binding, sem o nó 'Periodos'", optsD.join(",") === "Anual,Mensal", optsD);
+    check("D3 conta sem dado (nó) mostra 'Selecionar...'", rowCells(D, 3)[1] === "Selecionar...", rowCells(D, 3));
+    pick(D, 2, 0, "Anual");
+    pc = D.getPendingChanges().split("###");
+    check("D4 troca parte do binding: oldAddr tem Mensal+Bruno, newAddr tem Anual+Bruno",
+      pc.length === 1 && pc[0].split("§")[0].indexOf("[MENSAL]") !== -1 && pc[0].split("§")[0].indexOf("[BRUNO]") !== -1
+      && pc[0].split("§")[1].indexOf("[ANUAL]") !== -1 && pc[0].split("§")[1].indexOf("[BRUNO]") !== -1, pc);
+    check("D5 conta sem dado não leva o nó 'Periodos' no endereço", D._buildRowAddrStr(3, null, true).indexOf("PER_ALL") === -1, D._buildRowAddrStr(3, null, true));
+
+    // ── E ─────────────────────────────────────────────────────────
+    var E = document.getElementById("wE");
+    setup(E, {
+      styleConfig: { dropdownDimensions: ["PERIODICIDADE", "RESPONSAVEL"] },
+      mainBinding: M.mainBindingWithParentLevels()
+    });
+    await tick();
+    var eRow = E.shadowRoot.querySelector("tr[data-row-index]");
+    var eIdx = eRow ? eRow.getAttribute("data-row-index") : "";
+    check("E1 'Incluir níveis-pai': escolhe a linha das folhas (Anual|Ana), não a do nó", eIdx === "3" && rowCells(E, 3).slice(1, 3).join("|") === "Anual|Ana", { linha: eIdx, celulas: eIdx ? rowCells(E, eIdx) : null });
+    check("E2 conta sem dado (só nó) aparece com 'Selecionar...'", rowCells(E, 4).slice(1, 3).join("|") === "Selecionar...|Selecionar...", rowCells(E, 4));
+
+    // ── F ─────────────────────────────────────────────────────────
+    var F = document.getElementById("wF");
+    setup(F, { mainBinding: M.mainBindingWithParentLevels() });   // nada marcado, nenhum script
+    await tick();
+    check("F1 sem painel e sem script: todas as dimensões viram dropdown", F.shadowRoot.querySelectorAll('tr[data-row-index="3"] .cell-dropdown').length === 2, rowCells(F, 3));
+    check("F2 sem painel e sem script: mostra o valor gravado", rowCells(F, 3).slice(1, 3).join("|") === "Anual|Ana", rowCells(F, 3));
+
+    // ── G ─────────────────────────────────────────────────────────
+    var G = document.getElementById("wG");
+    setup(G, { mainBinding: M.mainBindingWithParentLevels(), dataBindings: M.dataBindings(true) });
+    await tick(80);
+    check("G1 conta sem valor inicia com NÃO APLICÁVEL (grafias diferentes)", rowCells(G, 4).slice(1, 3).join("|") === "NÃO APLICÁVEL|Nao Aplicavel", rowCells(G, 4));
+    var gC3 = G.shadowRoot.querySelectorAll('tr[data-row-index]');
+    var gC3Last = gC3[gC3.length - 1];
+    check("G1b conta sem dado com linha de folhas vazias também inicia com NÃO APLICÁVEL",
+      gC3.length === 2 && Array.prototype.slice.call(gC3Last.querySelectorAll("td"), 1, 3).map(function(td) { return td.textContent.trim(); }).join("|") === "NÃO APLICÁVEL|Nao Aplicavel",
+      Array.prototype.map.call(gC3, function(tr) { return tr.textContent.trim(); }));
+    check("G2 conta com valor gravado não muda", rowCells(G, 3).slice(1, 3).join("|") === "Anual|Ana", rowCells(G, 3));
+    var gAddr = G._buildRowAddrStr(4, null, true);
+    check("G3 endereço da conta sem valor usa os membros NÃO APLICÁVEL", gAddr.indexOf("[NA]") !== -1 && gAddr.indexOf("[NAO_APLICAVEL]") !== -1, gAddr);
+    var gInp = G.shadowRoot.querySelector('tr[data-row-index="4"] input');
+    gInp.value = "10"; gInp.dispatchEvent(new Event("change"));
+    check("G4 medida digitada nessa conta grava no endereço NÃO APLICÁVEL", G.getPendingChanges().indexOf("[NA]") !== -1, G.getPendingChanges());
+    G.styleConfig = JSON.stringify({ emptyDefaultLabel: "" });
+    check("G5 valor inicial vazio no painel volta para 'Selecionar...'", rowCells(G, 4)[1] === "Selecionar...", rowCells(G, 4));
+
+    // ── H ─────────────────────────────────────────────────────────
+    // Lista de gravação: substitui a lógica do script onSaveRequested
+    var H = document.getElementById("wH");
+    setup(H, {
+      styleConfig: {
+        writeHierarchies: "PERIODICIDADE=Periodos_H1\nRESPONSAVEL=H1_RESPONSABILIDADE",
+        noValueMembers: "RESPONSAVEL=CLIENTE;Ana"
+      },
+      mainBinding: M.mainBindingWithBookedLeaves()
+    });
+    await tick();
+    function writes(w) {
+      var n = w.getWriteCount(), out = [];
+      for (var i = 0; i < n; i++) {
+        var sel = {};
+        for (var d = 0; d < w.getWriteDimensionCount(i); d++) { sel[w.getWriteDimensionId(i, d)] = w.getWriteMemberId(i, d); }
+        out.push({ sel: sel, measure: w.getWriteMeasureId(i), value: w.getWriteValue(i) });
+      }
+      return out;
+    }
+    pick(H, 2, 0, "Anual");                       // Conta 2: Mensal → Anual (valor 50)
+    var hw = writes(H);
+    check("H1 troca de dropdown: zera o endereço antigo e grava 50 no novo", hw.length === 2
+      && hw[0].sel.PERIODICIDADE === "[PERIODICIDADE].[Periodos_H1].&[MENSAL]" && hw[0].value === "0"
+      && hw[1].sel.PERIODICIDADE === "[PERIODICIDADE].[Periodos_H1].&[ANUAL]" && hw[1].value === "50"
+      && hw[1].sel.RESPONSAVEL === "[RESPONSAVEL].[H1_RESPONSABILIDADE].&[BRUNO]" && hw[1].measure === "CUSTO", hw);
+    var hIn = H.shadowRoot.querySelector('tr[data-row-index="2"] input');
+    hIn.value = ""; hIn.dispatchEvent(new Event("change"));
+    hw = writes(H);
+    check("H2 célula apagada grava 0, sem duplicar o endereço", hw.length === 2 && hw[1].value === "0", hw);
+    var hIn1 = H.shadowRoot.querySelector('tr[data-row-index="1"] input');
+    hIn1.value = "7"; hIn1.dispatchEvent(new Event("change"));
+    hw = writes(H);
+    check("H3 membro configurado como 'não recebe valor' (Ana) grava 0", hw.length === 3 && hw[2].sel.RESPONSAVEL.indexOf("[ANA]") !== -1 && hw[2].value === "0", hw);
+    var hIn3 = H.shadowRoot.querySelector('tr[data-row-index="3"] input');
+    hIn3.value = "9"; hIn3.dispatchEvent(new Event("change"));
+    check("H4 endereço incompleto (conta sem dimensões) fica fora da gravação", writes(H).length === 3, writes(H));
+    H.styleConfig = JSON.stringify({ deleteValue: "-" });
+    check("H5 valor para apagar configurável no painel", writes(H)[0].value === "-", writes(H));
+
+    // ── I ─────────────────────────────────────────────────────────
+    // Regras de negócio: bloqueios, falha no save, avisos
+    var I = document.getElementById("wI");
+    var iBinding = M.mainBindingWithParentLevels();
+    // Conta 1 com uma segunda combinação gravada (valor ≠ 0) → dado inconsistente
+    iBinding.data.push({ dimensions_0: iBinding.data[3].dimensions_0,
+      dimensions_1: { id: M.PER + "[MENSAL]", label: "Mensal", parentId: M.PER + "[PER_ALL]" },
+      dimensions_2: { id: M.RESP + "[BRUNO]", label: "Bruno", parentId: M.RESP + "[RESP_ALL]" },
+      measures_0: { raw: 300, formattedValue: "300,00" } });
+    setup(I, { styleConfig: { noValueMembers: "RESPONSAVEL=CLIENTE" }, mainBinding: iBinding, dataBindings: M.dataBindings(true) });
+    await tick(80);
+    function inputOf(w, row) { return w.shadowRoot.querySelector('tr[data-row-index="' + row + '"] input'); }
+    check("I1 tudo NÃO APLICÁVEL: medidas bloqueadas", inputOf(I, 4).disabled === true, rowCells(I, 4));
+    pick(I, 4, 0, "Mensal");
+    check("I2 escolher uma dimensão libera as medidas", inputOf(I, 4).disabled === false, rowCells(I, 4));
+    var iw = (function() { var n = I.getWriteCount(), o = []; for (var k = 0; k < n; k++) { o.push(I.getWriteValue(k)); } return o; })();
+    check("I3 linha sem valor: troca só registra a escolha (não zera a combinação antiga)", I._pendingChanges.length === 1 && I._pendingChanges[0].noMove === true && iw.length === 1, { pending: I._pendingChanges, writes: iw });
+    pick(I, 3, 1, "CLIENTE");
+    check("I4 Responsabilidade CLIENTE: medidas travadas mostrando 0", inputOf(I, 3).disabled === true && inputOf(I, 3).value === "0", rowCells(I, 3));
+    function respOf(w, k) {
+      for (var d = 0; d < w.getWriteDimensionCount(k); d++) {
+        if (w.getWriteDimensionId(k, d) === "RESPONSAVEL") { return w.getWriteMemberId(k, d); }
+      }
+      return "";
+    }
+    var iN = I.getWriteCount(), iVals = [];
+    for (var ik = 0; ik < iN; ik++) { iVals.push(respOf(I, ik) + "=" + I.getWriteValue(ik)); }
+    check("I5 CLIENTE grava 0 na combinação nova e zera a antiga (Ana)", iVals.indexOf(M.RESP + "[CLIENTE]=0") !== -1 && iVals.indexOf(M.RESP + "[ANA]=0") !== -1, iVals);
+    check("I6 conta com 2 combinações gravadas mostra o alerta ⚠", !!I.shadowRoot.querySelector('tr[data-row-index="3"] .dt-multi-combo'));
+
+    // Falha no setUserInput: continua pendente e destacada
+    var iCount = I.getWriteCount();
+    for (var iw2 = 0; iw2 < iCount; iw2++) { I.setWriteResult(iw2, respOf(I, iw2).indexOf("[CLIENTE]") === -1); }
+    I.clearPendingChanges();
+    var iNotice = I.shadowRoot.getElementById("dt-notice");
+    check("I7 gravação com falha continua pendente; a que deu certo sai", I._pendingChanges.length === 1 && I.getPendingChanges().indexOf("[CLIENTE]") !== -1, I._pendingChanges);
+    check("I8 linha com falha destacada + aviso", !!I.shadowRoot.querySelector('tr[data-row-index="3"].dt-row-failed') && !iNotice.classList.contains("hidden") && iNotice.textContent.indexOf("não foi gravada") !== -1, iNotice.textContent);
+
+    // Troca de contexto com alteração pendente → aviso
+    I._saveWindowBindings = 0; I._saveWindowUntil = 0;
+    var iNew = M.mainBindingWithParentLevels();
+    iNew.data[3].measures_0 = { raw: 555, formattedValue: "555,00" };
+    I.myDataBinding = iNew; I.onCustomWidgetAfterUpdate({ myDataBinding: iNew });
+    check("I9 troca de contexto com pendências: aviso de descarte", iNotice.textContent.indexOf("descartada") !== -1 && I._pendingChanges.length === 0, iNotice.textContent);
+
+    // ── J ─────────────────────────────────────────────────────────
+    // CLIENTE: regra padrão (sem painel), ID ≠ descrição, todas as medidas vão a 0
+    var J = document.getElementById("wJ");
+    var jS = M.twoMeasuresScenario();
+    setup(J, { mainBinding: jS.binding, dataBindings: jS.dataBindings });
+    await tick(80);
+    pick(J, 2, 1, "CLIENTE");
+    var jInputs = J.shadowRoot.querySelectorAll('tr[data-row-index="2"] input');
+    check("J1 CLIENTE (sem configurar painel): QTDE e CUSTO travados mostrando 0",
+      jInputs.length === 2 && jInputs[0].disabled && jInputs[1].disabled && jInputs[0].value === "0" && jInputs[1].value === "0",
+      Array.prototype.map.call(jInputs, function(i) { return i.value + (i.disabled ? "(trav)" : ""); }));
+    var jN = J.getWriteCount(), jW = [];
+    for (var jk = 0; jk < jN; jk++) {
+      var jResp = "";
+      for (var jd = 0; jd < J.getWriteDimensionCount(jk); jd++) {
+        if (J.getWriteDimensionId(jk, jd) === "RESPONSABILIDADE") { jResp = J.getWriteMemberId(jk, jd); }
+      }
+      jW.push(jResp.replace(jS.R, "") + ":" + J.getWriteMeasureId(jk) + "=" + J.getWriteValue(jk));
+    }
+    check("J2 grava 0 em QTDE e CUSTO no CLIENTE e zera só a QTDE que existia em Ana",
+      jW.length === 3 && jW.indexOf("[CLI]:QTDE=0") !== -1 && jW.indexOf("[CLI]:CUSTO=0") !== -1 && jW.indexOf("[ANA]:QTDE=0") !== -1, jW);
+
+    // ── K ─────────────────────────────────────────────────────────
+    // Visual SAP Horizon (compacto) por padrão; cores do painel continuam prevalecendo
+    var K = document.getElementById("wK");
+    setup(K, { mainBinding: M.mainBindingWithBookedLeaves() });
+    await tick();
+    var kTh = K.shadowRoot.querySelector("thead th");
+    var kTd = K.shadowRoot.querySelector('tr[data-row-index="1"] td');
+    var kInput = K.shadowRoot.querySelector('tr[data-row-index="1"] input');
+    check("K1 Horizon: cabeçalho branco com texto #1d2d3e",
+      getComputedStyle(kTh).backgroundColor === "rgb(255, 255, 255)" && getComputedStyle(kTh).color === "rgb(29, 45, 62)",
+      { bg: getComputedStyle(kTh).backgroundColor, color: getComputedStyle(kTh).color });
+    check("K2 Horizon compacto: linha de 32px e números à direita",
+      Math.round(kTd.getBoundingClientRect().height) <= 33 && getComputedStyle(kInput).textAlign === "right",
+      { altura: kTd.getBoundingClientRect().height, alinhamento: getComputedStyle(kInput).textAlign });
+    K.headerColor = "#1a73e8";
+    K.styleConfig = JSON.stringify({ rowHeight: 44 });
+    kTh = K.shadowRoot.querySelector("thead th");
+    kTd = K.shadowRoot.querySelector('tr[data-row-index="1"] td');
+    check("K3 cores e altura do painel prevalecem sobre o tema",
+      getComputedStyle(kTh).backgroundColor === "rgb(26, 115, 232)" && Math.round(kTd.getBoundingClientRect().height) >= 44,
+      { bg: getComputedStyle(kTh).backgroundColor, altura: kTd.getBoundingClientRect().height });
+
+    // ── L ─────────────────────────────────────────────────────────
+    // Adicionar/excluir membro: regras no widget, script só chama createMembers/deleteMembers
+    var Lw = document.getElementById("wL");
+    setup(Lw, { mainBinding: M.mainBindingWithBookedLeaves() });
+    await tick();
+    var lEvents = [];
+    ["onAddMemberRequested", "onDeleteMemberRequested"].forEach(function(n) {
+      Lw.addEventListener(n, function(e) { lEvents.push({ name: n, detail: e.detail }); });
+    });
+    var lSR = Lw.shadowRoot;
+    function ctxOn(row) {
+      var sp = lSR.querySelector('tr[data-row-index="' + row + '"] .cell-plain');
+      sp.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 20 }));
+    }
+    function clickItem(id) { lSR.getElementById(id).dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); }
+
+    // Excluir conta com valores → bloqueado
+    ctxOn(1); clickItem("ctx-exclude-member");
+    var lOk = lSR.getElementById("dt-confirm-ok");
+    check("L1 excluir conta com valores: bloqueado (sem botão Excluir)",
+      !lSR.getElementById("dt-confirm-backdrop").classList.contains("hidden") && lOk.classList.contains("hidden")
+      && lSR.getElementById("dt-confirm-strip").textContent.indexOf("valores lançados") !== -1);
+    lSR.getElementById("dt-confirm-cancel").click();
+
+    // Excluir conta sem valores → confirmação → evento com ID limpo
+    ctxOn(3); clickItem("ctx-exclude-member");
+    check("L2 conta sem valores: só dispara depois de confirmar", lEvents.length === 0 && !lOk.classList.contains("hidden"));
+    lOk.click(); await tick();
+    var lDel = lEvents.filter(function(e) { return e.name === "onDeleteMemberRequested"; })[0];
+    check("L3 confirmação dispara onDeleteMemberRequested com ID limpo", lDel && lDel.detail.memberId === "C3" && Lw.getDeleteMemberId() === "C3", lDel && lDel.detail);
+
+    // Adicionar: maiúsculas, formato, duplicidade, lista de grupos
+    ctxOn(1); clickItem("ctx-add-member");
+    var lId = lSR.getElementById("dt-input-id"), lDesc = lSR.getElementById("dt-input-desc"), lPar = lSR.getElementById("dt-input-parent");
+    var lGroups = Array.prototype.map.call(lSR.querySelectorAll("#dt-parent-list option"), function(o) { return o.value; });
+    check("L4 lista de grupos existentes no campo Grupo (pai já preenchido)", lGroups.indexOf("ROOT") !== -1 && lPar.value === "ROOT", { grupos: lGroups, pai: lPar.value });
+    lId.value = "c1"; lDesc.value = "x"; lSR.getElementById("dt-modal-confirm").click(); await tick();
+    check("L5 ID duplicado é recusado no diálogo", lSR.getElementById("dt-error-id").textContent.indexOf("Já existe") !== -1 && lEvents.length === 1);
+    lId.value = "nova conta"; lSR.getElementById("dt-modal-confirm").click(); await tick();
+    check("L6 ID com espaço é recusado", lSR.getElementById("dt-error-id").textContent.indexOf("sem espaços") !== -1 && lEvents.length === 1);
+    lId.value = "nova_conta"; lDesc.value = "manutenção de câmeras"; lPar.value = "root";
+    lSR.getElementById("dt-modal-confirm").click(); await tick();
+    var lAdd = lEvents.filter(function(e) { return e.name === "onAddMemberRequested"; })[0];
+    check("L7 válido: evento com ID, descrição e pai em maiúsculas",
+      lAdd && Lw.getNewMemberId() === "NOVA_CONTA" && Lw.getNewMemberDescription() === "MANUTENÇÃO DE CÂMERAS" && Lw.getNewMemberParentId() === "ROOT",
+      { id: Lw.getNewMemberId(), desc: Lw.getNewMemberDescription(), pai: Lw.getNewMemberParentId() });
+    Lw.setMemberResult(true);
+    check("L8 setMemberResult mostra o resultado no widget", lSR.getElementById("dt-notice").textContent.indexOf("NOVA_CONTA criado com sucesso") !== -1, lSR.getElementById("dt-notice").textContent);
+
+    // ── N ─────────────────────────────────────────────────────────
+    // Netos (FINANCEIRO > MÁQUINA DE CARTÃO > máquinas): uma linha com dropdown dos filhos
+    var Nw = document.getElementById("wN");
+    setup(Nw, { mainBinding: M.grandchildrenScenario(false) });
+    await tick();
+    var nSR = Nw.shadowRoot;
+    var nRows = nSR.querySelectorAll("tr.dt-subgroup-row");
+    var nSub = Array.prototype.map.call(nSR.querySelectorAll("tr.dt-subheader"), function(t) { return t.textContent.trim(); });
+    check("N1 subgrupo de netos vira uma linha só (título do subgrupo mantido)",
+      nRows.length === 1 && nSub.join() === "MÁQUINA DE CARTÃO" && nSR.querySelectorAll("tr[data-row-index]").length === 2,
+      { linhas: nSR.querySelectorAll("tr[data-row-index]").length, sub: nSub });
+    var nCells = Array.prototype.map.call(nRows[0].querySelectorAll("td"), function(td) { var i = td.querySelector("input"); return i ? i.value : td.textContent.trim(); });
+    check("N2 por padrão mostra a máquina com valor (Máquina simples) e seus valores", nCells.join("|") === "MÁQUINA SIMPLES|ANUAL|ANA|71.98", nCells);
+    var nOpts = openOptions(Nw, 5, 0); Nw._closeDropdown();
+    check("N3 dropdown lista as 3 máquinas", nOpts.length === 3 && nOpts.indexOf("MÁQ. IMPRIME CUPOM FÁCIL") !== -1, nOpts);
+    var nDd = nSR.querySelector("tr.dt-subgroup-row .cell-dropdown");
+    nDd.click();
+    Array.prototype.find.call(nSR.querySelectorAll(".dt-dropdown-item"), function(i) { return i.textContent === "MÁQ. IMPRIME CUPOM FÁCIL"; })
+      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    var nRow2 = nSR.querySelector("tr.dt-subgroup-row");
+    check("N4 escolher outra máquina só troca a visualização (sem alteração pendente)",
+      nRow2.getAttribute("data-row-index") === "4" && nRow2.querySelector(".cell-value").textContent === "MÁQ. IMPRIME CUPOM FÁCIL" && Nw.getPendingChanges() === "",
+      { linha: nRow2.getAttribute("data-row-index"), pend: Nw.getPendingChanges() });
+    var nOpts2 = openOptions(Nw, 4, 0); Nw._closeDropdown();
+    check("N5 a máquina com valor aparece marcada na lista", nOpts2.indexOf("MÁQUINA SIMPLES  — com valor") !== -1, nOpts2);
+    setup(Nw, { mainBinding: M.grandchildrenScenario(true) });
+    await tick();
+    check("N6 duas máquinas com valor: alerta ⚠ na linha", !!nSR.querySelector("tr.dt-subgroup-row .dt-subgroup-warn"));
+
+    // ── R ─────────────────────────────────────────────────────────
+    // Correções da revisão para produção
+    var Rw = document.getElementById("wR");
+    setup(Rw, {});
+    await tick();
+    var rBox = Rw.parentNode;
+    rBox.removeChild(Rw); rBox.appendChild(Rw); // SAC recria o DOM ao trocar de página/aba
+    save(Rw); await tick();
+    check("R1 reconectar o widget não duplica o onSaveRequested",
+      Rw._events.filter(function(e) { return e.name === "onSaveRequested"; }).length === 1, Rw._events.length);
+    save(Rw); await tick();
+    check("R2 segundo clique antes do clearPendingChanges é ignorado", Rw._events.length === 0, Rw._events.length);
+    Rw.clearPendingChanges();
+    save(Rw); await tick();
+    check("R3 após clearPendingChanges o Salvar volta a funcionar",
+      Rw._events.filter(function(e) { return e.name === "onSaveRequested"; }).length === 1, Rw._events.length);
+    Rw.clearPendingChanges();
+
+    Rw.setMeasureLabels(JSON.stringify(["Valor R$"]));
+    var rHeads = Array.prototype.map.call(Rw.shadowRoot.querySelectorAll("thead th"), function(th) { return th.textContent.trim(); });
+    check("R4 setMeasureLabels depois do binding aparece no cabeçalho", rHeads.indexOf("Valor R$") !== -1, rHeads);
+
+    Rw.pendingChanges = "[CONTA].[H1].&[C1]§[CONTA].[H1].&[C2]§99§CUSTO";
+    check("R5 pendingChanges vindo do SAC (valor salvo na story) não é reaplicado", Rw.getPendingChanges() === "", Rw.getPendingChanges());
+
+    var rIdx1 = Rw._accountIndex();
+    check("R6 índice de contas reaproveitado entre chamadas", Rw._accountIndex() === rIdx1);
+    Rw.myDataBinding = M.mainBinding(777);
+    Rw.onCustomWidgetAfterUpdate({ myDataBinding: Rw.myDataBinding });
+    await tick();
+    check("R7 índice de contas recalculado quando o binding muda", Rw._accountIndex() !== rIdx1);
+
+    var R2w = document.getElementById("wR2");
+    var rS = M.twoMeasuresScenario();
+    setup(R2w, { mainBinding: rS.binding, dataBindings: rS.dataBindings });
+    await tick(80);
+    var rIn = R2w.shadowRoot.querySelectorAll('tr[data-row-index="2"] input');
+    rIn[1].value = "15"; rIn[1].dispatchEvent(new Event("change"));
+    var rMid = R2w.getMeasureChangeMeasureId();
+    R2w.clearMeasureInput();
+    rIn = R2w.shadowRoot.querySelectorAll('tr[data-row-index="2"] input');
+    check("R8 clearMeasureInput limpa a medida editada (CUSTO), não a primeira (QTDE)",
+      rMid === "CUSTO" && rIn[1].value === "" && rIn[0].value !== "", { id: rMid, qtde: rIn[0].value, custo: rIn[1].value });
+
+    // ── C ─────────────────────────────────────────────────────────
+    var C = document.getElementById("wC");
+    setup(C, { childrenBinding: M.childrenBinding() });
+    C.setRowValues(JSON.stringify({ "[CONTA].[H1].&[C2]": "[CONTA].[H1].&[C2]|" + M.PER + "[MENSAL]|" + M.RESP + "[BRUNO]" }));
+    await tick();
+    check("C1 legado: setRowValues continua funcionando", rowCells(C, 2).join("|") === "Conta 2|MENSAL|BRUNO|50,00", rowCells(C, 2));
+    var optsLeg = openOptions(C, 2, 0); C._closeDropdown();
+    check("C2 legado: opções acham os filhos pelo nó do binding", optsLeg.join(",") === "Mensal,Anual", optsLeg);
+  } catch (e) {
+    check("Erro inesperado no teste", false, String(e && e.stack || e));
+  }
+
+  var failed = results.filter(function(r) { return !r.ok; }).length;
+  var summary = document.getElementById("summary");
+  summary.textContent = failed === 0 ? "Todos os " + results.length + " testes passaram" : failed + " de " + results.length + " testes falharam";
+  summary.className = failed === 0 ? "pass" : "fail";
+  window.__results = results;
+})();
+</script>
+</body>
+</html>
