@@ -1,6 +1,6 @@
 {
   "name": "Dropdown Table Widget (DEV)",
-  "description": "[DEV @ 6566a2e] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
+  "description": "[DEV @ d05f3b8] SAC Table Widget with inline dropdown cell selection from data binding dimensions",
   "newInstancePrefix": "dropdowntableDev",
   "eula": "",
   "vendor": "Custom",
@@ -11,13 +11,13 @@
     {
       "kind": "main",
       "tag": "dropdowntable-widget-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@6566a2ef142818177bf558d283b10b8af2425a8c/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
-      "integrity": "sha256-Qacsd4I1YgkSYmlHtPjWYrOnWAcpxKsDZR/oyaw3n9A="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@d05f3b8ce0c34cce7352f36c7bb80f7d80135c21/dropdown-table-widget-v2.js?tag=dropdowntable-widget-dev",
+      "integrity": "sha256-j0xHx8Upzwn6E5CiP6az97I+OHyoPd8HTKR/uLRPfqo="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling-dev",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@6566a2ef142818177bf558d283b10b8af2425a8c/style-panel.js?tag=dropdowntable-styling-dev",
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@d05f3b8ce0c34cce7352f36c7bb80f7d80135c21/style-panel.js?tag=dropdowntable-styling-dev",
       "integrity": "sha256-mLLGqFLyqQOTDod/CyNpJw/Tx3WfVtMuwFDMVLzlneY="
     }
   ],
@@ -476,6 +476,16 @@
           "description": "Retorno do setUserInput"
         }
       ]
+    },
+    "setMemberResult": {
+      "description": "Informa o retorno do createMembers/deleteMembers; o widget mostra o aviso de sucesso ou falha.",
+      "parameters": [
+        {
+          "name": "ok",
+          "type": "boolean",
+          "description": "Retorno do createMembers/deleteMembers"
+        }
+      ]
     }
   },
   "events": {
@@ -486,10 +496,10 @@
       "description": "Fired when a dropdown value is selected. Read selectedCellData for {row, dimensionId, memberId, memberLabel}."
     },
     "onAddMemberRequested": {
-      "description": "Fired when user confirms 'Adicionar membro'. Detail: {dimensionId, dimensionName, newMemberId, newMemberDescription, parentId, rowIndex, contextMemberId, contextMemberLabel}. Connect to: PlanningModel_X.createMembers(dimensionName, [{id: newMemberId, description: newMemberDescription}])"
+      "description": "Disparado após validação no diálogo do widget (ID/descrição em maiúsculas, formato, duplicidade). Leia getNewMemberId/Description/ParentId e chame createMembers; depois setMemberResult(ok)."
     },
     "onDeleteMemberRequested": {
-      "description": "Fired when user clicks 'Excluir membro'. Detail: {action:'excludeMember', dimensionId, dimensionName, memberId, memberLabel, rowIndex}. Connect to: PlanningModel_X.deleteMembers(dimensionName, [memberId])"
+      "description": "Disparado só depois da confirmação no diálogo do widget (contas com valores ou com subcontas são bloqueadas). Leia getDeleteMemberId() e chame deleteMembers; depois setMemberResult(ok)."
     },
     "onFilterMemberRequested": {
       "description": "Fired when user clicks 'Filtrar membro' or 'Filtrar'. Detail: {action:'filterMember'|'filter', dimensionId, dimensionName, memberId, memberLabel, rowIndex}."
