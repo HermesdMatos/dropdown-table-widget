@@ -22,7 +22,14 @@
                 margin: 0 0 12px 0;
                 background: #ffffff;
             }
-            legend { font-weight: 700; font-size: 14px; padding: 0 6px; color: #1d2d3e; }
+            /* Título dentro do cartão (float tira a legend da borda; no painel escuro do SAC ficava ilegível) */
+            legend {
+                float: left; width: 100%;
+                padding: 0 0 8px 0; margin: 0 0 8px 0;
+                border-bottom: 1px solid #e5e5e5;
+                font-weight: 700; font-size: 14px; color: #1d2d3e;
+            }
+            legend + * { clear: both; }
             table { width: 100%; border-collapse: collapse; }
             td { padding: 4px; vertical-align: middle; font-size: 14px; color: #556b82; }
             input[type="text"], select, textarea {
