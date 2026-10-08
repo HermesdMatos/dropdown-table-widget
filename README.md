@@ -36,6 +36,8 @@ O `setUserInput` só existe no planejamento de uma **Tabela** (a API de custom w
 - **Troca de contexto** (ex: cliente) com alterações não salvas: aviso no topo do widget e evento `onPendingChangesDiscarded`.
 - **Conta com mais de uma combinação gravada** (valor ≠ 0): alerta ⚠ ao lado da conta; a tabela mostra a de maior valor.
 - **Subgrupo de netos** (ex: FINANCEIRO > MÁQUINA DE CARTÃO > máquinas): uma linha só, com dropdown dos filhos na coluna da conta. Mostra por padrão o filho com valor; trocar só muda a visualização (nada é movido). Mais de um filho com valor: alerta ⚠.
+- **Salvar** dispara `onSaveRequested` uma vez por clique; cliques repetidos são ignorados até o script chamar `clearPendingChanges()` (ou por 10s).
+- **`pendingChanges`** é só de saída: o widget publica, mas não reaplica o valor salvo na story (evita reenviar alterações de outra sessão).
 - **Desempate** entre combinações com 0: prefere a salva por último nesta sessão (ao recarregar a story, só uma Data Action de limpeza resolve).
 
 O widget também converte o número pt-BR, resolve o ID da medida, remove duplicatas e descarta endereços incompletos. No evento `onSaveRequested`:
@@ -108,7 +110,7 @@ Padrão **SAP Horizon (Fiori), densidade compacta**: fonte 72, cabeçalho branco
 ```bash
 node test/server.js
 ```
-- `http://127.0.0.1:5180/` roda os testes automáticos (modo explícito, getMembers, legado, save sem reenvio).
+- `http://127.0.0.1:5180/` roda os testes automáticos (modo explícito, getMembers, legado, save sem reenvio, regras de negócio, netos, regressões da revisão).
 - `http://127.0.0.1:5180/coexist.html` carrega PROD (branch `main`) + DEV na mesma página.
 
 ## Publicar no DEV (testar no SAC sem afetar produção)
@@ -132,7 +134,7 @@ A partir daí, merges na `main` não afetam a produção.
 ### Cada versão
 
 1. Pull Request da branch → merge na `main`.
-2. `git tag v2.13.0 && git push origin v2.13.0`
-3. `node tools/release-prod.js v2.13.0 --check` → commit do `dropdowntable.json` na `main`.
+2. `git tag v2.14.0 && git push origin v2.14.0`
+3. `node tools/release-prod.js v2.14.0 --check` → commit do `dropdowntable.json` na `main`.
 4. No SAC: importar `dropdowntable.json` e validar a story de produção.
-5. **Rollback**: reimportar o `dropdowntable.json` da versão anterior (`git show v2.12.0:dropdowntable.json`). As URLs ficam fixas no tag, então a versão antiga continua publicada.
+5. **Rollback**: reimportar o `dropdowntable.json` da versão anterior (ex: `git show v2.11.25:dropdowntable.json`). As URLs ficam fixas no tag, então a versão antiga continua publicada.

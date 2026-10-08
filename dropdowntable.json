@@ -6,7 +6,7 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "webcomponents": [
     {
       "kind": "main",
@@ -81,11 +81,6 @@
       "type": "string",
       "description": "Valor alterado/usado na ultima edicao de medida ou dropdown",
       "default": ""
-    },
-    "memberTechnicalMap": {
-      "type": "string",
-      "description": "JSON string mapping dimension names to member descriptions and their technical IDs. Example: {\"RESPONSABILIDADE\": {\"SAPORE\": \"[RESPONSABILIDADE].[H1].[&SAPORE]\"}}.  Populated from metadata during data binding.",
-      "default": "{}"
     },
     "pendingChanges": {
       "type": "string",

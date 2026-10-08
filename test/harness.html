@@ -42,6 +42,8 @@
 <h2>N — netos: uma linha com dropdown dos filhos do subgrupo</h2>
 <div class="widget-box"><dropdowntable-widget id="wN" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
+<div class="widget-box"><dropdowntable-widget id="wR" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wR2" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
 <script src="/mock-binding.js"></script>
@@ -282,7 +284,7 @@
     check("I8 linha com falha destacada + aviso", !!I.shadowRoot.querySelector('tr[data-row-index="3"].dt-row-failed') && !iNotice.classList.contains("hidden") && iNotice.textContent.indexOf("não foi gravada") !== -1, iNotice.textContent);
 
     // Troca de contexto com alteração pendente → aviso
-    I._skipHighlightRenders = 0;
+    I._saveWindowBindings = 0; I._saveWindowUntil = 0;
     var iNew = M.mainBindingWithParentLevels();
     iNew.data[3].measures_0 = { raw: 555, formattedValue: "555,00" };
     I.myDataBinding = iNew; I.onCustomWidgetAfterUpdate({ myDataBinding: iNew });
@@ -409,6 +411,50 @@
     setup(Nw, { mainBinding: M.grandchildrenScenario(true) });
     await tick();
     check("N6 duas máquinas com valor: alerta ⚠ na linha", !!nSR.querySelector("tr.dt-subgroup-row .dt-subgroup-warn"));
+
+    // ── R ─────────────────────────────────────────────────────────
+    // Correções da revisão para produção
+    var Rw = document.getElementById("wR");
+    setup(Rw, {});
+    await tick();
+    var rBox = Rw.parentNode;
+    rBox.removeChild(Rw); rBox.appendChild(Rw); // SAC recria o DOM ao trocar de página/aba
+    save(Rw); await tick();
+    check("R1 reconectar o widget não duplica o onSaveRequested",
+      Rw._events.filter(function(e) { return e.name === "onSaveRequested"; }).length === 1, Rw._events.length);
+    save(Rw); await tick();
+    check("R2 segundo clique antes do clearPendingChanges é ignorado", Rw._events.length === 0, Rw._events.length);
+    Rw.clearPendingChanges();
+    save(Rw); await tick();
+    check("R3 após clearPendingChanges o Salvar volta a funcionar",
+      Rw._events.filter(function(e) { return e.name === "onSaveRequested"; }).length === 1, Rw._events.length);
+    Rw.clearPendingChanges();
+
+    Rw.setMeasureLabels(JSON.stringify(["Valor R$"]));
+    var rHeads = Array.prototype.map.call(Rw.shadowRoot.querySelectorAll("thead th"), function(th) { return th.textContent.trim(); });
+    check("R4 setMeasureLabels depois do binding aparece no cabeçalho", rHeads.indexOf("Valor R$") !== -1, rHeads);
+
+    Rw.pendingChanges = "[CONTA].[H1].&[C1]§[CONTA].[H1].&[C2]§99§CUSTO";
+    check("R5 pendingChanges vindo do SAC (valor salvo na story) não é reaplicado", Rw.getPendingChanges() === "", Rw.getPendingChanges());
+
+    var rIdx1 = Rw._accountIndex();
+    check("R6 índice de contas reaproveitado entre chamadas", Rw._accountIndex() === rIdx1);
+    Rw.myDataBinding = M.mainBinding(777);
+    Rw.onCustomWidgetAfterUpdate({ myDataBinding: Rw.myDataBinding });
+    await tick();
+    check("R7 índice de contas recalculado quando o binding muda", Rw._accountIndex() !== rIdx1);
+
+    var R2w = document.getElementById("wR2");
+    var rS = M.twoMeasuresScenario();
+    setup(R2w, { mainBinding: rS.binding, dataBindings: rS.dataBindings });
+    await tick(80);
+    var rIn = R2w.shadowRoot.querySelectorAll('tr[data-row-index="2"] input');
+    rIn[1].value = "15"; rIn[1].dispatchEvent(new Event("change"));
+    var rMid = R2w.getMeasureChangeMeasureId();
+    R2w.clearMeasureInput();
+    rIn = R2w.shadowRoot.querySelectorAll('tr[data-row-index="2"] input');
+    check("R8 clearMeasureInput limpa a medida editada (CUSTO), não a primeira (QTDE)",
+      rMid === "CUSTO" && rIn[1].value === "" && rIn[0].value !== "", { id: rMid, qtde: rIn[0].value, custo: rIn[1].value });
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");

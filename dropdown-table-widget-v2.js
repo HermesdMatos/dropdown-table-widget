@@ -1,25 +1,10 @@
-// dropdown-table-widget.js — v2.13.0
-// Changelog:
-//   v2.13.0  — Feature: dropdowns sem script — dimensões marcadas no painel (modo explícito),
-//              valuesBinding (Builder) substitui setRowValues/tabela espelho, getMembers() da
-//              DataSource como fonte extra de opções, modo diagnóstico no console
-//              Fix: save não reenvia linhas já salvas (seleções viram _savedSelections)
-//              Fix: deduplicação e fingerprint consideram todas as medidas/dimensões
-//   v2.12.0  — Fix: parse numerico pt-BR (1.593,95 / 1.500); pendingChanges com valor canonico
-//              Fix: onSaveRequested inclui linhas alteradas por dropdown (chave de _localSelections)
-//              Fix: troca de contexto volta a limpar estado local apos o primeiro save
-//              Fix: dt-empty oculto de fato; cellAlign aplicado; revert de placeholder
-//              Fix: pendingChanges sem duplicatas (A→B→C colapsa em A→C)
-//              Refactor: endereco da linha centralizado em _buildRowAddrObj; remove codigo morto
-//              Fix: escopo isolado (IIFE) e tag configuravel via ?tag= na URL — permite carregar
-//                   duas versoes na mesma pagina (ex: PROD + DEV) sem "already declared"
-//   v2.11.25 — Fix: dt-empty hidden por padrao
-//   v2.11.24 — Fix: input focus restaurado; Delete funciona em selecao multipla
-//   v2.11.23 — Feature: loading spinner overlay durante carregamento do binding
-//   v2.11.22 — Feature: save button label configurável via style panel
-//   v2.11.21 — Feature: save button cores configuráveis via style panel
-//   v2.11.20 — Feature: group header e subheader cores configuráveis via style panel
-//   v2.11.19 — Fix: remove changed-cell do render; cor so aplicada em acao do usuario
+// Dropdown Table Widget (SAP Analytics Cloud custom widget) — v2.14.0
+//
+// Tabela de planejamento: contas em linhas, dimensões escolhidas por dropdown (validação de
+// dados), medidas editáveis e lista de gravação pronta para Table.getPlanning().setUserInput().
+// Regras de negócio e configuração: ver README.md. Histórico completo: git log.
+//
+// Ambiente: navegador do SAC (Optimized Story Experience). Sem dependências externas.
 
 (function() {
 
@@ -553,6 +538,17 @@ TMPL.innerHTML = `
 </div>
 `;
 
+// styleConfig → variável CSS do template
+var CSS_VARS_IF_SET = {
+  headerColor: "--header-color", headerTextColor: "--header-text-color", hoverRowColor: "--hover-row-color",
+  tableTextColor: "--table-text-color", editableCellColor: "--editable-cell-color"
+};
+var CSS_VARS_ALWAYS = {
+  groupHeaderBg: "--group-header-bg", groupHeaderColor: "--group-header-color",
+  subheaderBg: "--subheader-bg", subheaderColor: "--subheader-color",
+  saveBtnBg: "--save-btn-bg", saveBtnColor: "--save-btn-color", saveBtnHoverBg: "--save-btn-hover-bg"
+};
+
 class DropdownTableWidget extends HTMLElement {
 
   constructor() {
@@ -560,73 +556,102 @@ class DropdownTableWidget extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.shadowRoot.appendChild(TMPL.content.cloneNode(true));
 
-    this._dropdownDimensions = [];
-    this._dropdownOptions = {};
-    this._selectedCellData = {};
-    this._previousCellData = {};
-    this._activeFilters = {};
-    this._activeCell = null;
+    // ── Dados do binding ──
     this._metadata = null;
     this._data = null;
-    this._localSelections = {};
-    this._localMeasures = {};
-    this._measureLabels = [];
-    this._lastAddMemberRequest = {};
-    this._deleteMemberId          = "";
-    this._deleteMemberDimensionId = "";
-    this._rowValuesMap = {};
-    this._selectedCells  = []; // [{rowIndex, measureKey, tdEl}]
-    this._selAnchor      = null; // {rowIndex, measureKey}
-    this._isDragging     = false;
-    this._skipHighlightRenders = 0;
-    this._skipUntil = 0;
-    this._selectionRowIndex = {}; // {dim0Id: rowIndex} da ultima selecao de dropdown
-    this._savedSelections = {};   // seleções já salvas — mantêm o visual até o modelo atualizar
-    this._autoRowValuesMap = null; // montado a partir do valuesBinding
+    this._dimLabels = [];          // rótulos das colunas de dimensão (derivados do binding)
+    this._mesLabels = [];          // rótulos das colunas de medida (derivados do binding)
+    this._bindingNodeIds = {};     // {feedKey: {id: true}} nós de hierarquia vistos no binding
+    this._bindingLeaves = {};      // {feedKey: {id: label}} membros gravados vistos no binding
+    this._childrenFromBinding = {};// {feedKey: {parentId: [{value, label}]}} (childrenBinding)
+    this._autoRowValuesMap = null; // {conta: "conta|dim1|..."} (valuesBinding)
+    this._autoRowValuesMapStr = undefined;
     this._rowValueLabels = {};
     this._valuesLeaves = {};
-    this._dsMembers = {};
+    this._dsMembers = {};          // {feedKey: [{value, label}]} getMembers() da DataSource
     this._dsMembersRequested = false;
-    this._explicitDropdownDims = []; // styleConfig.dropdownDimensions (painel)
+    this._accountIndexCache = null;
+    this._defaultMemberCache = {};
+    this._memberLabelIndex = {};
+    this._fallbackOptionsCache = {};
+    this._multiComboAccounts = {};
+    this._dataFingerprint = undefined;
+
+    // ── Configuração por script (modo legado) ──
+    this._dropdownDimensions = [];
+    this._dropdownOptions = {};
+    this._rowValuesMap = {};
+    this._measureLabels = [];
+
+    // ── Configuração pelo painel (modo sem script) ──
+    this._explicitDropdownDims = [];
     this._debugMode = false;
     this._emptyDefaultLabel = "NÃO APLICAVEL"; // membro inicial quando a célula não tem valor
-    // Regras de gravação (painel → Gravação) — substituem a lógica do script onSaveRequested
-    this._writeHierarchies = {}; // {DIM: "HIERARQUIA"} da tabela usada no setUserInput
-    // {DIM: ["CLIENTE", ...]} membros que gravam 0 em todas as medidas (padrão: responsabilidade do cliente)
-    this._noValueMembers = { RESPONSABILIDADE: ["CLIENTE"] };
-    this._deleteValue = "0";     // valor enviado para "apagar" — setUserInput recusa vazio (Preenchimento obrigatório)
-    this._writes = [];           // lista montada por getWriteCount()
+    this._writeHierarchies = {};               // {DIM: "HIERARQUIA"} da tabela do setUserInput
+    this._noValueMembers = { RESPONSABILIDADE: ["CLIENTE"] }; // membros que gravam 0 em todas as medidas
+    this._deleteValue = "0";                   // "apagar": setUserInput recusa vazio
     this._availableDimensions = "[]";
-    this._dataFingerprint = undefined;
+
+    // ── Estado de edição ──
+    this._localSelections = {};    // {conta: {feedKey: {id, label}}} seleções pendentes
+    this._savedSelections = {};    // seleções já salvas, até o modelo atualizar
+    this._selectionRowIndex = {};  // {conta: rowIndex} da última seleção
+    this._localMeasures = {};      // {rowIndex: {measureKey: número}}
+    this._localData = {};          // {endereço___medida: {value}} valor exibido no input
+    this._originalData = {};
+    this._pendingChanges = [];
+    this._writes = [];             // lista montada por getWriteCount()
+    this._writeSkipped = [];
+    this._failedRows = {};
+    this._saveWindowBindings = 0;  // bindings protegidos após o save (não contam como troca de contexto)
+    this._saveWindowUntil = 0;
+    this._saveInFlightUntil = 0;   // evita onSaveRequested duplicado (duplo clique)
+    this._subgroupSelection = {};  // {subgrupo: conta escolhida} (só visualização)
+
+    // ── Valores expostos ao script (getters / propriedades) ──
+    this._selectedCellData = {};
+    this._previousCellData = {};
+    this._lastAddMemberRequest = {};
+    this._newMemberId = "";
+    this._newMemberDescription = "";
+    this._newMemberParentId = "";
+    this._newMemberDimensionId = "";
+    this._deleteMemberId = "";
+    this._deleteMemberDimensionId = "";
+    this._lastMemberAction = null;
     this._oldRowAddrStr = "";
     this._newRowAddrStr = "";
     this._changedValue = "";
-    this._pendingChanges = [];
-    this._localData = {};
-    this._originalData = {};
+    this._measureChangeValue = "";
+    this._measureChangeMeasureId = "";
+    this._measureChangeRowIndex = "";
+    this._measureChangeAddrStr = "";
 
-    // Style properties
-    // Padrões SAP Horizon (compacto); o painel de estilo sobrescreve
-    this._rowHeight        = 32;
-    this._colWidth         = "auto";
-    this._fontFamily       = "'72', '72full', Arial, Helvetica, sans-serif";
-    this._fontSize         = "14px";
-    this._fontWeight       = "normal";
-    this._fontStyle        = "normal";
-    this._textDecoration   = "none";
-    this._editableCellColor = "#ffffff";
-    this._showUnit         = "none";
-    this._tableTitle       = "";
-    this._titleColor       = "#1d2d3e";
-    this._titleSize        = "16px";
-    this._headerAlign      = "left";
-    this._cellAlign        = "left";
-    this._titleAlign       = "left";
+    // ── Interface ──
+    this._activeCell = null;
+    this._ctxTarget = null;        // {rowIndex, dimensionId, dimensionRealId, memberId, memberLabel}
+    this._pendingDelete = null;
+    this._selectedCells = [];      // [{rowIndex, measureKey, tdEl}]
+    this._selAnchor = null;
+    this._isDragging = false;
+    this._noticeTimer = null;
+    this._uiBound = false;
 
-    this._showSaveButton = true;
-
-    // Context menu state
-    this._ctxTarget = null; // {rowIndex, dimensionId, memberId, memberLabel, dimensionName}
+    // ── Estilo (padrão SAP Horizon compacto; o painel sobrescreve) ──
+    this._rowHeight         = 32;
+    this._colWidth          = "auto";
+    this._fontFamily        = "'72', '72full', Arial, Helvetica, sans-serif";
+    this._fontSize          = "14px";
+    this._fontWeight        = "normal";
+    this._fontStyle         = "normal";
+    this._textDecoration    = "none";
+    this._tableTitle        = "";
+    this._titleColor        = "#1d2d3e";
+    this._titleSize         = "16px";
+    this._headerAlign       = "left";
+    this._cellAlign         = "left";
+    this._titleAlign        = "left";
+    this._showSaveButton    = true;
 
     this._onDocClick    = this._closeDropdown.bind(this);
     this._onDocCtxClose = this._closeCtxMenu.bind(this);
@@ -638,17 +663,23 @@ class DropdownTableWidget extends HTMLElement {
     document.addEventListener("click", this._onDocCtxClose);
     document.addEventListener("mouseup", this._onDocMouseUp);
     this._applyDynamicStyles();
+    // O SAC pode desconectar e reconectar o elemento: os listeners do shadow DOM são ligados
+    // uma única vez (antes eram duplicados, disparando eventos — ex: onSaveRequested — em dobro)
+    if (this._uiBound) { return; }
+    this._uiBound = true;
     this._bindContextMenu();
     this._bindModal();
     this._bindDeleteConfirm();
     this._bindSelectionKeys();
     this._bindSaveButton();
+    this._bindDragSelection();
   }
 
   disconnectedCallback() {
     document.removeEventListener("click", this._onDocClick);
     document.removeEventListener("click", this._onDocCtxClose);
     document.removeEventListener("mouseup", this._onDocMouseUp);
+    if (this._noticeTimer) { clearTimeout(this._noticeTimer); this._noticeTimer = null; }
   }
 
   // ─── Loading Overlay ─────────────────────────────────────────
@@ -663,18 +694,11 @@ class DropdownTableWidget extends HTMLElement {
 
   // ─── SAC Lifecycle ────────────────────────────────────────────
   onCustomWidgetReady() { this._loadBinding(); }
-  onCustomWidgetBeforeUpdate(c) {}
   onCustomWidgetAfterUpdate(changedProperties) {
     if (changedProperties && "myDataBinding" in changedProperties) {
       var dataBinding = changedProperties.myDataBinding;
-      if (dataBinding && dataBinding.state !== "success") {
-        this._showLoading();
-        return;
-      }
-      if (dataBinding && dataBinding.state === "success") {
-        this._processDataBinding(dataBinding);
-        return;
-      }
+      if (dataBinding && dataBinding.state !== "success") { this._showLoading(); return; }
+      if (dataBinding) { this._processDataBinding(dataBinding); return; }
     }
     if (changedProperties && ("childrenBinding" in changedProperties || "valuesBinding" in changedProperties)) {
       this._processChildrenBinding();
@@ -682,7 +706,7 @@ class DropdownTableWidget extends HTMLElement {
       this._render();
       return;
     }
-    // Detecta mudança de filtro externo via setDimensionFilter()
+    // Filtro externo via propriedades dimensionFilterId/dimensionFilterMembers
     if (changedProperties && ("dimensionFilterId" in changedProperties || "dimensionFilterMembers" in changedProperties)) {
       this._applyExternalFilter();
       return;
@@ -690,11 +714,7 @@ class DropdownTableWidget extends HTMLElement {
     this._loadBinding();
   }
   onCustomWidgetResize(w, h) { this.style.width = w + "px"; this.style.height = h + "px"; }
-  onCustomWidgetDestroy() {
-    document.removeEventListener("click", this._onDocClick);
-    document.removeEventListener("click", this._onDocCtxClose);
-    document.removeEventListener("mouseup", this._onDocMouseUp);
-  }
+  onCustomWidgetDestroy() { this.disconnectedCallback(); }
 
   // ─── Binding ──────────────────────────────────────────────────
   _loadBinding() {
@@ -708,158 +728,29 @@ class DropdownTableWidget extends HTMLElement {
 
   _processDataBinding(dataBinding) {
     try {
-      if (!dataBinding || !dataBinding.metadata || !dataBinding.data) return;
-
-      // Detecta troca de contexto comparando IDs de todas as linhas
-      // (todas as dimensões e medidas de cada linha)
-      var newFingerprint = "";
-      if (dataBinding.data && dataBinding.data.length > 0) {
-        for (var fpi = 0; fpi < dataBinding.data.length; fpi++) {
-          var fpRow = dataBinding.data[fpi];
-          for (var fpk in fpRow) {
-            var fpCell = fpRow[fpk] || {};
-            if (fpk.indexOf("dimensions_") === 0) {
-              newFingerprint = newFingerprint + (fpCell.id || "") + ";";
-            } else if (fpk.indexOf("measures_") === 0) {
-              newFingerprint = newFingerprint + (fpCell.raw !== undefined ? String(fpCell.raw) : (fpCell.formattedValue || "")) + ";";
-            }
-          }
-          newFingerprint = newFingerprint + "|";
-        }
-      }
-      // Janela pós-save: protege no máximo 2 bindings e 15s após clearPendingChanges
-      var inSaveWindow = this._skipHighlightRenders > 0 && Date.now() < this._skipUntil;
-      if (this._skipHighlightRenders > 0) { this._skipHighlightRenders--; }
-      if (this._dataFingerprint !== undefined && this._dataFingerprint !== newFingerprint) {
-        if (!inSaveWindow) {
-          // Troca real de contexto (ex: mudança de cliente) — limpa estado local
-          var discarded = (this._pendingChanges || []).length;
-          if (discarded > 0) {
-            this._showNotice(discarded + (discarded === 1 ? " alteração não salva foi descartada" : " alterações não salvas foram descartadas") + " na troca de contexto.", "warn");
-            var discardedSelf = this;
-            Promise.resolve().then(function() {
-              discardedSelf.dispatchEvent(new CustomEvent("onPendingChangesDiscarded", {
-                bubbles: true, composed: true, detail: { count: discarded }
-              }));
-            });
-          }
-          this._failedRows        = {};
-          this._localSelections   = {};
-          this._localMeasures     = {};
-          this._pendingChanges    = [];
-          this._localData         = {};
-          this._originalData      = {};
-          this._selectionRowIndex = {};
-          this._savedSelections   = {};
-          this._debugLog("Troca de contexto detectada — estado local limpo");
-        }
-      }
-      this._dataFingerprint = newFingerprint;
-
+      if (!dataBinding || !dataBinding.metadata || !dataBinding.data) { return; }
+      var data = dataBinding.data;
       var meta = dataBinding.metadata;
-      var dimLabels = [];
-      var mesLabels = [];
 
-      // ── Dimension labels — follow PlanifyIT pattern ──
-      var dims = meta.feeds ? meta.feeds.dimensions : null;
-      var dimValues = dims ? dims.values : [];
-      for (var di = 0; di < dimValues.length; di++) {
-        var dv = dimValues[di];
-        var firstRow = dataBinding.data[0];
-        var firstCell = firstRow ? firstRow["dimensions_" + di] : null;
-        var dimLabel = "";
-        if (firstCell && firstCell.parentId) {
-          var m = firstCell.parentId.match(/^\[([^\]]+)\]/);
-          if (m) { dimLabel = m[1].replace(/_/g, " "); }
-        }
-        if (!dimLabel && firstCell && firstCell.id) {
-          var m4 = firstCell.id.match(/^\[([^\]]+)\]/);
-          if (m4) { dimLabel = m4[1].replace(/_/g, " "); }
-        }
-        if (!dimLabel && firstCell && firstCell.label && firstCell.isCollapsed) {
-          dimLabel = firstCell.label;
-        }
-        if (!dimLabel) {
-          if (typeof dv === "object") {
-            dimLabel = dv.description || dv.label || dv.id || ("Dim " + di);
-          } else {
-            dimLabel = "Dim " + di;
-          }
-        }
-        dimLabels.push(dimLabel);
+      // Troca de contexto (ex: outro cliente): o conteúdo do binding mudou fora da janela pós-save
+      var fingerprint = this._fingerprint(data);
+      var inSaveWindow = this._saveWindowBindings > 0 && Date.now() < this._saveWindowUntil;
+      if (this._saveWindowBindings > 0) { this._saveWindowBindings--; }
+      if (this._dataFingerprint !== undefined && this._dataFingerprint !== fingerprint && !inSaveWindow) {
+        this._resetLocalState(true);
       }
-
-      // ── Measure labels ──
-      var measMeta = meta.mainStructureMembers || (meta.feeds && meta.feeds.measures) || null;
-      var measValues = [];
-      if (measMeta) {
-        if (Array.isArray(measMeta)) {
-          measValues = measMeta;
-        } else if (measMeta.values) {
-          measValues = measMeta.values;
-        } else if (typeof measMeta === "object") {
-          for (var mk in measMeta) {
-            if (measMeta[mk] !== undefined) { measValues.push(measMeta[mk]); }
-          }
-        }
-      }
-
-      for (var mi = 0; mi < measValues.length; mi++) {
-        var mv = measValues[mi];
-        var mesLabel = "";
-        if (this._measureLabels && this._measureLabels[mi]) {
-          mesLabel = this._measureLabels[mi];
-        } else if (typeof mv === "object" && mv !== null) {
-          mesLabel = mv.label || mv.description || mv.id || ("Med " + mi);
-        } else {
-          mesLabel = "Med " + mi;
-        }
-        mesLabels.push(mesLabel);
-      }
-
-      // Build _mesIds: real technical IDs for measures (separate from display labels)
-      var mesIds = [];
-      for (var mii = 0; mii < measValues.length; mii++) {
-        var miv = measValues[mii];
-        if (typeof miv === "string") { mesIds.push(miv); }
-        else if (miv && miv.id) { mesIds.push(miv.id); }
-        else { mesIds.push("measures_" + mii); }
-      }
+      this._dataFingerprint = fingerprint;
 
       this._metadata = meta;
-      this._metadata._dimLabels = dimLabels;
-      this._metadata._mesLabels = mesLabels;
-      this._metadata._mesIds    = mesIds;
-      this._metadata._measCount = mesLabels.length;
-      this._data = dataBinding.data;
-
-      // Nós de hierarquia vistos no binding (isNode/isCollapsed ou pai de outra célula) — nunca são opção.
-      // As demais células (membros gravados, ex: "Anual", "RH") viram opção de último recurso.
-      this._bindingNodeIds = {};
-      var leafCandidates = {};
-      for (var nr = 0; nr < dataBinding.data.length; nr++) {
-        for (var nk in dataBinding.data[nr]) {
-          var ncell = dataBinding.data[nr][nk];
-          if (nk.indexOf("dimensions_") !== 0 || nk === "dimensions_0" || !ncell || !ncell.id) { continue; }
-          if (!this._bindingNodeIds[nk]) { this._bindingNodeIds[nk] = {}; }
-          if (ncell.isNode === true || ncell.isCollapsed === true) { this._bindingNodeIds[nk][ncell.id] = true; }
-          if (ncell.parentId) { this._bindingNodeIds[nk][ncell.parentId] = true; }
-          if (!leafCandidates[nk]) { leafCandidates[nk] = {}; }
-          leafCandidates[nk][ncell.id] = ncell.label || this._cleanMemberId(ncell.id);
-        }
-      }
-      this._bindingLeaves = {};
-      for (var lk in leafCandidates) {
-        this._bindingLeaves[lk] = {};
-        for (var lid in leafCandidates[lk]) {
-          if (this._bindingNodeIds[lk][lid] || this._cleanMemberId(lid) === "#") { continue; }
-          this._bindingLeaves[lk][lid] = leafCandidates[lk][lid];
-        }
-      }
+      this._data = data;
+      this._accountIndexCache = null;
+      this._dimLabels = this._buildDimLabels(meta, data);
+      this._mesLabels = this._buildMeasureLabels(meta);
+      this._indexBindingMembers(data);
 
       this._debugLog("myDataBinding", {
         dimensions: meta.dimensions, feeds: meta.feeds, mainStructureMembers: meta.mainStructureMembers,
-        rows: dataBinding.data.length, firstRows: dataBinding.data.slice(0, 3)
+        rows: data.length, firstRows: data.slice(0, 3)
       });
 
       this._processChildrenBinding();
@@ -871,34 +762,134 @@ class DropdownTableWidget extends HTMLElement {
     } catch(e) { console.error("DropdownTable _processDataBinding:", e); }
   }
 
+  // Hash (53 bits) de todas as dimensões e medidas: detecta troca de contexto sem guardar
+  // uma string do tamanho do binding (dezenas de milhares de linhas)
+  _fingerprint(data) {
+    var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    var mix = function(str) {
+      for (var i = 0; i < str.length; i++) {
+        var ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+    };
+    for (var r = 0; r < data.length; r++) {
+      var row = data[r];
+      for (var k in row) {
+        var c = row[k] || {};
+        if (k.indexOf("dimensions_") === 0) { mix((c.id || "") + ";"); }
+        else if (k.indexOf("measures_") === 0) { mix((c.raw !== undefined ? String(c.raw) : (c.formattedValue || "")) + ";"); }
+      }
+      mix("|");
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return data.length + ":" + (4294967296 * (2097151 & h2) + (h1 >>> 0));
+  }
+
+  // Descarta o estado de edição. notify: avisa e dispara onPendingChangesDiscarded se havia pendências
+  _resetLocalState(notify) {
+    var discarded = this._pendingChanges.length;
+    if (notify && discarded > 0) {
+      this._showNotice(discarded + (discarded === 1 ? " alteração não salva foi descartada" : " alterações não salvas foram descartadas") + " na troca de contexto.", "warn");
+      this._emitEvent("onPendingChangesDiscarded", { count: discarded });
+    }
+    this._failedRows = {};
+    this._localSelections = {};
+    this._localMeasures = {};
+    this._pendingChanges = [];
+    this._localData = {};
+    this._originalData = {};
+    this._selectionRowIndex = {};
+    this._savedSelections = {};
+    this._debugLog("Troca de contexto detectada — estado local limpo");
+  }
+
+  // Rótulo de cada coluna de dimensão: nome da dimensão no ID do membro ("[PERIODICIDADE]..."),
+  // senão descrição do feed
+  _buildDimLabels(meta, data) {
+    var labels = [];
+    var values = meta.feeds && meta.feeds.dimensions ? meta.feeds.dimensions.values : [];
+    var first = data[0] || {};
+    for (var i = 0; i < values.length; i++) {
+      var cell = first["dimensions_" + i];
+      var label = "";
+      var fromId = function(s) { var m = s ? String(s).match(/^\[([^\]]+)\]/) : null; return m ? m[1].replace(/_/g, " ") : ""; };
+      if (cell) { label = fromId(cell.parentId) || fromId(cell.id) || (cell.isCollapsed && cell.label) || ""; }
+      if (!label) {
+        var dv = values[i];
+        label = typeof dv === "object" && dv ? (dv.description || dv.label || dv.id) : "";
+      }
+      labels.push(label || ("Dim " + i));
+    }
+    return labels;
+  }
+
+  _measureEntries(meta) {
+    var msm = meta.mainStructureMembers || (meta.feeds && meta.feeds.measures) || null;
+    if (!msm) { return []; }
+    if (Array.isArray(msm)) { return msm; }
+    if (msm.values) { return msm.values; }
+    var list = [];
+    for (var k in msm) { if (msm[k] !== undefined) { list.push(msm[k]); } }
+    return list;
+  }
+
+  _buildMeasureLabels(meta) {
+    var entries = this._measureEntries(meta);
+    var labels = [];
+    for (var i = 0; i < entries.length; i++) {
+      var mv = entries[i];
+      labels.push(typeof mv === "object" && mv ? (mv.label || mv.description || mv.id || ("Med " + i)) : ("Med " + i));
+    }
+    return labels;
+  }
+
+  // Nós de hierarquia (isNode/isCollapsed ou pai de outra célula) — nunca são opção nem endereço.
+  // As demais células (membros gravados, ex: "Anual", "RH") viram opção de último recurso.
+  _indexBindingMembers(data) {
+    var nodes = {};
+    var seen = {};
+    for (var r = 0; r < data.length; r++) {
+      for (var k in data[r]) {
+        var c = data[r][k];
+        if (k.indexOf("dimensions_") !== 0 || k === "dimensions_0" || !c || !c.id) { continue; }
+        if (!nodes[k]) { nodes[k] = {}; seen[k] = {}; }
+        if (c.isNode === true || c.isCollapsed === true) { nodes[k][c.id] = true; }
+        if (c.parentId) { nodes[k][c.parentId] = true; }
+        seen[k][c.id] = c.label || this._cleanMemberId(c.id);
+      }
+    }
+    var leaves = {};
+    for (var fk in seen) {
+      leaves[fk] = {};
+      for (var id in seen[fk]) {
+        if (!nodes[fk][id] && this._cleanMemberId(id) !== "#") { leaves[fk][id] = seen[fk][id]; }
+      }
+    }
+    this._bindingNodeIds = nodes;
+    this._bindingLeaves = leaves;
+  }
+
+  // childrenBinding (Builder): filhos de cada nó por dimensão — opções do dropdown
   _processChildrenBinding() {
     try {
       var cb = this.childrenBinding;
-      if (!cb || !cb.data || cb.data.length === 0) return;
-      if (!this._metadata) return;
-
-      var dims = this._metadata.feeds.dimensions.values;
       this._childrenFromBinding = {};
-
-      for (var di = 0; di < dims.length; di++) {
+      if (!cb || !cb.data || !this._metadata) { return; }
+      var count = this._metadata.feeds.dimensions.values.length;
+      for (var di = 0; di < count; di++) {
         var dk = "dimensions_" + di;
-        this._childrenFromBinding[dk] = {};
+        var byParent = {};
+        var seen = {};
         for (var r = 0; r < cb.data.length; r++) {
           var cell = cb.data[r][dk];
-          if (cell && cell.id && cell.parentId) {
-            var pid = cell.parentId;
-            if (!this._childrenFromBinding[dk][pid]) {
-              this._childrenFromBinding[dk][pid] = [];
-            }
-            var exists = false;
-            for (var ex = 0; ex < this._childrenFromBinding[dk][pid].length; ex++) {
-              if (this._childrenFromBinding[dk][pid][ex].value === cell.id) { exists = true; break; }
-            }
-            if (!exists) {
-              this._childrenFromBinding[dk][pid].push({ value: cell.id, label: cell.label || cell.id });
-            }
-          }
+          if (!cell || !cell.id || !cell.parentId || seen[cell.parentId + "\u0000" + cell.id]) { continue; }
+          seen[cell.parentId + "\u0000" + cell.id] = true;
+          if (!byParent[cell.parentId]) { byParent[cell.parentId] = []; }
+          byParent[cell.parentId].push({ value: cell.id, label: cell.label || cell.id });
         }
+        this._childrenFromBinding[dk] = byParent;
       }
     } catch(e) { console.error("DropdownTable _processChildrenBinding:", e); }
   }
@@ -942,7 +933,12 @@ class DropdownTableWidget extends HTMLElement {
   _processValuesBinding() {
     try {
       var vb = this.valuesBinding;
-      if (!vb || !vb.data || !this._metadata || !this._metadata.feeds) { return; }
+      if (!vb || !vb.data || !this._metadata || !this._metadata.feeds) {
+        this._autoRowValuesMap = null;
+        this._rowValueLabels = {};
+        this._valuesLeaves = {};
+        return;
+      }
       var mainCount = this._metadata.feeds.dimensions.values.length;
 
       // Casa as dimensões dos dois bindings pelo ID real; sem metadata, usa a posição
@@ -1091,7 +1087,10 @@ class DropdownTableWidget extends HTMLElement {
     for (i = 0; i < ids.length; i++) {
       if (ids[i] && cbp && cbp[ids[i]] && cbp[ids[i]].length > 0) { return cbp[ids[i]]; }
     }
-    // Último recurso: membros gravados vistos no valuesBinding e no binding principal (sem nós)
+    // Último recurso: membros gravados vistos no valuesBinding e no binding principal (sem nós).
+    // Não depende da linha: calculado uma vez por render.
+    var cacheKey = feedKey + (childrenByParent ? "|cbp" : "");
+    if (this._fallbackOptionsCache[cacheKey]) { return this._fallbackOptionsCache[cacheKey]; }
     var opts = [];
     var seen = {};
     var sources = [this._valuesLeaves && this._valuesLeaves[feedKey], this._bindingLeaves && this._bindingLeaves[feedKey]];
@@ -1104,6 +1103,7 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
     opts.sort(function(a, b) { return String(a.label).localeCompare(String(b.label), "pt-BR"); });
+    this._fallbackOptionsCache[cacheKey] = opts;
     return opts;
   }
 
@@ -1121,7 +1121,6 @@ class DropdownTableWidget extends HTMLElement {
     if (!target) { return null; }
     // Cache por render (chamado por linha × dimensão); _render() o reinicia
     var cacheKey = feedKey + "|" + target + "|" + (ids || []).join("|") + (childrenByParent ? "|cbp" : "");
-    if (!this._defaultMemberCache) { this._defaultMemberCache = {}; }
     if (cacheKey in this._defaultMemberCache) { return this._defaultMemberCache[cacheKey]; }
     var found = null;
     var opts = this._resolveDropdownOptions(feedKey, ids || [], childrenByParent);
@@ -1140,7 +1139,7 @@ class DropdownTableWidget extends HTMLElement {
     try {
       if (!this._metadata || !this._metadata.feeds) { return; }
       var count = this._metadata.feeds.dimensions.values.length;
-      var labels = this._metadata._dimLabels || [];
+      var labels = this._dimLabels;
       var list = [];
       for (var i = 0; i < count; i++) {
         var key = "dimensions_" + i;
@@ -1149,10 +1148,7 @@ class DropdownTableWidget extends HTMLElement {
       var str = JSON.stringify(list);
       if (str === this._availableDimensions) { return; }
       this._availableDimensions = str;
-      this.dispatchEvent(new CustomEvent("propertiesChanged", {
-        bubbles: true, composed: true,
-        detail: { properties: { availableDimensions: str } }
-      }));
+      this._emitProperties({ availableDimensions: str });
     } catch(e) { console.error("DropdownTable _publishAvailableDimensions:", e); }
   }
 
@@ -1189,7 +1185,7 @@ class DropdownTableWidget extends HTMLElement {
               var mem = list[m];
               if (!mem || !mem.id) { continue; }
               var clean = self._cleanMemberId(mem.id);
-              if (clean === "#" || /root/i.test(clean) || self._isNodeId(t.key, mem.id, null)) { continue; }
+              if (clean === "#" || clean.toUpperCase() === "ROOT" || self._isNodeId(t.key, mem.id, null)) { continue; }
               opts.push({ value: mem.id, label: mem.description || mem.displayId || clean });
             }
             if (!self._dsMembers) { self._dsMembers = {}; }
@@ -1204,18 +1200,15 @@ class DropdownTableWidget extends HTMLElement {
 
   // ─── Properties ───────────────────────────────────────────────
   get dropdownOptions() { return JSON.stringify(this._dropdownOptions || {}); }
-  set styleConfig(v) {
-    try { this.applyStyleConfig(v); } catch(e) { console.error("styleConfig set error:", e); }
-  }
+  set styleConfig(v) { this.applyStyleConfig(v); }
 
   applyStyleConfig(v) {
     try {
       var cfg = typeof v === "string" ? JSON.parse(v) : v;
-      if (cfg.headerColor)       { this.style.setProperty("--header-color", cfg.headerColor); }
-      if (cfg.headerTextColor)   { this.style.setProperty("--header-text-color", cfg.headerTextColor); }
-      if (cfg.hoverRowColor)     { this.style.setProperty("--hover-row-color", cfg.hoverRowColor); }
-      if (cfg.tableTextColor)    { this.style.setProperty("--table-text-color", cfg.tableTextColor); }
-      if (cfg.editableCellColor) { this._editableCellColor = cfg.editableCellColor; this.style.setProperty("--editable-cell-color", cfg.editableCellColor); }
+      // Cores do painel viram variáveis CSS. Grupo 1: vazio mantém a atual; grupo 2: vazio volta ao padrão.
+      var name;
+      for (name in CSS_VARS_IF_SET) { if (cfg[name]) { this.style.setProperty(CSS_VARS_IF_SET[name], cfg[name]); } }
+      for (name in CSS_VARS_ALWAYS) { if (cfg[name] !== undefined) { this.style.setProperty(CSS_VARS_ALWAYS[name], cfg[name]); } }
       if (cfg.rowHeight)         { this._rowHeight = parseInt(cfg.rowHeight, 10) || 32; }
       if (cfg.colWidth)          { this._colWidth = cfg.colWidth; }
       if (cfg.fontFamily)        { this._fontFamily = cfg.fontFamily; }
@@ -1223,7 +1216,6 @@ class DropdownTableWidget extends HTMLElement {
       if (cfg.fontWeight)        { this._fontWeight = cfg.fontWeight; }
       if (cfg.fontStyle)         { this._fontStyle = cfg.fontStyle; }
       if (cfg.textDecoration)    { this._textDecoration = cfg.textDecoration; }
-      if (cfg.showUnit)          { this._showUnit = cfg.showUnit; }
       if (cfg.tableTitle  !== undefined) { this._tableTitle  = cfg.tableTitle; }
       if (cfg.titleColor  !== undefined) { this._titleColor  = cfg.titleColor; }
       if (cfg.titleSize   !== undefined) { this._titleSize   = cfg.titleSize; }
@@ -1245,13 +1237,6 @@ class DropdownTableWidget extends HTMLElement {
         this._noValueMembers = nvmAny ? nvm : { RESPONSABILIDADE: ["CLIENTE"] };
       }
       if (cfg.deleteValue      !== undefined) { this._deleteValue      = String(cfg.deleteValue); }
-      if (cfg.groupHeaderBg    !== undefined) { this.style.setProperty("--group-header-bg",    cfg.groupHeaderBg); }
-      if (cfg.groupHeaderColor !== undefined) { this.style.setProperty("--group-header-color", cfg.groupHeaderColor); }
-      if (cfg.subheaderBg      !== undefined) { this.style.setProperty("--subheader-bg",       cfg.subheaderBg); }
-      if (cfg.subheaderColor   !== undefined) { this.style.setProperty("--subheader-color",    cfg.subheaderColor); }
-      if (cfg.saveBtnBg        !== undefined) { this.style.setProperty("--save-btn-bg",       cfg.saveBtnBg); }
-      if (cfg.saveBtnColor     !== undefined) { this.style.setProperty("--save-btn-color",    cfg.saveBtnColor); }
-      if (cfg.saveBtnHoverBg   !== undefined) { this.style.setProperty("--save-btn-hover-bg", cfg.saveBtnHoverBg); }
       if (cfg.saveBtnLabel     !== undefined) {
         var btnEl = this.shadowRoot.getElementById("dt-save-btn");
         if (btnEl) { btnEl.textContent = cfg.saveBtnLabel || "Salvar"; }
@@ -1324,17 +1309,9 @@ class DropdownTableWidget extends HTMLElement {
   get pendingChanges() {
     return this._serializePendingChanges(this._pendingChanges);
   }
-  set pendingChanges(v) {
-    // Eco do próprio propertiesChanged: mantém os objetos (rowIndex/noMove não vão na string)
-    if (typeof v === "string" && v === this._serializePendingChanges(this._pendingChanges)) { return; }
-    if (typeof v === "string") {
-      this._pendingChanges = this._parsePendingChangesString(v);
-    } else if (Array.isArray(v)) {
-      this._pendingChanges = v;
-    } else {
-      this._pendingChanges = [];
-    }
-  }
+  // Somente leitura para o SAC. O valor que o SAC devolve (eco do propertiesChanged ou valor salvo
+  // na story em modo de edição) não é reaplicado: evita reenviar alterações de outra sessão.
+  set pendingChanges(v) { /* estado interno é a fonte da verdade */ }
 
   getMeasureChangeValue()     { return this._measureChangeValue     || ""; }
   getChangedValue()           { return this._changedValue           || ""; }
@@ -1420,7 +1397,6 @@ class DropdownTableWidget extends HTMLElement {
   // Descrição de um membro (dimensão pelo ID real) a partir das opções e seleções conhecidas.
   // Índice em cache por render; a hierarquia do ID é ignorada (compara o ID limpo).
   _memberLabel(dimRealId, memberId) {
-    if (!this._memberLabelIndex) { this._memberLabelIndex = {}; }
     var idx = this._memberLabelIndex[dimRealId];
     if (!idx) {
       idx = {};
@@ -1500,37 +1476,38 @@ class DropdownTableWidget extends HTMLElement {
   getWriteMemberId(i, d)          { var w = this._writes[i]; return w && w.pairs[d] ? w.pairs[d].member : ""; }
   getWriteMeasureId(i)            { var w = this._writes[i]; return w ? w.measureId : ""; }
   getWriteValue(i)                { var w = this._writes[i]; return w ? w.value : ""; }
+  // Chave estável da linha: ID da conta (dimensions_0) — sobrevive à reordenação do binding
+  _rowKey(rowIndex) {
+    var row = this._data ? this._data[rowIndex] : null;
+    return (row && (row["dimensions_0"] || {}).id) || String(rowIndex);
+  }
+
+  // Chamado pelo script depois do submitData(). Gravações que falharam (setWriteResult(i, false))
+  // continuam pendentes e destacadas; as demais viram "salvas" e saem do rastreio de alterações.
   clearPendingChanges() {
-    // Gravações que falharam (setWriteResult(i, false)) continuam pendentes e destacadas
     var keepSources = {};
-    var writes = this._writes || [];
-    for (var wi = 0; wi < writes.length; wi++) {
-      if (!writes[wi].failed) { continue; }
-      for (var si = 0; si < writes[wi].sources.length; si++) { keepSources[writes[wi].sources[si]] = true; }
+    for (var wi = 0; wi < this._writes.length; wi++) {
+      if (!this._writes[wi].failed) { continue; }
+      for (var si = 0; si < this._writes[wi].sources.length; si++) { keepSources[this._writes[wi].sources[si]] = true; }
     }
     var kept = [];
-    var keptRows = {}; // chave da linha (id de dimensions_0) → true
-    for (var pi = 0; pi < (this._pendingChanges || []).length; pi++) {
+    var keptRows = {};
+    for (var pi = 0; pi < this._pendingChanges.length; pi++) {
       if (!keepSources[pi]) { continue; }
-      var keptChange = this._pendingChanges[pi];
-      kept.push(keptChange);
-      var keptRowData = this._data && keptChange.rowIndex !== undefined ? this._data[keptChange.rowIndex] : null;
-      keptRows[keptRowData ? ((keptRowData["dimensions_0"] || {}).id || String(keptChange.rowIndex)) : String(keptChange.rowIndex)] = true;
+      kept.push(this._pendingChanges[pi]);
+      keptRows[this._rowKey(this._pendingChanges[pi].rowIndex)] = true;
     }
-    this._writes = [];
-    this._failedRows = keptRows;
     if (kept.length > 0) {
       this._showNotice(kept.length + (kept.length === 1 ? " alteração não foi gravada" : " alterações não foram gravadas") + " — as linhas destacadas continuam pendentes. Corrija e salve de novo.", "error");
     }
-
+    this._writes = [];
+    this._failedRows = keptRows;
     this._pendingChanges = kept;
     if (kept.length === 0) {
       this._localData = {};
       this._originalData = {};
     }
-    // Save confirmado: seleções viram "salvas" (só visual/endereço até o modelo atualizar)
-    // e saem do rastreio de alterações — o próximo save não reenvia estas linhas.
-    if (!this._savedSelections) { this._savedSelections = {}; }
+    // Seleções gravadas valem como estado do modelo até o binding atualizar
     var stillLocal = {};
     for (var sk in this._localSelections) {
       if (keptRows[sk]) { stillLocal[sk] = this._localSelections[sk]; continue; }
@@ -1540,27 +1517,16 @@ class DropdownTableWidget extends HTMLElement {
     this._localSelections = stillLocal;
     var stillMeasures = {};
     for (var lm in this._localMeasures) {
-      var lmRow = this._data && this._data[lm] ? ((this._data[lm]["dimensions_0"] || {}).id || String(lm)) : String(lm);
-      if (keptRows[lmRow]) { stillMeasures[lm] = this._localMeasures[lm]; }
+      if (keptRows[this._rowKey(lm)]) { stillMeasures[lm] = this._localMeasures[lm]; }
     }
     this._localMeasures = stillMeasures;
     this._selectionRowIndex = {};
-    this._skipHighlightRenders = 2; // protege até 2 bindings após save...
-    this._skipUntil = Date.now() + 15000; // ...dentro de 15s
-    // Reseta cor de todas as células alteradas para transparente (cor natural da tabela)
-    var changedCells = this.shadowRoot.querySelectorAll(".changed-cell");
-    for (var cc = 0; cc < changedCells.length; cc++) {
-      changedCells[cc].classList.remove("changed-cell");
-      changedCells[cc].style.background = "transparent";
-      changedCells[cc].style.border = "";
-    }
-    this.dispatchEvent(new CustomEvent("propertiesChanged", {
-      bubbles: true, composed: true,
-      detail: { properties: { pendingChanges: this._serializePendingChanges(this._pendingChanges) } }
-    }));
+    this._saveWindowBindings = 2;               // protege até 2 bindings após o save...
+    this._saveWindowUntil = Date.now() + 15000; // ...dentro de 15s
+    this._saveInFlightUntil = 0;                // libera o botão Salvar
+    this._emitProperties({ pendingChanges: this._serializePendingChanges(this._pendingChanges) });
     this._render();
   }
-
   // Aviso no topo do widget (regras de negócio): type = "warn" | "error" | "info"
   _showNotice(text, type) {
     var el = this.shadowRoot.getElementById("dt-notice");
@@ -1629,26 +1595,18 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
   }
+  // Limpa no DOM a última medida editada (sem re-render)
   clearMeasureInput() {
     var rowIdx = parseInt(this._measureChangeRowIndex || "0", 10);
-    var measureKey = "measures_0";
-    if (this._measureChangeMeasureId !== "") {
-      var measFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
-      var measValues = measFeed ? measFeed.values : [];
-      for (var cx = 0; cx < measValues.length; cx++) {
-        var mv = measValues[cx];
-        var mid = (typeof mv === "string") ? mv : (mv.id || mv.feedKey || "measures_" + cx);
-        if (mid === this._measureChangeMeasureId) { measureKey = "measures_" + cx; break; }
-      }
+    var count = this._metadata && this._metadata.feeds.measures ? this._metadata.feeds.measures.values.length : 0;
+    var mIdx = 0;
+    for (var i = 0; i < count; i++) {
+      if (this._getMeasureIdByKey("measures_" + i) === this._measureChangeMeasureId) { mIdx = i; break; }
     }
-    if (this._localMeasures && this._localMeasures[rowIdx]) {
-      delete this._localMeasures[rowIdx][measureKey];
-    }
-    // Limpa o input diretamente no DOM sem re-renderizar (evita loop)
-    var rows = this.shadowRoot.querySelectorAll("tbody tr[data-row-index='" + rowIdx + "']");
-    for (var ri = 0; ri < rows.length; ri++) {
-      var inputs = rows[ri].querySelectorAll("input");
-      var mIdx = parseInt(measureKey.replace("measures_", ""), 10);
+    if (this._localMeasures[rowIdx]) { delete this._localMeasures[rowIdx]["measures_" + mIdx]; }
+    var rows = this.shadowRoot.querySelectorAll('tbody tr[data-row-index="' + rowIdx + '"]');
+    for (var r = 0; r < rows.length; r++) {
+      var inputs = rows[r].querySelectorAll("td.dt-mcell input");
       if (inputs[mIdx]) { inputs[mIdx].value = ""; }
     }
   }
@@ -1676,20 +1634,12 @@ class DropdownTableWidget extends HTMLElement {
   getDropdownDimensions() { return this.dropdownDimensions; }
   getLastAddMemberRequest()    { return JSON.stringify(this._lastAddMemberRequest || {}); }
   getDeleteMemberId()          { return this._deleteMemberId          || ""; }
-  getDeleteMemberIdClean() {
-    var raw = this._deleteMemberId || "";
-    if (raw === "") { return ""; }
-    // Extrai ID do formato [DIM].[HIER].&[ID] ou [DIM].&[ID]
-    var match = raw.match(/\.&\[([^\]]+)\]$/);
-    if (match) { return match[1]; }
-    // Fallback: retorna o raw se não tiver o padrão
-    return raw;
-  }
+  getDeleteMemberIdClean()      { return this._cleanMemberId(this._deleteMemberId); }
   getDeleteMemberDimensionId() { return this._deleteMemberDimensionId || ""; }
-  getNewMemberId()          { return this.getAttribute("data-new-member-id")     || ""; }
-  getNewMemberDescription() { return this.getAttribute("data-new-member-desc")   || ""; }
-  getNewMemberParentId()    { return this.getAttribute("data-new-member-parent") || ""; }
-  getNewMemberDimensionId() { return this.getAttribute("data-new-member-dim")    || ""; }
+  getNewMemberId()          { return this._newMemberId; }
+  getNewMemberDescription() { return this._newMemberDescription; }
+  getNewMemberParentId()    { return this._newMemberParentId; }
+  getNewMemberDimensionId() { return this._newMemberDimensionId; }
   getSelectedCellData() { return JSON.stringify(this._selectedCellData); }
   getPreviousCellData() { return JSON.stringify(this._previousCellData); }
   getOldRowAddrStr() {
@@ -1708,7 +1658,7 @@ class DropdownTableWidget extends HTMLElement {
 
     if (!measureKey) { measureKey = "measures_0"; }
     // Checa localMeasures para essa medida específica
-    if (this._localMeasures && this._localMeasures[rowIndex] && this._localMeasures[rowIndex][measureKey] !== undefined) {
+    if (this._localMeasures[rowIndex] && this._localMeasures[rowIndex][measureKey] !== undefined) {
       return String(this._localMeasures[rowIndex][measureKey]);
     }
 
@@ -1752,32 +1702,24 @@ class DropdownTableWidget extends HTMLElement {
     var n = this._parseLocaleNumber(v);
     return isNaN(n) ? "" : String(n);
   }
+  // ID técnico da medida de um feed ("measures_1" → "CUSTO"). Fonte única para a edição de
+  // medida, a troca de dropdown e a lista de gravação (antes havia duas lógicas diferentes).
   _getMeasureIdByKey(measureKey) {
-    var fallback = measureKey || "measures_0";
-    var mIdx = parseInt(fallback.replace("measures_", ""), 10);
-    // Tenta resolver pelo mainStructureMembers direto (sem feeds) primeiro
-    if (this._metadata && this._metadata.mainStructureMembers) {
-      var msmKeys = [];
-      for (var msmK in this._metadata.mainStructureMembers) { msmKeys.push(msmK); }
-      if (!isNaN(mIdx) && mIdx < msmKeys.length) {
-        var msmEntry = this._metadata.mainStructureMembers[msmKeys[mIdx]];
-        if (msmEntry && msmEntry.id) { return msmEntry.id; }
-        if (typeof msmEntry === "string") { return msmEntry; }
-      }
+    var key = measureKey || "measures_0";
+    var idx = parseInt(key.replace("measures_", ""), 10);
+    var meta = this._metadata;
+    if (!meta) { return key; }
+    var msm = meta.mainStructureMembers;
+    if (msm) {
+      var entry = msm[key];
+      if (!entry && !isNaN(idx)) { entry = msm[Object.keys(msm)[idx]]; }
+      if (entry && entry.id) { return entry.id; }
+      if (typeof entry === "string") { return entry; }
     }
-    var measFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
-    var measValues = measFeed ? measFeed.values : [];
-    var mv = !isNaN(mIdx) ? measValues[mIdx] : null;
-    if (mv) { return typeof mv === "string" ? mv : (mv.id || fallback); }
-    // Fallback 1: _mesIds — IDs tecnicos reais das medidas
-    if (this._metadata && this._metadata._mesIds && this._metadata._mesIds[mIdx] && this._metadata._mesIds[mIdx].indexOf("measures_") === -1) {
-      return this._metadata._mesIds[mIdx];
-    }
-    // Fallback 2: _mesLabels
-    if (this._metadata && this._metadata._mesLabels && this._metadata._mesLabels[mIdx]) {
-      return this._metadata._mesLabels[mIdx];
-    }
-    return fallback;
+    var feed = meta.feeds && meta.feeds.measures ? meta.feeds.measures.values : [];
+    var mv = !isNaN(idx) ? feed[idx] : null;
+    if (mv) { return typeof mv === "string" ? mv : (mv.id || key); }
+    return this._mesLabels[idx] || key;
   }
   // Resolve a chave de _localSelections (id de dimensions_0, ou rowIndex como string) para o rowIndex
   _findRowIndexByDim0(key) {
@@ -1799,28 +1741,20 @@ class DropdownTableWidget extends HTMLElement {
     if (this._localData && this._localData[rowKey]) {
       return this._localData[rowKey].value;
     }
-    if (this._originalData && this._originalData[rowKey] !== undefined) {
+    if (this._originalData[rowKey] !== undefined) {
       return this._originalData[rowKey];
     }
     return "";
   }
   _setLocalCellValue(addrStr, measureId, value) {
     var rowKey = this._createRowKey(addrStr, measureId);
-    if (!this._localData) { this._localData = {}; }
     this._localData[rowKey] = {
       value: value,
       changed: true
     };
     return rowKey;
   }
-  _getFirstChangedMeasureKey(rowIndex) {
-    if (this._localMeasures && this._localMeasures[rowIndex]) {
-      for (var fck in this._localMeasures[rowIndex]) { return fck; }
-    }
-    return "measures_0";
-  }
   _addPendingChange(change) {
-    if (!this._pendingChanges) { this._pendingChanges = []; }
     // Encadeia com registro existente da mesma medida cujo destino é a origem desta mudança:
     // A→B seguido de B→C vira A→C; edições repetidas na mesma célula atualizam o valor.
     for (var pi = this._pendingChanges.length - 1; pi >= 0; pi--) {
@@ -1833,24 +1767,6 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
     this._pendingChanges.push(change);
-  }
-  _parsePendingChangesString(value) {
-    var result = [];
-    if (!value || typeof value !== "string") { return result; }
-    var records = value.split("###");
-    for (var ri = 0; ri < records.length; ri++) {
-      var record = records[ri];
-      if (!record) { continue; }
-      var parts = record.split("§");
-      if (parts.length < 4) { continue; }
-      result.push({
-        oldAddr: parts[0],
-        newAddr: parts[1],
-        value: parts[2],
-        measureId: parts[3]
-      });
-    }
-    return result;
   }
   _serializePendingChanges(changes) {
     if (!changes || !changes.length) { return ""; }
@@ -1948,7 +1864,7 @@ class DropdownTableWidget extends HTMLElement {
     }
     return addrObj;
   }
-  getActiveFilters() { return JSON.stringify(this._activeFilters); }
+  getActiveFilters() { return "{}"; } // mantido por compatibilidade com o JSON (sem filtros ativos próprios)
 
   setDropdownOptions(v) {
     try {
@@ -1978,14 +1894,8 @@ class DropdownTableWidget extends HTMLElement {
   }
   getMeasureLabels() { return JSON.stringify(this._measureLabels || []); }
 
-  // Permite que o script SAC aplique filtro de dimensão diretamente no binding
-  // Ex: dropdowntable_1.setDimensionFilter("Date", "2024.01")
-  // ou: dropdowntable_1.setDimensionFilter("Date", ["2024.01","2024.02"])
-  // Compatibilidade com padrão SAC: widget.getDataSource().setDimensionFilter(...)
-  getDataSource() {
-    return this.myDataBinding;
-  }
-
+  // Filtro no binding pelo script (ex: dropdowntable_1.setDimensionFilter("Date", "2024.01")).
+  // Só atua se o objeto do binding expuser setDimensionFilter/removeDimensionFilter.
   setDimensionFilter(dimensionId, memberIds) {
     try {
       var binding = this.myDataBinding;
@@ -2073,6 +1983,32 @@ class DropdownTableWidget extends HTMLElement {
     }
   }
 
+  // Seleção de células de medida arrastando o mouse (ligado uma vez em connectedCallback)
+  _bindDragSelection() {
+    var self = this;
+    var wrapper = this.shadowRoot.getElementById("dt-wrapper");
+    wrapper.addEventListener("mousedown", function(e) {
+      var td = e.target.closest("td.dt-mcell");
+      if (!td) { return; }
+      self._clearSelection();
+      // Clique direto no input: deixa o foco/edição acontecer
+      if (e.target.tagName === "INPUT") { return; }
+      e.preventDefault();
+      self._isDragging = true;
+      var row = parseInt(td.getAttribute("data-row-index"), 10);
+      var key = td.getAttribute("data-measure-key");
+      self._selAnchor = { rowIndex: row, measureKey: key };
+      self._selectCell(row, key, td);
+      wrapper.focus();
+    });
+    wrapper.addEventListener("mouseover", function(e) {
+      if (!self._isDragging || !self._selAnchor) { return; }
+      var td = e.target.closest("td.dt-mcell");
+      if (!td) { return; }
+      self._selectRange(self._selAnchor.rowIndex, self._selAnchor.measureKey, parseInt(td.getAttribute("data-row-index"), 10), td.getAttribute("data-measure-key"));
+    });
+  }
+
   _bindSelectionKeys() {
     var self = this;
     var wrapper = this.shadowRoot.getElementById("dt-wrapper");
@@ -2084,18 +2020,7 @@ class DropdownTableWidget extends HTMLElement {
       // Delete — dispara evento com células selecionadas
       if (e.key === "Delete" && self._selectedCells.length > 0) {
         e.preventDefault();
-        var cells = [];
-        for (var sc = 0; sc < self._selectedCells.length; sc++) {
-          cells.push({
-            rowIndex:   self._selectedCells[sc].rowIndex,
-            measureKey: self._selectedCells[sc].measureKey
-          });
-        }
-        self.dispatchEvent(new CustomEvent("onCellsDeleteRequested", {
-          bubbles: true, composed: true,
-          detail: { cells: cells }
-        }));
-        self._clearSelection();
+        self._dispatchCellsDelete();
         return;
       }
 
@@ -2154,7 +2079,6 @@ class DropdownTableWidget extends HTMLElement {
   // ─── Context Menu wiring ──────────────────────────────────────
   _bindContextMenu() {
     var self = this;
-    var menu = this.shadowRoot.getElementById("dt-ctx-menu");
 
     this.shadowRoot.getElementById("ctx-add-member").addEventListener("mousedown", function(e) {
       e.stopPropagation();
@@ -2162,14 +2086,16 @@ class DropdownTableWidget extends HTMLElement {
       self._openAddMemberModal();
     });
 
-    this.shadowRoot.getElementById("ctx-filter-member").addEventListener("mousedown", function(e) {
-      e.stopPropagation();
-      self._closeCtxMenu();
-      if (self._ctxTarget) {
-        self.dispatchEvent(new CustomEvent("onFilterMemberRequested", {
+    // Itens que só repassam a linha clicada ao script
+    var forward = function(itemId, eventName, action) {
+      self.shadowRoot.getElementById(itemId).addEventListener("mousedown", function(e) {
+        e.stopPropagation();
+        self._closeCtxMenu();
+        if (!self._ctxTarget) { return; }
+        self.dispatchEvent(new CustomEvent(eventName, {
           bubbles: true, composed: true,
           detail: {
-            action: "filterMember",
+            action:        action,
             rowIndex:      self._ctxTarget.rowIndex,
             dimensionId:   self._ctxTarget.dimensionId,
             dimensionName: self._ctxTarget.dimensionName,
@@ -2177,50 +2103,17 @@ class DropdownTableWidget extends HTMLElement {
             memberLabel:   self._ctxTarget.memberLabel
           }
         }));
-      }
-    });
-
-    this.shadowRoot.getElementById("ctx-filter").addEventListener("mousedown", function(e) {
-      e.stopPropagation();
-      self._closeCtxMenu();
-      if (self._ctxTarget) {
-        self.dispatchEvent(new CustomEvent("onFilterMemberRequested", {
-          bubbles: true, composed: true,
-          detail: {
-            action: "filter",
-            rowIndex:      self._ctxTarget.rowIndex,
-            dimensionId:   self._ctxTarget.dimensionId,
-            dimensionName: self._ctxTarget.dimensionName,
-            memberId:      self._ctxTarget.memberId,
-            memberLabel:   self._ctxTarget.memberLabel
-          }
-        }));
-      }
-    });
+      });
+    };
+    forward("ctx-filter-member", "onFilterMemberRequested", "filterMember");
+    forward("ctx-filter",        "onFilterMemberRequested", "filter");
+    forward("ctx-exclude",       "onExcludeRowRequested",   "exclude");
 
     // Excluir membro: abre a confirmação (com bloqueio por regra de negócio); o evento só sai no "Excluir"
     this.shadowRoot.getElementById("ctx-exclude-member").addEventListener("mousedown", function(e) {
       e.stopPropagation();
       self._closeCtxMenu();
       if (self._ctxTarget) { self._openDeleteConfirm(self._ctxTarget); }
-    });
-
-    this.shadowRoot.getElementById("ctx-exclude").addEventListener("mousedown", function(e) {
-      e.stopPropagation();
-      self._closeCtxMenu();
-      if (self._ctxTarget) {
-        self.dispatchEvent(new CustomEvent("onExcludeRowRequested", {
-          bubbles: true, composed: true,
-          detail: {
-            action: "exclude",
-            rowIndex:      self._ctxTarget.rowIndex,
-            dimensionId:   self._ctxTarget.dimensionId,
-            dimensionName: self._ctxTarget.dimensionName,
-            memberId:      self._ctxTarget.memberId,
-            memberLabel:   self._ctxTarget.memberLabel
-          }
-        }));
-      }
     });
   }
 
@@ -2373,38 +2266,19 @@ class DropdownTableWidget extends HTMLElement {
       self._newMemberId          = idVal;
       self._newMemberDescription = descVal;
       self._newMemberParentId    = parentVal;
+      self._newMemberDimensionId = realDimId;
       self._selectedCellData     = payload;
 
-      // Salva atributos no elemento host
-      self.setAttribute("data-new-member-id",     idVal);
-      self.setAttribute("data-new-member-desc",   descVal);
-      self.setAttribute("data-new-member-parent", parentVal);
-      self.setAttribute("data-new-member-dim",    realDimId);
-      self.setAttribute("data-last-add-member",   JSON.stringify(payload));
-
-      // Notifica SAC de TODOS os campos de uma vez via propertiesChanged
-      self.dispatchEvent(new CustomEvent("propertiesChanged", {
-        bubbles: true, composed: true,
-        detail: {
-          properties: {
-            selectedCellData:     JSON.stringify(payload),
-            lastAddMemberRequest: JSON.stringify(payload),
-            newMemberId:          idVal,
-            newMemberDescription: descVal,
-            newMemberParentId:    parentVal
-          }
-        }
-      }));
-
-      self._closeModal();
-
-      // Microtask garante que SAC processou propertiesChanged antes do evento
-      Promise.resolve().then(function() {
-        self.dispatchEvent(new CustomEvent("onAddMemberRequested", {
-          bubbles: true, composed: true,
-          detail: payload
-        }));
+      // Notifica o SAC de todos os campos de uma vez (os getters com "body" no JSON leem daqui)
+      self._emitProperties({
+        selectedCellData:     JSON.stringify(payload),
+        lastAddMemberRequest: JSON.stringify(payload),
+        newMemberId:          idVal,
+        newMemberDescription: descVal,
+        newMemberParentId:    parentVal
       });
+      self._closeModal();
+      self._emitEvent("onAddMemberRequested", payload);
     });
 
     inputDesc.addEventListener("keydown", function(e) {
@@ -2481,6 +2355,7 @@ class DropdownTableWidget extends HTMLElement {
 
   // ─── Contas (dimensions_0): IDs, grupos e valores — base das regras de adicionar/excluir ───
   _accountIndex() {
+    if (this._accountIndexCache) { return this._accountIndexCache; }
     var ids = {};      // ID limpo (maiúsculo) → true, para checar duplicidade
     var labels = {};   // ID completo → descrição
     var parents = {};  // ID completo do pai → true
@@ -2498,7 +2373,8 @@ class DropdownTableWidget extends HTMLElement {
         if (!isNaN(n) && n !== 0) { withValues[c.id] = true; }
       }
     }
-    return { ids: ids, labels: labels, parents: parents, withValues: withValues };
+    this._accountIndexCache = { ids: ids, labels: labels, parents: parents, withValues: withValues };
+    return this._accountIndexCache;
   }
 
   // Grupos existentes (contas que são pai de outras) para a lista do campo "Grupo"
@@ -2572,27 +2448,18 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   _dispatchDeleteMember(target, cleanId, dimRealId) {
-    var self = this;
     this._deleteMemberId          = cleanId;
     this._deleteMemberDimensionId = dimRealId;
     this._lastMemberAction = { type: "delete", id: cleanId };
-    this.dispatchEvent(new CustomEvent("propertiesChanged", {
-      bubbles: true, composed: true,
-      detail: { properties: { deleteMemberId: cleanId, deleteMemberDimensionId: dimRealId } }
-    }));
-    Promise.resolve().then(function() {
-      self.dispatchEvent(new CustomEvent("onDeleteMemberRequested", {
-        bubbles: true, composed: true,
-        detail: {
-          action:          "excludeMember",
-          rowIndex:        target.rowIndex,
-          dimensionId:     target.dimensionId,
-          dimensionRealId: dimRealId,
-          dimensionName:   target.dimensionName,
-          memberId:        cleanId,
-          memberLabel:     target.memberLabel
-        }
-      }));
+    this._emitProperties({ deleteMemberId: cleanId, deleteMemberDimensionId: dimRealId });
+    this._emitEvent("onDeleteMemberRequested", {
+      action:          "excludeMember",
+      rowIndex:        target.rowIndex,
+      dimensionId:     target.dimensionId,
+      dimensionRealId: dimRealId,
+      dimensionName:   target.dimensionName,
+      memberId:        cleanId,
+      memberLabel:     target.memberLabel
     });
   }
 
@@ -2608,70 +2475,48 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   // ─── Save Button ──────────────────────────────────────────────
+  // Um clique dispara onSaveRequested uma única vez: novos cliques são ignorados até o script
+  // chamar clearPendingChanges() (ou por 10s, se o script não chamar)
   _bindSaveButton() {
     var self = this;
-    var btn = this.shadowRoot.getElementById("dt-save-btn");
-    if (!btn) { return; }
-    btn.addEventListener("click", function() {
+    this.shadowRoot.getElementById("dt-save-btn").addEventListener("click", function() {
+      if (Date.now() < self._saveInFlightUntil) { return; }
+      self._saveInFlightUntil = Date.now() + 10000;
       var changedData = self._buildChangedData();
-      self._debugLog("Salvar", { pendingChanges: self._serializePendingChanges(self._pendingChanges), changedData: changedData });
-      self.dispatchEvent(new CustomEvent("propertiesChanged", {
-        bubbles: true, composed: true,
-        detail: { properties: { pendingChanges: self._serializePendingChanges(self._pendingChanges) } }
-      }));
-      Promise.resolve().then(function() {
-        self.dispatchEvent(new CustomEvent("onSaveRequested", {
-          bubbles: true, composed: true,
-          detail: changedData
-        }));
-      });
+      var serialized = self._serializePendingChanges(self._pendingChanges);
+      self._debugLog("Salvar", { pendingChanges: serialized, changedData: changedData });
+      self._emitProperties({ pendingChanges: serialized });
+      self._emitEvent("onSaveRequested", changedData);
     });
   }
 
+  // detail do onSaveRequested: linhas alteradas (seleção ou medida) com endereço e medidas.
+  // As chaves de "measures" seguem o valor do feed (comportamento mantido para scripts antigos).
   _buildChangedData() {
     var result = [];
     if (!this._metadata || !this._data) { return result; }
-    var dims = this._metadata.feeds.dimensions.values;
-    var measFeed = this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures;
-    var measValues = measFeed ? measFeed.values : [];
-
+    var feed = this._metadata.feeds.measures ? this._metadata.feeds.measures.values : [];
     var changedRows = {};
-    // Coleta linhas com _localSelections (chave = id de dimensions_0 → resolve o rowIndex)
-    if (this._localSelections) {
-      for (var lsKey in this._localSelections) {
-        var lsRow = this._findRowIndexByDim0(lsKey);
-        if (lsRow !== -1) { changedRows[lsRow] = true; }
-      }
+    for (var lsKey in this._localSelections) {
+      var lsRow = this._findRowIndexByDim0(lsKey);
+      if (lsRow !== -1) { changedRows[lsRow] = true; }
     }
-    // Coleta linhas com _localMeasures (chave = rowIndex)
-    if (this._localMeasures) {
-      for (var msi2 in this._localMeasures) { changedRows[msi2] = true; }
-    }
+    for (var lmKey in this._localMeasures) { changedRows[lmKey] = true; }
 
     for (var ri in changedRows) {
       var rowIdx = parseInt(ri, 10);
-      var rowData = this._data[rowIdx];
-      if (!rowData) { continue; }
-
+      if (!this._data[rowIdx]) { continue; }
       var addrObj = this._buildRowAddrObj(rowIdx, null, true);
-      var addrStr = this._serializeAddrObj(addrObj);
-
-      // Medidas alteradas
       var measures = {};
-      if (this._localMeasures && this._localMeasures[rowIdx]) {
-        for (var mkey in this._localMeasures[rowIdx]) {
-          var mIdx = parseInt(mkey.replace("measures_", ""), 10);
-          var mv = measValues[mIdx];
-          var mId = mv ? (typeof mv === "string" ? mv : (mv.id || mkey)) : mkey;
-          measures[mId] = this._localMeasures[rowIdx][mkey];
-        }
+      var local = this._localMeasures[rowIdx] || {};
+      for (var mkey in local) {
+        var mv = feed[parseInt(mkey.replace("measures_", ""), 10)];
+        measures[mv ? (typeof mv === "string" ? mv : (mv.id || mkey)) : mkey] = local[mkey];
       }
-
-      result.push({ rowIndex: rowIdx, addrStr: addrStr, measures: measures, address: addrObj });
+      result.push({ rowIndex: rowIdx, addrStr: this._serializeAddrObj(addrObj), measures: measures, address: addrObj });
     }
     return result;
   }
-
   // ─── Dynamic Styles ───────────────────────────────────────────
   _applyDynamicStyles() {
     // Altura da linha via variável CSS (cabeçalho, células, dropdown e input usam --dt-row-height)
@@ -2689,8 +2534,10 @@ class DropdownTableWidget extends HTMLElement {
   // ─── Render ───────────────────────────────────────────────────
   _render() {
     var self      = this;
-    this._defaultMemberCache = {}; // opções podem ter mudado (binding, getMembers, painel)
+    // Caches por render: opções podem ter mudado (binding, getMembers, painel)
+    this._defaultMemberCache = {};
     this._memberLabelIndex = {};
+    this._fallbackOptionsCache = {};
     var headerRow = this.shadowRoot.getElementById("dt-header");
     var tbody     = this.shadowRoot.getElementById("dt-body");
     var emptyMsg  = this.shadowRoot.getElementById("dt-empty");
@@ -2729,82 +2576,48 @@ class DropdownTableWidget extends HTMLElement {
     emptyMsg.classList.add("hidden");
 
     var dimensions = this._metadata.feeds.dimensions.values;
-    var measFeed   = this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures;
-    var measValues = measFeed ? measFeed.values : [];
-    var measures   = [];
-    for (var mvi = 0; mvi < measValues.length; mvi++) {
-      var mv2 = measValues[mvi];
-      if (typeof mv2 === "string") {
-        // Tenta resolver o ID real da medida do mainStructureMembers
-        var realMeasId = mv2;
-        if (this._metadata.mainStructureMembers && this._metadata.mainStructureMembers[mv2]) {
-          realMeasId = this._metadata.mainStructureMembers[mv2].id || mv2;
-        }
-        measures.push({ id: realMeasId, description: "", feedKey: mv2 });
-      } else {
-        measures.push(mv2);
-      }
+    var measureFeed = this._metadata.feeds.measures ? this._metadata.feeds.measures.values : [];
+    var measureKeys = [];
+    var measureIds = [];
+    for (var mvi = 0; mvi < measureFeed.length; mvi++) {
+      measureKeys.push("measures_" + mvi);
+      measureIds.push(this._getMeasureIdByKey("measures_" + mvi));
     }
 
-    var dimLabels = this._metadata._dimLabels || [];
-    var mesLabels = this._metadata._mesLabels || [];
-
-    if (dimLabels.length === 0) {
-      for (var dfl = 0; dfl < dimensions.length; dfl++) { dimLabels.push("Dim " + dfl); }
-    }
-    if (mesLabels.length === 0) {
-      for (var mfl = 0; mfl < measures.length; mfl++) {
-        mesLabels.push((this._measureLabels && this._measureLabels[mfl]) || "Med " + mfl);
-      }
-    }
-
-    // ── Header ──────────────────────────────────────────────────
-    for (var i = 0; i < dimLabels.length; i++) {
+    // ── Cabeçalho (setMeasureLabels sobrescreve os rótulos de medida a qualquer momento) ──
+    var colMin = this._colWidth === "auto" ? null : this._colWidth + "px";
+    for (var i = 0; i < dimensions.length; i++) {
       var th = document.createElement("th");
-      th.textContent = dimLabels[i];
-      th.style.minWidth  = this._colWidth === "auto" ? "120px" : this._colWidth + "px";
+      th.textContent = this._dimLabels[i] || ("Dim " + i);
+      th.style.minWidth  = colMin || "120px";
       th.style.textAlign = this._headerAlign || "left";
       headerRow.appendChild(th);
     }
-    for (var j = 0; j < mesLabels.length; j++) {
+    for (var j = 0; j < measureKeys.length; j++) {
       var thm = document.createElement("th");
-      thm.textContent = mesLabels[j];
+      thm.textContent = this._measureLabels[j] || this._mesLabels[j] || ("Med " + j);
       thm.style.textAlign = this._headerAlign || "right";
-      thm.style.minWidth  = this._colWidth === "auto" ? "100px" : this._colWidth + "px";
+      thm.style.minWidth  = colMin || "100px";
       headerRow.appendChild(thm);
     }
 
-    // ── Children map ─────────────────────────────────────────────
+    // ── Filhos de cada nó no binding principal (opções e detecção de nós) ──
     var childrenByParent = {};
-    var hasChildren = {};
     for (var cbd = 0; cbd < dimensions.length; cbd++) {
       var cbdk = "dimensions_" + cbd;
-      childrenByParent[cbdk] = {};
-      hasChildren[cbdk] = {};
+      var byParent = {};
+      var seenChild = {};
       for (var cbr = 0; cbr < this._data.length; cbr++) {
         var cbCell = this._data[cbr][cbdk];
-        if (cbCell && cbCell.id && cbCell.parentId) {
-          var pid = cbCell.parentId;
-          if (!childrenByParent[cbdk][pid]) { childrenByParent[cbdk][pid] = []; }
-          var alreadyIn = false;
-          for (var chi = 0; chi < childrenByParent[cbdk][pid].length; chi++) {
-            if (childrenByParent[cbdk][pid][chi].value === cbCell.id) { alreadyIn = true; break; }
-          }
-          if (!alreadyIn) {
-            childrenByParent[cbdk][pid].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
-          }
-          hasChildren[cbdk][pid] = true;
-        }
+        if (!cbCell || !cbCell.id || !cbCell.parentId || seenChild[cbCell.parentId + "\u0000" + cbCell.id]) { continue; }
+        seenChild[cbCell.parentId + "\u0000" + cbCell.id] = true;
+        if (!byParent[cbCell.parentId]) { byParent[cbCell.parentId] = []; }
+        byParent[cbCell.parentId].push({ value: cbCell.id, label: cbCell.label || cbCell.id });
       }
+      childrenByParent[cbdk] = byParent;
     }
 
-    // ── Build render list ────────────────────────────────────────
-    var idToRow = {};
-    for (var im = 0; im < this._data.length; im++) {
-      var imCell = this._data[im]["dimensions_0"] || {};
-      if (imCell.id) { idToRow[imCell.id] = im; }
-    }
-
+    // ── Lista de linhas ──
     var renderList = [];
     var rendered = {};
 
@@ -2841,7 +2654,7 @@ class DropdownTableWidget extends HTMLElement {
       }
       var brHasData = this._rowHasData(this._data[br]);
       var brNonZero = brVal > 0;
-      var brSaved = this._savedSelections && this._savedSelections[brCell.id];
+      var brSaved = this._savedSelections[brCell.id];
       var brMatchesSaved = false;
       if (brSaved) {
         brMatchesSaved = true;
@@ -2929,39 +2742,8 @@ class DropdownTableWidget extends HTMLElement {
       renderList = sgList;
     }
 
-    var totalCols = dimensions.length + measures.length;
+    var totalCols = dimensions.length + measureKeys.length;
     var self2 = this;
-
-    // Mouse drag selection
-    var wrapper2 = self2.shadowRoot.getElementById("dt-wrapper");
-    if (wrapper2 && !wrapper2._selBound) {
-      wrapper2._selBound = true;
-
-      wrapper2.addEventListener("mousedown", function(e) {
-        var td = e.target.closest("td.dt-mcell");
-        if (!td) { return; }
-        // Não previne default se clicou diretamente no input — deixa o foco funcionar
-        if (e.target.tagName === "INPUT") { self2._clearSelection(); return; }
-        e.preventDefault();
-        self2._clearSelection();
-        self2._isDragging  = true;
-        var ri2 = parseInt(td.getAttribute("data-row-index"), 10);
-        var mk3 = td.getAttribute("data-measure-key");
-        self2._selAnchor   = { rowIndex: ri2, measureKey: mk3 };
-        self2._selectCell(ri2, mk3, td);
-        wrapper2.focus();
-      });
-
-      wrapper2.addEventListener("mouseover", function(e) {
-        if (!self2._isDragging) { return; }
-        var td = e.target.closest("td.dt-mcell");
-        if (!td) { return; }
-        var ri3 = parseInt(td.getAttribute("data-row-index"), 10);
-        var mk4 = td.getAttribute("data-measure-key");
-        self2._selectRange(self2._selAnchor.rowIndex, self2._selAnchor.measureKey, ri3, mk4);
-      });
-      // mouseup global fica em connectedCallback (_onDocMouseUp)
-    }
 
     var renderRow = function(ri) {
       var rowData = self2._data[ri];
@@ -3030,8 +2812,7 @@ class DropdownTableWidget extends HTMLElement {
           }
         } else {
           // Modo legado: dropdown só onde há filhos ou valor gravado
-          var cellHasChildren = hasChildren[dk2][cId] || hasChildren[dk2][bindingId]
-            || self2._isNodeId(dk2, cId, childrenByParent) || self2._isNodeId(dk2, bindingId, childrenByParent)
+          var cellHasChildren = self2._isNodeId(dk2, cId, childrenByParent) || self2._isNodeId(dk2, bindingId, childrenByParent)
             || self2._isNodeId(dk2, nodeId, childrenByParent);
           if (isDrop && !cellHasChildren && !hasRowValueMap) { isDrop = false; }
           if (isDrop && (!opts || opts.length === 0) && !hasRowValueMap) { isDrop = false; }
@@ -3045,7 +2826,7 @@ class DropdownTableWidget extends HTMLElement {
           sp.className = "cell-plain";
           sp.textContent = cLbl;
           // Conta com mais de uma combinação gravada (valor ≠ 0): só uma aparece aqui
-          var multiCombo = di2 === 0 && self2._multiComboAccounts ? self2._multiComboAccounts[cId] : 0;
+          var multiCombo = di2 === 0 ? (self2._multiComboAccounts[cId] || 0) : 0;
           if (multiCombo) {
             var badge = document.createElement("span");
             badge.className = "dt-multi-combo";
@@ -3072,150 +2853,35 @@ class DropdownTableWidget extends HTMLElement {
         tr.appendChild(td);
       }
 
-      // Measure cells
-      for (var mi2 = 0; mi2 < measures.length; mi2++) {
-        var mk2  = "measures_" + mi2;
+      // Células de medida. O endereço da linha é o mesmo para todas as medidas: calculado uma vez
+      var visualAddrStr = self2._buildRowAddrStr(ri, null, true);
+      for (var mi2 = 0; mi2 < measureKeys.length; mi2++) {
+        var mk2  = measureKeys[mi2];
         var tdm  = document.createElement("td");
-        tdm.style.padding = "0";
-        tdm.classList.add("dt-mcell");
+        tdm.className = "dt-mcell";
         tdm.setAttribute("data-row-index", ri);
-        tdm.setAttribute("data-measure-key", "measures_" + mi2);
-        var measureId2 = self2._getMeasureIdByKey(mk2);
-        var visualAddrStr = self2._buildRowAddrStr(ri, null, true);
-        var measureRowKey = self2._createRowKey(visualAddrStr, measureId2);
-        var mv2  = rowData[mk2];
-        var mvVal = "";
-        if (mv2) {
-          if (mv2.formattedValue !== undefined && mv2.formattedValue !== null && String(mv2.formattedValue) !== "") {
-            mvVal = String(mv2.formattedValue);
-          } else if (mv2.formatted !== undefined && mv2.formatted !== null && String(mv2.formatted) !== "" && mv2.formatted !== "NaN") {
-            mvVal = String(mv2.formatted);
-            // Remove sufixos de unidade SAC (ex: "13,00c" → "13,00", "1.593,95BRL" → "1.593,95")
-            mvVal = mvVal.replace(/[a-zA-Z]+$/, "").trim();
-          } else if (mv2.raw !== null && mv2.raw !== undefined && String(mv2.raw) !== "NaN" && String(mv2.raw) !== "null") {
-            mvVal = String(mv2.raw);
-          }
-        }
-        if (!self2._originalData) { self2._originalData = {}; }
-        if (self2._originalData[measureRowKey] === undefined) {
-          self2._originalData[measureRowKey] = mvVal;
-        }
-        if (self2._localData && self2._localData[measureRowKey]) {
-          mvVal = self2._localData[measureRowKey].value;
-        }
+        tdm.setAttribute("data-measure-key", mk2);
+        var measureRowKey = self2._createRowKey(visualAddrStr, measureIds[mi2]);
+        var mvVal = self2._formatMeasureCell(rowData[mk2]);
+        if (self2._originalData[measureRowKey] === undefined) { self2._originalData[measureRowKey] = mvVal; }
+        if (self2._localData[measureRowKey]) { mvVal = self2._localData[measureRowKey].value; }
         var input = document.createElement("input");
         input.type = "text";
         input.value = mvVal;
-        // Input do Fiori: hover/foco pelo CSS (.dt-measure-input); fundo do foco = cor de edição do painel
-        input.className = "dt-measure-input";
+        input.className = "dt-measure-input"; // hover/foco pelo CSS; fundo do foco = cor de edição do painel
         input.addEventListener("keydown", function(e) {
-          // Delete com células selecionadas — dispara evento e não apaga o input focado
-          if (e.key === "Delete" && self2._selectedCells && self2._selectedCells.length > 1) {
+          // Delete com várias células selecionadas: dispara o evento e não apaga o input focado
+          if (e.key === "Delete" && self2._selectedCells.length > 1) {
             e.preventDefault();
-            var cells = [];
-            for (var sc = 0; sc < self2._selectedCells.length; sc++) {
-              cells.push({ rowIndex: self2._selectedCells[sc].rowIndex, measureKey: self2._selectedCells[sc].measureKey });
-            }
-            self2.dispatchEvent(new CustomEvent("onCellsDeleteRequested", { bubbles: true, composed: true, detail: { cells: cells } }));
-            self2._clearSelection();
+            self2._dispatchCellsDelete();
             return;
           }
-          if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
-            e.preventDefault();
-            var allInputs = Array.from(self2.shadowRoot.querySelectorAll("tbody input, tbody .cell-dropdown"));
-            var idx = allInputs.indexOf(e.target);
-            if (idx === -1) { return; }
-            // Calcula número de colunas
-            var row = e.target.closest("tr");
-            var allCells = row ? Array.from(row.querySelectorAll("input, .cell-dropdown")) : [];
-            var colCount = allCells.length;
-            var nextIdx = idx;
-            if (e.key === "ArrowDown")  { nextIdx = idx + colCount; }
-            if (e.key === "ArrowUp")    { nextIdx = idx - colCount; }
-            if (e.key === "ArrowRight") { nextIdx = idx + 1; }
-            if (e.key === "ArrowLeft")  { nextIdx = idx - 1; }
-            if (nextIdx >= 0 && nextIdx < allInputs.length) {
-              allInputs[nextIdx].focus();
-            }
-          }
+          self2._handleArrowNavigation(e, e.target);
         });
 
-        (function(inputEl, rowIdx, measureKey, measureId, rowD) {
-          inputEl.addEventListener("change", function() {
-            var rawInputValue = inputEl.value;
-            var newVal = self2._parseLocaleNumber(rawInputValue);
-            if (isNaN(newVal)) { newVal = 0; }
-            // Valor canônico para o SAC; input vazio continua indo vazio
-            var pendingVal = rawInputValue.trim() === "" ? "" : String(newVal);
-            if (!self2._localMeasures) { self2._localMeasures = {}; }
-            if (!self2._localMeasures[rowIdx]) { self2._localMeasures[rowIdx] = {}; }
-            self2._localMeasures[rowIdx][measureKey] = newVal;
-
-            // Endereço: dimensões do binding, sobrepostas por rowValuesMap e _localSelections
-            var rowAddrObj = self2._buildRowAddrObj(rowIdx, null, true);
-            var addrStr    = self2._serializeAddrObj(rowAddrObj);
-            var addrObj    = {};
-            var dims3      = self2._metadata.feeds.dimensions.values;
-            for (var x = 0; x < dims3.length; x++) {
-              var dc = rowD["dimensions_" + x] || {};
-              if (dc.id) {
-                var dimRealId3 = "dimensions_" + x;
-                if (self2._metadata.dimensions && self2._metadata.dimensions["dimensions_" + x]) {
-                  dimRealId3 = self2._metadata.dimensions["dimensions_" + x].id || dimRealId3;
-                }
-                addrObj[dimRealId3] = dc.id;
-              }
-            }
-            for (var rak in rowAddrObj) { addrObj[rak] = rowAddrObj[rak]; }
-            self2._setLocalCellValue(addrStr, measureId, rawInputValue);
-            if (inputEl.parentElement) { inputEl.parentElement.classList.add("changed-cell"); }
-
-            // Salva payload para o script SAC
-            self2._measureChangeValue     = String(newVal);
-            self2._changedValue           = rawInputValue;
-            self2._measureChangeMeasureId = measureId;
-            self2._measureChangeRowIndex  = String(rowIdx);
-            self2._measureChangeAddrStr   = addrStr;
-            self2._oldRowAddrStr          = addrStr;
-            self2._newRowAddrStr          = addrStr;
-            self2._addPendingChange({
-              type: "measure",
-              rowIndex: rowIdx,
-              oldAddr: addrStr,
-              newAddr: addrStr,
-              value: pendingVal,
-              measureId: measureId
-            });
-
-            // Notifica SAC via propertiesChanged
-            self2.dispatchEvent(new CustomEvent("propertiesChanged", {
-              bubbles: true, composed: true,
-              detail: {
-                properties: {
-                  measureChangeValue:     String(newVal),
-                  changedValue:           rawInputValue,
-                  measureChangeMeasureId: measureId,
-                  measureChangeRowIndex:  String(rowIdx),
-                  measureChangeAddrStr:   addrStr,
-                  pendingChanges:         self2._serializePendingChanges(self2._pendingChanges)
-                }
-              }
-            }));
-
-            // Dispara evento onMeasureChanged via microtask
-            Promise.resolve().then(function() {
-              self2.dispatchEvent(new CustomEvent("onMeasureChanged", {
-                bubbles: true, composed: true,
-                detail: {
-                  rowIndex:  rowIdx,
-                  measureId: measureId,
-                  value:     newVal,
-                  address:   addrObj
-                }
-              }));
-            });
-          });
-        })(input, ri, mk2, measures[mi2].id || mk2, rowData);
+        (function(inputEl, rowIdx, measureKey, measureId) {
+          inputEl.addEventListener("change", function() { self2._onMeasureChange(inputEl, rowIdx, measureKey, measureId); });
+        })(input, ri, mk2, measureIds[mi2]);
 
         tdm.appendChild(input);
         tr.appendChild(tdm);
@@ -3262,7 +2928,6 @@ class DropdownTableWidget extends HTMLElement {
   _renderSubgroupSelect(item, renderRow, bestRowByDim0) {
     var self = this;
     var kids = item.children;
-    if (!this._subgroupSelection) { this._subgroupSelection = {}; }
 
     // Filhos com valor ≠ 0 (para o padrão, o rótulo da lista e o alerta)
     var withValue = {};
@@ -3325,6 +2990,109 @@ class DropdownTableWidget extends HTMLElement {
     }
   }
 
+  // Texto exibido numa célula de medida: valor formatado do SAC (sem sufixo de unidade) ou bruto
+  _formatMeasureCell(mv) {
+    if (!mv) { return ""; }
+    if (mv.formattedValue !== undefined && mv.formattedValue !== null && String(mv.formattedValue) !== "") {
+      return String(mv.formattedValue);
+    }
+    if (mv.formatted !== undefined && mv.formatted !== null && String(mv.formatted) !== "" && mv.formatted !== "NaN") {
+      return String(mv.formatted).replace(/[a-zA-Z]+$/, "").trim(); // "1.593,95BRL" → "1.593,95"
+    }
+    if (mv.raw !== null && mv.raw !== undefined && String(mv.raw) !== "NaN" && String(mv.raw) !== "null") {
+      return String(mv.raw);
+    }
+    return "";
+  }
+
+  // Edição de uma célula de medida: registra a alteração pendente e avisa o SAC
+  _onMeasureChange(inputEl, rowIdx, measureKey, measureId) {
+    var self = this;
+    var rawInputValue = inputEl.value;
+    var newVal = this._parseLocaleNumber(rawInputValue);
+    if (isNaN(newVal)) { newVal = 0; }
+    // Valor canônico para o SAC; input vazio continua indo vazio
+    var pendingVal = rawInputValue.trim() === "" ? "" : String(newVal);
+    if (!this._localMeasures[rowIdx]) { this._localMeasures[rowIdx] = {}; }
+    this._localMeasures[rowIdx][measureKey] = newVal;
+
+    var rowAddrObj = this._buildRowAddrObj(rowIdx, null, true);
+    var addrStr = this._serializeAddrObj(rowAddrObj);
+    // address do evento: dimensões do binding, sobrepostas pelo endereço efetivo da linha
+    var addrObj = {};
+    var rowData = this._data[rowIdx] || {};
+    var count = this._metadata.feeds.dimensions.values.length;
+    for (var x = 0; x < count; x++) {
+      var dc = rowData["dimensions_" + x] || {};
+      if (dc.id) { addrObj[this._dimRealId("dimensions_" + x)] = dc.id; }
+    }
+    for (var rak in rowAddrObj) { addrObj[rak] = rowAddrObj[rak]; }
+
+    this._setLocalCellValue(addrStr, measureId, rawInputValue);
+    if (inputEl.parentElement) { inputEl.parentElement.classList.add("changed-cell"); }
+
+    this._measureChangeValue     = String(newVal);
+    this._changedValue           = rawInputValue;
+    this._measureChangeMeasureId = measureId;
+    this._measureChangeRowIndex  = String(rowIdx);
+    this._measureChangeAddrStr   = addrStr;
+    this._oldRowAddrStr          = addrStr;
+    this._newRowAddrStr          = addrStr;
+    this._addPendingChange({ type: "measure", rowIndex: rowIdx, oldAddr: addrStr, newAddr: addrStr, value: pendingVal, measureId: measureId });
+
+    this._emitProperties({
+      measureChangeValue:     String(newVal),
+      changedValue:           rawInputValue,
+      measureChangeMeasureId: measureId,
+      measureChangeRowIndex:  String(rowIdx),
+      measureChangeAddrStr:   addrStr,
+      pendingChanges:         this._serializePendingChanges(this._pendingChanges)
+    });
+    this._emitEvent("onMeasureChanged", { rowIndex: rowIdx, measureId: measureId, value: newVal, address: addrObj });
+  }
+
+  // Setas movem o foco entre inputs e dropdowns da tabela (grade linha × coluna)
+  _handleArrowNavigation(e, el) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && e.key !== "ArrowLeft" && e.key !== "ArrowRight") { return; }
+    e.preventDefault();
+    var all = Array.prototype.slice.call(this.shadowRoot.querySelectorAll("tbody input, tbody .cell-dropdown"));
+    var idx = all.indexOf(el);
+    if (idx === -1) { return; }
+    var row = el.closest("tr");
+    var colCount = row ? row.querySelectorAll("input, .cell-dropdown").length : 1;
+    var next = idx;
+    if (e.key === "ArrowDown")  { next = idx + colCount; }
+    if (e.key === "ArrowUp")    { next = idx - colCount; }
+    if (e.key === "ArrowRight") { next = idx + 1; }
+    if (e.key === "ArrowLeft")  { next = idx - 1; }
+    if (next >= 0 && next < all.length) {
+      this._closeDropdown();
+      all[next].focus();
+    }
+  }
+
+  _dispatchCellsDelete() {
+    var cells = [];
+    for (var i = 0; i < this._selectedCells.length; i++) {
+      cells.push({ rowIndex: this._selectedCells[i].rowIndex, measureKey: this._selectedCells[i].measureKey });
+    }
+    this._clearSelection();
+    this.dispatchEvent(new CustomEvent("onCellsDeleteRequested", { bubbles: true, composed: true, detail: { cells: cells } }));
+  }
+
+  // propertiesChanged: o SAC atualiza as propriedades lidas pelos getters com "body" no JSON
+  _emitProperties(props) {
+    this.dispatchEvent(new CustomEvent("propertiesChanged", { bubbles: true, composed: true, detail: { properties: props } }));
+  }
+
+  // Evento do widget em microtask: garante que o SAC já processou o propertiesChanged anterior
+  _emitEvent(name, detail) {
+    var self = this;
+    Promise.resolve().then(function() {
+      self.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail }));
+    });
+  }
+
   // ─── Dropdown cell ────────────────────────────────────────────
   // onPick (opcional): ação ao escolher um item; sem ele, troca o valor da dimensão (_selectValue)
   _buildDropdownCell(td, rowIndex, dimensionId, currentLabel, currentId, options, onPick) {
@@ -3358,25 +3126,8 @@ class DropdownTableWidget extends HTMLElement {
     });
     wrapper.addEventListener("keydown", function(e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); wrapper.click(); }
-      if (e.key === "Escape") self._closeDropdown();
-      if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        e.preventDefault();
-        var allCells = Array.from(self.shadowRoot.querySelectorAll("tbody input, tbody .cell-dropdown"));
-        var idx = allCells.indexOf(wrapper);
-        if (idx === -1) { return; }
-        var row = wrapper.closest("tr");
-        var rowCells = row ? Array.from(row.querySelectorAll("input, .cell-dropdown")) : [];
-        var colCount = rowCells.length;
-        var nextIdx = idx;
-        if (e.key === "ArrowDown")  { nextIdx = idx + colCount; }
-        if (e.key === "ArrowUp")    { nextIdx = idx - colCount; }
-        if (e.key === "ArrowRight") { nextIdx = idx + 1; }
-        if (e.key === "ArrowLeft")  { nextIdx = idx - 1; }
-        if (nextIdx >= 0 && nextIdx < allCells.length) {
-          self._closeDropdown();
-          allCells[nextIdx].focus();
-        }
-      }
+      if (e.key === "Escape") { self._closeDropdown(); }
+      self._handleArrowNavigation(e, wrapper);
     });
 
     td.appendChild(wrapper);
@@ -3404,7 +3155,7 @@ class DropdownTableWidget extends HTMLElement {
     for (var fi = 0; fi < options.length; fi++) {
       var opt = options[fi];
       var val = (opt.value || "").toLowerCase();
-      if (val.indexOf("root") !== -1 || val.indexOf("].&[root]") !== -1) { continue; }
+      if (this._cleanMemberId(opt.value).toUpperCase() === "ROOT") { continue; }
       filteredOptions.push(opt);
     }
     if (filteredOptions.length === 0) {
@@ -3453,9 +3204,6 @@ class DropdownTableWidget extends HTMLElement {
     list.style.top      = top  + "px";
     list.style.minWidth = listW + "px";
 
-    setTimeout(function() {
-      document.addEventListener("click", self._onDocClick, { once: true });
-    }, 0);
   }
 
   _closeDropdown() {
@@ -3464,206 +3212,140 @@ class DropdownTableWidget extends HTMLElement {
     if (this._activeCell) { this._activeCell.classList.remove("active"); this._activeCell = null; }
   }
 
-  // ─── Select & write-back ──────────────────────────────────────
+  // ─── Troca de valor no dropdown de dimensão ───────────────────
   _selectValue(rowIndex, dimensionId, memberId, memberLabel) {
-    var self = this;
-
     this._previousCellData = JSON.parse(JSON.stringify(this._selectedCellData));
-    this._selectedCellData = {
-      row: rowIndex,
-      dimensionId: dimensionId,
-      memberId: memberId,
-      memberLabel: memberLabel
-    };
-
+    this._selectedCellData = { row: rowIndex, dimensionId: dimensionId, memberId: memberId, memberLabel: memberLabel };
     this._oldRowAddrStr = this._buildRowAddrStr(rowIndex, null, true);
-    this._changedValue = this._getRowMeasureValue(rowIndex);
-    var changedMeasureKey = this._getFirstChangedMeasureKey(rowIndex);
-    var changedMeasureId = this._getMeasureIdByKey(changedMeasureKey);
 
-    if (!this._localSelections) { this._localSelections = {}; }
-    // Usa dimensions_0 id como chave para sobreviver a reordenação do binding
-    var rowData0 = this._data && this._data[rowIndex] ? this._data[rowIndex] : {};
-    var dim0Key = (rowData0["dimensions_0"] || {}).id || String(rowIndex);
-    if (!this._localSelections[dim0Key]) { this._localSelections[dim0Key] = {}; }
-    // Resolve technical member ID (prefer full member id like [DIM].[HIER].&[ID])
-    var technicalId = memberId;
-    // If incoming value looks like a simple label (no .&[ ), try to resolve from known option sources
-    if (!technicalId || technicalId.indexOf(".&[") === -1) {
-      // Try explicit dropdownOptions first
-      try {
-        if (this._dropdownOptions && this._dropdownOptions[dimensionId]) {
-          var dopts = this._dropdownOptions[dimensionId];
-          for (var di = 0; di < dopts.length; di++) {
-            var o = dopts[di];
-            if ((o.label && o.label === memberLabel) || (o.value && o.value === memberId)) {
-              if (o.value && o.value.indexOf(".&[") !== -1) { technicalId = o.value; break; }
-            }
-          }
-        }
-      } catch(e) {}
-      // Try children from binding (flatten groups) — sem Object.keys()
-      if ((!technicalId || technicalId.indexOf(".&[") === -1) && this._childrenFromBinding && this._childrenFromBinding[dimensionId]) {
-        for (var cbKey in this._childrenFromBinding[dimensionId]) {
-          if (technicalId && technicalId.indexOf(".&[") !== -1) { break; }
-          var arr = this._childrenFromBinding[dimensionId][cbKey] || [];
-          for (var a = 0; a < arr.length; a++) {
-            var ao = arr[a];
-            if ((ao.label && ao.label === memberLabel) || (ao.value && ao.value === memberId)) {
-              if (ao.value && ao.value.indexOf(".&[") !== -1) { technicalId = ao.value; break; }
-            }
-          }
-        }
-      }
-    }
-
-    // Fix: se technicalId ainda nao tem formato tecnico, tenta construir a partir do metadata da dimensao
-    if (!technicalId || technicalId.indexOf(".&[") === -1) {
-      var dimMetaEntry = this._metadata && this._metadata.dimensions ? this._metadata.dimensions[dimensionId] : null;
-      if (dimMetaEntry && dimMetaEntry.id) {
-        var dimRealKey = dimMetaEntry.id;
-        var hierKey = dimMetaEntry.hierarchies && dimMetaEntry.hierarchies[0] ? dimMetaEntry.hierarchies[0].id : (dimRealKey + "_H1");
-        // Usa memberId como label (é o ID real), só cai no memberLabel se memberId parecer um label de display
-        var idForLabel = memberId || memberLabel;
-        // Se memberId já tem formato técnico parcial, extrai só o label
-        var labelMatch2 = idForLabel ? idForLabel.match(/\.&\[([^\]]+)\]$/) : null;
-        if (labelMatch2) { idForLabel = labelMatch2[1]; }
-        technicalId = "[" + dimRealKey + "].[" + hierKey + "].&[" + idForLabel + "]";
-      }
-    }
-
-    // Block placeholder/invalid selections — do not persist or mount address
-    var placeholders = ["RESPONSAVEL", "Periodos", "FONTE", "Selecionar...", "RESPONSABILIDADE", "FONTE", "PERIODICIDADE", "DESCRICAO_DA_CONTA"];
-    var isPlaceholder = false;
-    for (var ph = 0; ph < placeholders.length; ph++) {
-      if ((memberLabel && memberLabel === placeholders[ph]) || (memberId && memberId === placeholders[ph]) || (technicalId && technicalId === placeholders[ph])) { isPlaceholder = true; break; }
-    }
+    var technicalId = this._resolveTechnicalId(dimensionId, memberId, memberLabel);
     var cellWrapper = this._activeCell;
-    if (isPlaceholder) {
-      // Revert displayed value to previous value if available
+
+    // Nó de hierarquia / placeholder (modo legado) não é seleção válida: volta o valor anterior
+    if (this._isPlaceholderSelection(memberId, memberLabel, technicalId)) {
       if (cellWrapper) {
-        var prevLabel = (this._previousCellData && this._previousCellData.memberLabel) ? this._previousCellData.memberLabel : "Selecionar...";
-        var valSpan2 = cellWrapper.querySelector(".cell-value");
-        if (valSpan2) { valSpan2.textContent = prevLabel; }
-        cellWrapper._currentId = this._previousCellData && this._previousCellData.memberId ? this._previousCellData.memberId : "";
+        var prev = this._previousCellData || {};
+        var prevSpan = cellWrapper.querySelector(".cell-value");
+        if (prevSpan) { prevSpan.textContent = prev.memberLabel || "Selecionar..."; }
+        cellWrapper._currentId = prev.memberId || "";
         cellWrapper.classList.remove("changed-cell");
       }
       return;
     }
 
-    // Persist selection using technical id
+    var dim0Key = this._rowKey(rowIndex);
+    if (!this._localSelections[dim0Key]) { this._localSelections[dim0Key] = {}; }
     this._localSelections[dim0Key][dimensionId] = { id: technicalId, label: memberLabel };
-    if (!this._selectionRowIndex) { this._selectionRowIndex = {}; }
     this._selectionRowIndex[dim0Key] = rowIndex;
 
     if (cellWrapper) {
       var valSpan = cellWrapper.querySelector(".cell-value");
-      if (valSpan) {
-        valSpan.textContent = memberLabel;
-        valSpan.className = "cell-value";
-      }
+      if (valSpan) { valSpan.textContent = memberLabel; valSpan.className = "cell-value"; }
       cellWrapper._currentId = technicalId;
       cellWrapper.classList.add("changed-cell");
     }
 
-    // Endereço completo da linha com a nova seleção (prioridade máxima para a dimensão atual)
-    var dropAddrStr = this._buildRowAddrStr(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
-    this._newRowAddrStr = dropAddrStr;
-    var pendingMeasureKeys = [];
-    var pendingMeasFeed = this._metadata ? (this._metadata.feeds.mainStructureMembers || this._metadata.feeds.measures) : null;
-    var pendingMeasValues = pendingMeasFeed ? pendingMeasFeed.values : [];
-    if (pendingMeasValues.length > 0) {
-      for (var pm = 0; pm < pendingMeasValues.length; pm++) { pendingMeasureKeys.push("measures_" + pm); }
-    } else {
-      pendingMeasureKeys.push(changedMeasureKey);
-    }
-    // Move só as medidas que têm valor. Linha sem nenhum valor: registra só a escolha (grava o
-    // "apagar" na combinação nova para guardá-la) sem zerar a combinação antiga, que não existe.
-    var movedAny = false;
-    var firstMeasureId = "";
-    // Destino é um membro sem valor (ex: CLIENTE): todas as medidas gravam 0, inclusive as vazias
-    this._memberLabelIndex = {};
-    var targetObj = this._buildRowAddrObj(rowIndex, { dimensionId: dimensionId, memberId: technicalId }, true);
+    var override = { dimensionId: dimensionId, memberId: technicalId };
+    var targetObj = this._buildRowAddrObj(rowIndex, override, true);
+    var newAddr = this._serializeAddrObj(targetObj);
+    this._newRowAddrStr = newAddr;
+    var change = this._registerDropdownMove(rowIndex, this._oldRowAddrStr, newAddr, targetObj);
+
+    // Responsabilidade CLIENTE trava/mostra 0; sair de tudo NÃO APLICÁVEL libera as medidas
+    this._applyRowLock(rowIndex);
+
+    this._changedValue           = change.value;
+    this._measureChangeValue     = String(change.value || "");
+    this._measureChangeMeasureId = change.measureId;
+    this._measureChangeRowIndex  = String(rowIndex);
+    this._measureChangeAddrStr   = newAddr;
+    this._emitProperties({
+      selectedCellData:       JSON.stringify(this._selectedCellData),
+      changedValue:           this._changedValue,
+      measureChangeValue:     this._measureChangeValue,
+      measureChangeMeasureId: change.measureId,
+      measureChangeRowIndex:  String(rowIndex),
+      measureChangeAddrStr:   newAddr,
+      pendingChanges:         this._serializePendingChanges(this._pendingChanges)
+    });
+    this._emitEvent("onDropdownChanged", this._selectedCellData);
+  }
+
+  // Alterações pendentes da troca de combinação. Move só as medidas que têm valor (zera a
+  // combinação antiga). Linha sem valor nenhum só registra a escolha (noMove). Destino num membro
+  // sem valor (ex: CLIENTE): todas as medidas vão a 0, inclusive as vazias.
+  // Retorna {value, measureId} da primeira medida registrada (para measureChange*).
+  _registerDropdownMove(rowIndex, oldAddr, newAddr, targetObj) {
     var targetPairs = [];
     for (var tk in targetObj) { targetPairs.push({ dim: tk, member: targetObj[tk] }); }
+    this._memberLabelIndex = {};
     var noValueTarget = this._isNoValueAddress(targetPairs);
-    for (var pmk = 0; pmk < pendingMeasureKeys.length; pmk++) {
-      var pendingMeasureKey = pendingMeasureKeys[pmk];
-      var pendingMeasureId = this._getMeasureIdByKey(pendingMeasureKey);
-      if (pmk === 0) { firstMeasureId = pendingMeasureId; }
-      // Usa _getRowMeasureValue como fonte primária (binding direto) — mais confiável que _originalData
-      var currentValue = this._getRowMeasureValue(rowIndex, pendingMeasureKey);
-      // Fallback: _originalData via oldRowAddrStr
-      if (currentValue === "") { currentValue = this._toCanonicalNumber(this._getCurrentLocalValue(this._oldRowAddrStr, pendingMeasureId)); }
-      if (currentValue === "") {
+
+    var feedCount = this._metadata.feeds.measures ? this._metadata.feeds.measures.values.length : 0;
+    var keys = [];
+    for (var k = 0; k < feedCount; k++) { keys.push("measures_" + k); }
+    if (keys.length === 0) {
+      for (var first in (this._localMeasures[rowIndex] || {})) { keys.push(first); break; }
+      if (keys.length === 0) { keys.push("measures_0"); }
+    }
+
+    var result = null;
+    for (var i = 0; i < keys.length; i++) {
+      var measureId = this._getMeasureIdByKey(keys[i]);
+      var value = this._getRowMeasureValue(rowIndex, keys[i]);
+      if (value === "") { value = this._toCanonicalNumber(this._getCurrentLocalValue(oldAddr, measureId)); }
+      if (value === "") {
         if (noValueTarget) {
-          this._addPendingChange({
-            type: "dropdown", rowIndex: rowIndex, noMove: true,
-            oldAddr: this._oldRowAddrStr, newAddr: this._newRowAddrStr,
-            value: "", measureId: pendingMeasureId
-          });
-          movedAny = true;
+          this._addPendingChange({ type: "dropdown", rowIndex: rowIndex, noMove: true, oldAddr: oldAddr, newAddr: newAddr, value: "", measureId: measureId });
+          if (!result) { result = { value: "", measureId: measureId }; }
         }
         continue;
       }
-      this._setLocalCellValue(this._newRowAddrStr, pendingMeasureId, currentValue);
-      this._addPendingChange({
-        type: "dropdown",
-        rowIndex: rowIndex,
-        oldAddr: this._oldRowAddrStr,
-        newAddr: this._newRowAddrStr,
-        value: currentValue,
-        measureId: pendingMeasureId
-      });
-      if (!movedAny) {
-        this._changedValue = currentValue;
-        changedMeasureId = pendingMeasureId;
-      }
-      movedAny = true;
+      this._setLocalCellValue(newAddr, measureId, value);
+      this._addPendingChange({ type: "dropdown", rowIndex: rowIndex, oldAddr: oldAddr, newAddr: newAddr, value: value, measureId: measureId });
+      if (!result || result.value === "") { result = { value: value, measureId: measureId }; }
     }
-    if (!movedAny && firstMeasureId) {
-      this._addPendingChange({
-        type: "dropdown",
-        rowIndex: rowIndex,
-        noMove: true,
-        oldAddr: this._oldRowAddrStr,
-        newAddr: this._newRowAddrStr,
-        value: "",
-        measureId: firstMeasureId
-      });
-      this._changedValue = "";
-      changedMeasureId = firstMeasureId;
+    if (!result) {
+      var firstId = this._getMeasureIdByKey(keys[0]);
+      this._addPendingChange({ type: "dropdown", rowIndex: rowIndex, noMove: true, oldAddr: oldAddr, newAddr: newAddr, value: "", measureId: firstId });
+      result = { value: "", measureId: firstId };
     }
-    // Responsabilidade CLIENTE trava/mostra 0; sair de tudo NÃO APLICÁVEL libera as medidas
-    this._applyRowLock(rowIndex);
-    this._measureChangeValue = String(this._changedValue || "");
-    this._measureChangeMeasureId = changedMeasureId;
-    this._measureChangeRowIndex = String(rowIndex);
-    this._measureChangeAddrStr = dropAddrStr;
-
-    // Notifica SAC via propertiesChanged antes do evento
-    this.dispatchEvent(new CustomEvent("propertiesChanged", {
-      bubbles: true, composed: true,
-      detail: {
-        properties: {
-          selectedCellData: JSON.stringify(this._selectedCellData),
-          changedValue: this._changedValue,
-          measureChangeValue: String(this._changedValue || ""),
-          measureChangeMeasureId: changedMeasureId,
-          measureChangeRowIndex: String(rowIndex),
-          measureChangeAddrStr: dropAddrStr,
-          pendingChanges: this._serializePendingChanges(this._pendingChanges)
-        }
-      }
-    }));
-
-    Promise.resolve().then(function() {
-      self.dispatchEvent(new CustomEvent("onDropdownChanged", {
-        bubbles: true, composed: true, detail: self._selectedCellData
-      }));
-    });
+    return result;
   }
 
+  // ID técnico do membro ([DIM].[HIER].&[ID]): valor da opção → opções/childrenBinding por
+  // rótulo → montado a partir do metadata da dimensão
+  _resolveTechnicalId(dimensionId, memberId, memberLabel) {
+    var isTechnical = function(id) { return !!id && id.indexOf(".&[") !== -1; };
+    if (isTechnical(memberId)) { return memberId; }
+    var candidates = [];
+    if (this._dropdownOptions[dimensionId]) { candidates.push(this._dropdownOptions[dimensionId]); }
+    var cfb = this._childrenFromBinding[dimensionId] || {};
+    for (var p in cfb) { candidates.push(cfb[p]); }
+    for (var c = 0; c < candidates.length; c++) {
+      for (var o = 0; o < candidates[c].length; o++) {
+        var opt = candidates[c][o];
+        if ((opt.label && opt.label === memberLabel) || (opt.value && opt.value === memberId)) {
+          if (isTechnical(opt.value)) { return opt.value; }
+        }
+      }
+    }
+    var dimMeta = this._metadata && this._metadata.dimensions ? this._metadata.dimensions[dimensionId] : null;
+    if (dimMeta && dimMeta.id) {
+      var hier = dimMeta.hierarchies && dimMeta.hierarchies[0] ? dimMeta.hierarchies[0].id : (dimMeta.id + "_H1");
+      return "[" + dimMeta.id + "].[" + hier + "].&[" + this._cleanMemberId(memberId || memberLabel) + "]";
+    }
+    return memberId;
+  }
+
+  // Rótulos de nós usados como placeholder no modo legado (não são membros selecionáveis)
+  _isPlaceholderSelection(memberId, memberLabel, technicalId) {
+    var placeholders = ["RESPONSAVEL", "Periodos", "FONTE", "Selecionar...", "RESPONSABILIDADE", "PERIODICIDADE", "DESCRICAO_DA_CONTA"];
+    for (var i = 0; i < placeholders.length; i++) {
+      if (memberLabel === placeholders[i] || memberId === placeholders[i] || technicalId === placeholders[i]) { return true; }
+    }
+    return false;
+  }
 }
 
 if (!customElements.get(DT_TAG)) {
@@ -3671,5 +3353,3 @@ if (!customElements.get(DT_TAG)) {
 }
 
 })();
-
-// v2.13.0

@@ -396,144 +396,93 @@
         </form>
     `;
 
+    // Campos de cor: id do input (o seletor é id + "_picker"), onde o valor é publicado
+    // (prop = propriedade própria do widget; cfg = dentro de styleConfig) e o padrão SAP Horizon
+    var COLOR_FIELDS = [
+        { id: "style_title_color",        cfg:  "titleColor",        horizon: "#1d2d3e" },
+        { id: "style_header_color",       prop: "headerColor",       horizon: "#ffffff" },
+        { id: "style_header_text_color",  prop: "headerTextColor",   horizon: "#1d2d3e" },
+        { id: "style_selected_row_color", prop: "selectedRowColor",  horizon: "#ebf8ff" },
+        { id: "style_hover_row_color",    prop: "hoverRowColor",     horizon: "#eaecee" },
+        { id: "style_table_text_color",   prop: "tableTextColor",    horizon: "#1d2d3e" },
+        { id: "style_editable_color",     cfg:  "editableCellColor", horizon: "#ffffff" },
+        { id: "style_group_header_bg",    cfg:  "groupHeaderBg",     horizon: "#f5f6f7" },
+        { id: "style_group_header_color", cfg:  "groupHeaderColor",  horizon: "#1d2d3e" },
+        { id: "style_subheader_bg",       cfg:  "subheaderBg",       horizon: "#ffffff" },
+        { id: "style_subheader_color",    cfg:  "subheaderColor",    horizon: "#1d2d3e" },
+        { id: "style_save_btn_bg",        cfg:  "saveBtnBg",         horizon: "#0070f2" },
+        { id: "style_save_btn_color",     cfg:  "saveBtnColor",      horizon: "#ffffff" },
+        { id: "style_save_btn_hover_bg",  cfg:  "saveBtnHoverBg",    horizon: "#0064d9" }
+    ];
+
     class DropdownTableStyling extends HTMLElement {
         constructor() {
             super();
+            var self = this;
             this._shadowRoot = this.attachShadow({ mode: "open" });
             this._shadowRoot.appendChild(template.content.cloneNode(true));
+            var $ = function(id) { return self._shadowRoot.getElementById(id); };
 
-            this._form = this._shadowRoot.getElementById("form");
+            this._form = $("form");
 
-            // Color inputs
-            this._headerColorInput       = this._shadowRoot.getElementById("style_header_color");
-            this._headerColorPicker      = this._shadowRoot.getElementById("style_header_color_picker");
-            this._headerTextColorInput   = this._shadowRoot.getElementById("style_header_text_color");
-            this._headerTextColorPicker  = this._shadowRoot.getElementById("style_header_text_color_picker");
-            this._selectedRowColorInput  = this._shadowRoot.getElementById("style_selected_row_color");
-            this._selectedRowColorPicker = this._shadowRoot.getElementById("style_selected_row_color_picker");
-            this._hoverRowColorInput     = this._shadowRoot.getElementById("style_hover_row_color");
-            this._hoverRowColorPicker    = this._shadowRoot.getElementById("style_hover_row_color_picker");
-            this._tableTextColorInput    = this._shadowRoot.getElementById("style_table_text_color");
-            this._tableTextColorPicker   = this._shadowRoot.getElementById("style_table_text_color_picker");
-            this._editableColorInput     = this._shadowRoot.getElementById("style_editable_color");
-            this._editableColorPicker    = this._shadowRoot.getElementById("style_editable_color_picker");
-            this._groupHeaderBgInput     = this._shadowRoot.getElementById("style_group_header_bg");
-            this._groupHeaderBgPicker    = this._shadowRoot.getElementById("style_group_header_bg_picker");
-            this._groupHeaderColorInput  = this._shadowRoot.getElementById("style_group_header_color");
-            this._groupHeaderColorPicker = this._shadowRoot.getElementById("style_group_header_color_picker");
-            this._subheaderBgInput       = this._shadowRoot.getElementById("style_subheader_bg");
-            this._subheaderBgPicker      = this._shadowRoot.getElementById("style_subheader_bg_picker");
-            this._subheaderColorInput    = this._shadowRoot.getElementById("style_subheader_color");
-            this._subheaderColorPicker   = this._shadowRoot.getElementById("style_subheader_color_picker");
-            this._saveBtnBgInput         = this._shadowRoot.getElementById("style_save_btn_bg");
-            this._saveBtnBgPicker        = this._shadowRoot.getElementById("style_save_btn_bg_picker");
-            this._saveBtnColorInput      = this._shadowRoot.getElementById("style_save_btn_color");
-            this._saveBtnColorPicker     = this._shadowRoot.getElementById("style_save_btn_color_picker");
-            this._saveBtnHoverBgInput    = this._shadowRoot.getElementById("style_save_btn_hover_bg");
-            this._saveBtnHoverBgPicker   = this._shadowRoot.getElementById("style_save_btn_hover_bg_picker");
-            this._saveBtnLabelInput      = this._shadowRoot.getElementById("style_save_btn_label");
-            this._titleColorInput        = this._shadowRoot.getElementById("style_title_color");
-            this._titleColorPicker       = this._shadowRoot.getElementById("style_title_color_picker");
+            // Cores: {campo, input de texto, seletor} sincronizados nos dois sentidos
+            this._colors = COLOR_FIELDS.map(function(f) {
+                var c = { field: f, input: $(f.id), picker: $(f.id + "_picker") };
+                c.picker.addEventListener("input", function() { c.input.value = c.picker.value; });
+                c.input.addEventListener("change", function() { c.picker.value = c.input.value; });
+                return c;
+            });
+            this._saveBtnLabelInput = $("style_save_btn_label");
 
-            // Font + table inputs
-            this._fontFamilySelect = this._shadowRoot.getElementById("style_font_family");
-            this._fontSizeSelect   = this._shadowRoot.getElementById("style_font_size");
-            this._fontWeightSelect = this._shadowRoot.getElementById("style_font_weight");
-            this._rowHeightSelect  = this._shadowRoot.getElementById("style_row_height");
-            this._colWidthSelect   = this._shadowRoot.getElementById("style_col_width");
-            this._tableTitleInput  = this._shadowRoot.getElementById("style_table_title");
-            this._titleSizeSelect  = this._shadowRoot.getElementById("style_title_size");
+            // Fonte e tabela
+            this._fontFamilySelect = $("style_font_family");
+            this._fontSizeSelect   = $("style_font_size");
+            this._fontWeightSelect = $("style_font_weight");
+            this._rowHeightSelect  = $("style_row_height");
+            this._colWidthSelect   = $("style_col_width");
+            this._tableTitleInput  = $("style_table_title");
+            this._titleSizeSelect  = $("style_title_size");
 
-            // Alignment state
+            // Alinhamento
             this._headerAlign = "left";
             this._cellAlign   = "left";
             this._titleAlign  = "left";
-
-            this._applyButton = this._shadowRoot.getElementById("apply_styles");
-
-            // Dropdowns
-            this._ddDimsContainer = this._shadowRoot.getElementById("dd_dims");
-            this._debugModeInput  = this._shadowRoot.getElementById("style_debug_mode");
-            this._emptyDefaultInput = this._shadowRoot.getElementById("style_empty_default");
-            this._writeHierInput    = this._shadowRoot.getElementById("style_write_hierarchies");
-            this._noValueInput      = this._shadowRoot.getElementById("style_no_value_members");
-            this._deleteValueInput  = this._shadowRoot.getElementById("style_delete_value");
-            this._availableDims   = [];  // [{key, id, label}] publicado pelo widget
-            this._ddSelected      = [];  // IDs reais das dimensões marcadas
-            this._renderDropdownDims();
-
-            this._connectColorPickers();
-            this._connectAlignButtons();
-            this._shadowRoot.getElementById("reset_horizon").addEventListener("click", this._restoreHorizon.bind(this));
-            this._form.addEventListener("submit", this._submit.bind(this));
-            this._applyButton.addEventListener("click", this._submit.bind(this));
-        }
-
-        _connectColorPickers() {
-            var pairs = [
-                [this._headerColorInput,      this._headerColorPicker],
-                [this._headerTextColorInput,   this._headerTextColorPicker],
-                [this._selectedRowColorInput,  this._selectedRowColorPicker],
-                [this._hoverRowColorInput,     this._hoverRowColorPicker],
-                [this._tableTextColorInput,    this._tableTextColorPicker],
-                [this._editableColorInput,     this._editableColorPicker],
-                [this._groupHeaderBgInput,    this._groupHeaderBgPicker],
-                [this._groupHeaderColorInput, this._groupHeaderColorPicker],
-                [this._subheaderBgInput,      this._subheaderBgPicker],
-                [this._subheaderColorInput,   this._subheaderColorPicker],
-                [this._saveBtnBgInput,        this._saveBtnBgPicker],
-                [this._saveBtnColorInput,     this._saveBtnColorPicker],
-                [this._saveBtnHoverBgInput,   this._saveBtnHoverBgPicker],
-                [this._titleColorInput,        this._titleColorPicker]
-            ];
-            pairs.forEach(function(pair) {
-                var textInput = pair[0];
-                var picker    = pair[1];
-                picker.addEventListener("input", function() { textInput.value = picker.value; });
-                textInput.addEventListener("change", function() { picker.value = textInput.value; });
-            });
-        }
-
-        _connectAlignButtons() {
-            var self = this;
-            var allBtns = this._shadowRoot.querySelectorAll(".align-btn");
-            allBtns.forEach(function(btn) {
+            this._shadowRoot.querySelectorAll(".align-btn").forEach(function(btn) {
                 btn.addEventListener("click", function() {
-                    var group = btn.getAttribute("data-group");
-                    var align = btn.getAttribute("data-align");
-                    // Deactivate siblings in same group
-                    self._shadowRoot.querySelectorAll(".align-btn[data-group='" + group + "']").forEach(function(b) {
-                        b.classList.remove("active");
-                    });
-                    btn.classList.add("active");
-                    if (group === "header") { self._headerAlign = align; }
-                    else if (group === "cell") { self._cellAlign = align; }
-                    else                    { self._titleAlign  = align; }
+                    self._setAlignActive(btn.getAttribute("data-group"), btn.getAttribute("data-align"));
                 });
             });
+
+            // Dropdowns e gravação
+            this._ddDimsContainer   = $("dd_dims");
+            this._debugModeInput    = $("style_debug_mode");
+            this._emptyDefaultInput = $("style_empty_default");
+            this._writeHierInput    = $("style_write_hierarchies");
+            this._noValueInput      = $("style_no_value_members");
+            this._deleteValueInput  = $("style_delete_value");
+            this._availableDims = [];  // [{key, id, label}] publicado pelo widget
+            this._ddSelected    = [];  // IDs reais das dimensões marcadas
+            this._renderDropdownDims();
+
+            $("reset_horizon").addEventListener("click", this._restoreHorizon.bind(this));
+            this._form.addEventListener("submit", this._submit.bind(this));
+            $("apply_styles").addEventListener("click", this._submit.bind(this));
         }
+
+        _color(key) {
+            for (var i = 0; i < this._colors.length; i++) {
+                var f = this._colors[i].field;
+                if (f.prop === key || f.cfg === key) { return this._colors[i]; }
+            }
+            return null;
+        }
+        _setColor(c, v) { c.input.value = v; c.picker.value = v; }
 
         // Preenche cores, fonte e densidade com o padrão SAP Horizon (compacto).
         // Não mexe em Dropdowns nem Gravação. O usuário confirma com "Aplicar".
         _restoreHorizon() {
             var self = this;
-            var colors = [
-                [this._titleColorInput,       this._titleColorPicker,       "#1d2d3e"],
-                [this._headerColorInput,      this._headerColorPicker,      "#ffffff"],
-                [this._headerTextColorInput,  this._headerTextColorPicker,  "#1d2d3e"],
-                [this._selectedRowColorInput, this._selectedRowColorPicker, "#ebf8ff"],
-                [this._hoverRowColorInput,    this._hoverRowColorPicker,    "#eaecee"],
-                [this._tableTextColorInput,   this._tableTextColorPicker,   "#1d2d3e"],
-                [this._editableColorInput,    this._editableColorPicker,    "#ffffff"],
-                [this._groupHeaderBgInput,    this._groupHeaderBgPicker,    "#f5f6f7"],
-                [this._groupHeaderColorInput, this._groupHeaderColorPicker, "#1d2d3e"],
-                [this._subheaderBgInput,      this._subheaderBgPicker,      "#ffffff"],
-                [this._subheaderColorInput,   this._subheaderColorPicker,   "#1d2d3e"],
-                [this._saveBtnBgInput,        this._saveBtnBgPicker,        "#0070f2"],
-                [this._saveBtnColorInput,     this._saveBtnColorPicker,     "#ffffff"],
-                [this._saveBtnHoverBgInput,   this._saveBtnHoverBgPicker,   "#0064d9"]
-            ];
-            colors.forEach(function(c) { c[0].value = c[2]; c[1].value = c[2]; });
+            this._colors.forEach(function(c) { self._setColor(c, c.field.horizon); });
             this._fontFamilySelect.value = "'72', '72full', Arial, Helvetica, sans-serif";
             this._fontSizeSelect.value   = "14px";
             this._fontWeightSelect.value = "normal";
@@ -545,89 +494,65 @@
 
         _submit(e) {
             e.preventDefault();
-            this.dispatchEvent(new CustomEvent("propertiesChanged", {
-                detail: {
-                    properties: {
-                        headerColor:       this._headerColorInput.value,
-                        headerTextColor:   this._headerTextColorInput.value,
-                        selectedRowColor:  this._selectedRowColorInput.value,
-                        hoverRowColor:     this._hoverRowColorInput.value,
-                        tableTextColor:    this._tableTextColorInput.value,
-                        styleConfig: JSON.stringify({
-                            editableCellColor:   this._editableColorInput.value,
-                            groupHeaderBg:       this._groupHeaderBgInput.value,
-                            groupHeaderColor:    this._groupHeaderColorInput.value,
-                            subheaderBg:         this._subheaderBgInput.value,
-                            subheaderColor:      this._subheaderColorInput.value,
-                            saveBtnBg:           this._saveBtnBgInput.value,
-                            saveBtnColor:        this._saveBtnColorInput.value,
-                            saveBtnHoverBg:      this._saveBtnHoverBgInput.value,
-                            saveBtnLabel:        this._saveBtnLabelInput.value,
-                            rowHeight:         parseInt(this._rowHeightSelect.value, 10),
-                            colWidth:          this._colWidthSelect.value,
-                            fontFamily:        this._fontFamilySelect.value,
-                            fontSize:          this._fontSizeSelect.value,
-                            fontWeight:        this._fontWeightSelect.value,
-                            tableTitle:        this._tableTitleInput.value,
-                            titleColor:        this._titleColorInput.value,
-                            titleSize:         this._titleSizeSelect.value,
-                            headerAlign:       this._headerAlign,
-                            cellAlign:         this._cellAlign,
-                            titleAlign:        this._titleAlign,
-                            dropdownDimensions: this._ddSelected.slice(),
-                            debugMode:          this._debugModeInput.checked,
-                            emptyDefaultLabel:  this._emptyDefaultInput.value,
-                            writeHierarchies:   this._writeHierInput.value,
-                            noValueMembers:     this._noValueInput.value,
-                            deleteValue:        this._deleteValueInput.value
-                        })
-                    }
-                }
-            }));
+            var props = {};
+            var cfg = {};
+            this._colors.forEach(function(c) {
+                if (c.field.prop) { props[c.field.prop] = c.input.value; } else { cfg[c.field.cfg] = c.input.value; }
+            });
+            cfg.saveBtnLabel       = this._saveBtnLabelInput.value;
+            cfg.rowHeight          = parseInt(this._rowHeightSelect.value, 10);
+            cfg.colWidth           = this._colWidthSelect.value;
+            cfg.fontFamily         = this._fontFamilySelect.value;
+            cfg.fontSize           = this._fontSizeSelect.value;
+            cfg.fontWeight         = this._fontWeightSelect.value;
+            cfg.tableTitle         = this._tableTitleInput.value;
+            cfg.titleSize          = this._titleSizeSelect.value;
+            cfg.headerAlign        = this._headerAlign;
+            cfg.cellAlign          = this._cellAlign;
+            cfg.titleAlign         = this._titleAlign;
+            cfg.dropdownDimensions = this._ddSelected.slice();
+            cfg.debugMode          = this._debugModeInput.checked;
+            cfg.emptyDefaultLabel  = this._emptyDefaultInput.value;
+            cfg.writeHierarchies   = this._writeHierInput.value;
+            cfg.noValueMembers     = this._noValueInput.value;
+            cfg.deleteValue        = this._deleteValueInput.value;
+            props.styleConfig = JSON.stringify(cfg);
+            this.dispatchEvent(new CustomEvent("propertiesChanged", { detail: { properties: props } }));
         }
 
-        // Getters/setters for SAC
-        get headerColor() { return this._headerColorInput.value; }
-        set headerColor(v) { if (v) { this._headerColorInput.value = v; this._headerColorPicker.value = v; } }
-
-        get headerTextColor() { return this._headerTextColorInput.value; }
-        set headerTextColor(v) { if (v) { this._headerTextColorInput.value = v; this._headerTextColorPicker.value = v; } }
-
-        get selectedRowColor() { return this._selectedRowColorInput.value; }
-        set selectedRowColor(v) { if (v) { this._selectedRowColorInput.value = v; this._selectedRowColorPicker.value = v; } }
-
-        get hoverRowColor() { return this._hoverRowColorInput.value; }
-        set hoverRowColor(v) { if (v) { this._hoverRowColorInput.value = v; this._hoverRowColorPicker.value = v; } }
-
-        get tableTextColor() { return this._tableTextColorInput.value; }
-        set tableTextColor(v) { if (v) { this._tableTextColorInput.value = v; this._tableTextColorPicker.value = v; } }
+        // Propriedades de cor próprias do widget (o SAC chama o setter ao abrir o painel)
+        get headerColor()       { return this._color("headerColor").input.value; }
+        set headerColor(v)      { if (v) { this._setColor(this._color("headerColor"), v); } }
+        get headerTextColor()   { return this._color("headerTextColor").input.value; }
+        set headerTextColor(v)  { if (v) { this._setColor(this._color("headerTextColor"), v); } }
+        get selectedRowColor()  { return this._color("selectedRowColor").input.value; }
+        set selectedRowColor(v) { if (v) { this._setColor(this._color("selectedRowColor"), v); } }
+        get hoverRowColor()     { return this._color("hoverRowColor").input.value; }
+        set hoverRowColor(v)    { if (v) { this._setColor(this._color("hoverRowColor"), v); } }
+        get tableTextColor()    { return this._color("tableTextColor").input.value; }
+        set tableTextColor(v)   { if (v) { this._setColor(this._color("tableTextColor"), v); } }
 
         get styleConfig() { return "{}"; }
         set styleConfig(v) {
+            var self = this;
             try {
                 var cfg = JSON.parse(v);
+                this._colors.forEach(function(c) {
+                    if (c.field.cfg && cfg[c.field.cfg]) { self._setColor(c, cfg[c.field.cfg]); }
+                });
                 if (cfg.tableTitle)   { this._tableTitleInput.value = cfg.tableTitle; }
-                if (cfg.titleColor)   { this._titleColorInput.value = cfg.titleColor; this._titleColorPicker.value = cfg.titleColor; }
                 if (cfg.titleSize)    { this._titleSizeSelect.value = cfg.titleSize; }
                 if (cfg.fontFamily)   { this._fontFamilySelect.value = cfg.fontFamily; }
                 if (cfg.fontSize)     { this._fontSizeSelect.value = cfg.fontSize; }
                 if (cfg.fontWeight)   { this._fontWeightSelect.value = cfg.fontWeight; }
                 if (cfg.rowHeight)    { this._rowHeightSelect.value = String(cfg.rowHeight); }
-                if (cfg.colWidth)          { this._colWidthSelect.value = cfg.colWidth; }
-                if (cfg.editableCellColor) { this._editableColorInput.value = cfg.editableCellColor; this._editableColorPicker.value = cfg.editableCellColor; }
-                if (cfg.groupHeaderBg)    { this._groupHeaderBgInput.value = cfg.groupHeaderBg; this._groupHeaderBgPicker.value = cfg.groupHeaderBg; }
-                if (cfg.groupHeaderColor) { this._groupHeaderColorInput.value = cfg.groupHeaderColor; this._groupHeaderColorPicker.value = cfg.groupHeaderColor; }
-                if (cfg.subheaderBg)      { this._subheaderBgInput.value = cfg.subheaderBg; this._subheaderBgPicker.value = cfg.subheaderBg; }
-                if (cfg.subheaderColor)   { this._subheaderColorInput.value = cfg.subheaderColor; this._subheaderColorPicker.value = cfg.subheaderColor; }
-                if (cfg.saveBtnBg)       { this._saveBtnBgInput.value = cfg.saveBtnBg; this._saveBtnBgPicker.value = cfg.saveBtnBg; }
-                if (cfg.saveBtnColor)    { this._saveBtnColorInput.value = cfg.saveBtnColor; this._saveBtnColorPicker.value = cfg.saveBtnColor; }
-                if (cfg.saveBtnHoverBg)  { this._saveBtnHoverBgInput.value = cfg.saveBtnHoverBg; this._saveBtnHoverBgPicker.value = cfg.saveBtnHoverBg; }
-                if (cfg.saveBtnLabel)    { this._saveBtnLabelInput.value = cfg.saveBtnLabel; }
+                if (cfg.colWidth)     { this._colWidthSelect.value = cfg.colWidth; }
+                if (cfg.saveBtnLabel) { this._saveBtnLabelInput.value = cfg.saveBtnLabel; }
                 if (cfg.headerAlign)  { this._setAlignActive("header", cfg.headerAlign); }
                 if (cfg.cellAlign)    { this._setAlignActive("cell",   cfg.cellAlign); }
                 if (cfg.titleAlign)   { this._setAlignActive("title",  cfg.titleAlign); }
                 if (Array.isArray(cfg.dropdownDimensions)) { this._ddSelected = cfg.dropdownDimensions.slice(); this._renderDropdownDims(); }
-                if (cfg.debugMode !== undefined) { this._debugModeInput.checked = !!cfg.debugMode; }
+                if (cfg.debugMode !== undefined)         { this._debugModeInput.checked = !!cfg.debugMode; }
                 if (cfg.emptyDefaultLabel !== undefined) { this._emptyDefaultInput.value = cfg.emptyDefaultLabel; }
                 if (cfg.writeHierarchies !== undefined)  { this._writeHierInput.value = cfg.writeHierarchies; }
                 if (cfg.noValueMembers !== undefined)    { this._noValueInput.value = cfg.noValueMembers; }
