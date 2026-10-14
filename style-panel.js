@@ -389,6 +389,8 @@
                 <textarea id="style_write_hierarchies" class="rule-box" rows="4" placeholder="PERIODICIDADE=Periodos_H1"></textarea>
                 <div class="dd-hint">Membros que gravam 0 em todas as medidas (trava a linha) — DIMENSAO=MEMBRO1;MEMBRO2. Vazio = RESPONSABILIDADE=CLIENTE</div>
                 <textarea id="style_no_value_members" class="rule-box" rows="2" placeholder="RESPONSABILIDADE=CLIENTE">RESPONSABILIDADE=CLIENTE</textarea>
+                <div class="dd-hint">Liberação e base NÃO APLICÁVEL — DIMENSAO=MEMBRO. Enquanto a dimensão estiver em NÃO APLICÁVEL, a linha mostra os valores pré-definidos (travados) e as demais dimensões ficam travadas; o membro copia esses valores, que nunca são alterados. Vazio = regra desligada.</div>
+                <textarea id="style_base_copy" class="rule-box" rows="2" placeholder="RESPONSABILIDADE=SAPORE">RESPONSABILIDADE=SAPORE</textarea>
                 <table>
                     <tr>
                         <td>Valor para apagar</td>
@@ -467,6 +469,7 @@
             this._writeHierInput    = $("style_write_hierarchies");
             this._noValueInput      = $("style_no_value_members");
             this._deleteValueInput  = $("style_delete_value");
+            this._baseCopyInput     = $("style_base_copy");
             this._availableDims = [];  // [{key, id, label}] publicado pelo widget
             this._ddSelected    = [];  // IDs reais das dimensões marcadas
             this._renderDropdownDims();
@@ -523,6 +526,7 @@
             cfg.writeHierarchies   = this._writeHierInput.value;
             cfg.noValueMembers     = this._noValueInput.value;
             cfg.deleteValue        = this._deleteValueInput.value;
+            cfg.baseCopyMembers    = this._baseCopyInput.value;
             props.styleConfig = JSON.stringify(cfg);
             this.dispatchEvent(new CustomEvent("propertiesChanged", { detail: { properties: props } }));
         }
@@ -564,6 +568,7 @@
                 if (cfg.writeHierarchies !== undefined)  { this._writeHierInput.value = cfg.writeHierarchies; }
                 if (cfg.noValueMembers !== undefined)    { this._noValueInput.value = cfg.noValueMembers; }
                 if (cfg.deleteValue !== undefined)       { this._deleteValueInput.value = cfg.deleteValue; }
+                if (cfg.baseCopyMembers !== undefined)   { this._baseCopyInput.value = cfg.baseCopyMembers; }
             } catch(ex) {}
         }
 

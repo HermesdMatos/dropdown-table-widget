@@ -176,6 +176,47 @@
     return { binding: binding, dataBindings: dbs, R: R };
   }
 
+  // Base NÃO APLICÁVEL pré-definida (Data Action): C1 tem QTDE=2 e CUSTO=10 com Responsabilidade e
+  // Periodicidade em NÃO APLICÁVEL. variant: "base" (só a base), "saved" (+ SAPORE/Mensal gravado
+  // com os mesmos valores) ou "savedZero" (+ SAPORE/Mensal zerado).
+  function presetScenario(variant) {
+    var R = "[RESPONSABILIDADE].[H1].&";
+    var c1 = cell(CONTA + "[C1]", "Conta 1", CONTA + "[ROOT]");
+    var respNode = cell(R + "[RESP_ALL]", "Responsabilidade");
+    var perNode = cell(PER + "[PER_ALL]", "Periodos");
+    var leaf = function(prefix, id, label, node) { return cell(prefix + "[" + id + "]", label, prefix + "[" + node + "]"); };
+    var data = [
+      { dimensions_0: cell(CONTA + "[ROOT]", "Contas"), dimensions_1: respNode, dimensions_2: perNode, measures_0: measure(null, ""), measures_1: measure(null, "") },
+      { dimensions_0: c1, dimensions_1: leaf(R, "NA", "NÃO APLICÁVEL", "RESP_ALL"), dimensions_2: leaf(PER, "NA", "NÃO APLICÁVEL", "PER_ALL"), measures_0: measure(2, "2"), measures_1: measure(10, "10,00") }
+    ];
+    if (variant === "saved" || variant === "savedZero") {
+      var v = variant === "saved";
+      data.push({ dimensions_0: c1, dimensions_1: leaf(R, "SAP", "SAPORE", "RESP_ALL"), dimensions_2: leaf(PER, "MENSAL", "Mensal", "PER_ALL"),
+        measures_0: measure(v ? 2 : 0, v ? "2" : "0"), measures_1: measure(v ? 10 : 0, v ? "10,00" : "0,00") });
+    }
+    var binding = {
+      state: "success",
+      metadata: {
+        feeds: { dimensions: { values: ["dimensions_0", "dimensions_1", "dimensions_2"] }, measures: { values: ["measures_0", "measures_1"] } },
+        dimensions: { dimensions_0: { id: "CONTA" }, dimensions_1: { id: "RESPONSABILIDADE" }, dimensions_2: { id: "PERIODICIDADE" } },
+        mainStructureMembers: { measures_0: { id: "QTDE", label: "Quantidade" }, measures_1: { id: "CUSTO", label: "Custo" } }
+      },
+      data: data
+    };
+    var members = {
+      RESPONSABILIDADE: [{ id: R + "[SAP]", description: "SAPORE" }, { id: R + "[CLI]", description: "CLIENTE" }, { id: R + "[NA]", description: "NÃO APLICÁVEL" }],
+      PERIODICIDADE: [{ id: PER + "[MENSAL]", description: "Mensal" }, { id: PER + "[NA]", description: "NÃO APLICÁVEL" }]
+    };
+    var dbs = {
+      getDataBinding: function() {
+        return Promise.resolve({ getDataSource: function() {
+          return Promise.resolve({ getMembers: function(dimId) { return Promise.resolve(members[dimId] || []); } });
+        } });
+      }
+    };
+    return { binding: binding, dataBindings: dbs, R: R };
+  }
+
   // FINANCEIRO > SEGUROS (conta) e FINANCEIRO > MÁQUINA DE CARTÃO > 3 máquinas (netos).
   // Só a "Máquina simples" tem valor (ou duas, com twoWithValues).
   function grandchildrenScenario(twoWithValues) {
@@ -200,5 +241,5 @@
     return b;
   }
 
-  window.DTMock = { grandchildrenScenario: grandchildrenScenario, twoMeasuresScenario: twoMeasuresScenario, mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, mainBindingWithParentLevels: mainBindingWithParentLevels, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
+  window.DTMock = { presetScenario: presetScenario, grandchildrenScenario: grandchildrenScenario, twoMeasuresScenario: twoMeasuresScenario, mainBinding: mainBinding, mainBindingWithBookedLeaves: mainBindingWithBookedLeaves, mainBindingWithParentLevels: mainBindingWithParentLevels, childrenBinding: childrenBinding, valuesBinding: valuesBinding, dataBindings: dataBindings, PER: PER, RESP: RESP, CONTA: CONTA };
 })();

@@ -25,11 +25,18 @@ O `setUserInput` só existe no planejamento de uma **Tabela** (a API de custom w
 
 - **Hierarquias** da tabela de gravação, uma por linha: `PERIODICIDADE=Periodos_H1`
 - **Membros que não recebem valor**: padrão `RESPONSABILIDADE=CLIENTE` (campo vazio = padrão) — todas as medidas da linha travam mostrando 0 e gravam 0, inclusive as que estavam vazias. Compara pelo ID e pela descrição do membro
+- **Liberação e base NÃO APLICÁVEL**: padrão `RESPONSABILIDADE=SAPORE` (campo vazio = regra desligada). Ver a regra abaixo.
 - **Valor para apagar**: `0` (padrão). Usado no endereço antigo quando a combinação muda, em células apagadas e nos membros acima. O `setUserInput` recusa vazio ("Preenchimento obrigatório"); para null de verdade seria preciso uma Data Action que apague os zeros depois do save.
 
 ### Regras de negócio aplicadas pelo widget
 
-- **Tudo NÃO APLICÁVEL**: com as dimensões de dropdown todas em NÃO APLICÁVEL (ou sem valor), as medidas ficam bloqueadas — escolha as dimensões antes de informar valores.
+- **Base NÃO APLICÁVEL (valores pré-definidos)**: uma Data Action grava, por cliente, valores na combinação com todas as dimensões em NÃO APLICÁVEL. A conta abre mostrando esses valores **travados**, e as demais dimensões só liberam depois da Responsabilidade.
+  - **SAPORE** libera as medidas com os valores da base e, ao salvar, **copia** esses valores para a combinação escolhida.
+  - **CLIENTE** grava 0 e trava.
+  - A **base nunca é gravada**: nem zerada, nem sobrescrita.
+  - Voltar a Responsabilidade para NÃO APLICÁVEL zera a combinação anterior e mostra a base de novo.
+  - Depois de salvo, a tabela mostra a combinação real; a base não conta para o alerta ⚠.
+- **Tudo NÃO APLICÁVEL** (regra acima desligada): com as dimensões de dropdown todas em NÃO APLICÁVEL (ou sem valor), as medidas ficam bloqueadas — escolha as dimensões antes de informar valores.
 - **Membro sem valor** (ex: CLIENTE): medidas travadas mostrando 0; grava 0.
 - **Troca de dimensão** move só as medidas com valor (zera a combinação antiga). Linha sem valor nenhum só registra a escolha.
 - **Gravação que falha** (`setWriteResult(i, false)`) continua pendente e destacada em vermelho após `clearPendingChanges()`.
@@ -134,7 +141,7 @@ A partir daí, merges na `main` não afetam a produção.
 ### Cada versão
 
 1. Pull Request da branch → merge na `main`.
-2. `git tag v2.14.0 && git push origin v2.14.0`
-3. `node tools/release-prod.js v2.14.0 --check` → commit do `dropdowntable.json` na `main`.
+2. `git tag vX.Y.Z && git push origin vX.Y.Z`
+3. `node tools/release-prod.js vX.Y.Z --check` → commit do `dropdowntable.json` na `main` (jsDelivr), **ou** `node tools/release-sac.js vX.Y.Z` → JSON + zip em `dist/` para hospedar no próprio SAC (Criar widget a partir de arquivo).
 4. No SAC: importar `dropdowntable.json` e validar a story de produção.
 5. **Rollback**: reimportar o `dropdowntable.json` da versão anterior (ex: `git show v2.11.25:dropdowntable.json`). As URLs ficam fixas no tag, então a versão antiga continua publicada.
