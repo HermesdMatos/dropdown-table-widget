@@ -125,6 +125,11 @@ TMPL.innerHTML = `
   }
   .cell-dropdown:hover { box-shadow: inset 0 0 0 1px var(--sap-brand-hover); background: #ffffff; }
   .cell-dropdown:focus, .cell-dropdown.active { box-shadow: inset 0 0 0 2px var(--sap-brand); background: #ffffff; }
+  /* Travado pela regra de liberação (ex: Responsabilidade ainda em NÃO APLICÁVEL) */
+  .cell-dropdown.dt-dd-locked, .cell-dropdown.dt-dd-locked:hover {
+    cursor: not-allowed; background: var(--sap-readonly-bg); box-shadow: none;
+  }
+  .cell-dropdown.dt-dd-locked .cell-value, .cell-dropdown.dt-dd-locked .cell-arrow { color: var(--sap-label); }
   .cell-value {
     flex: 1;
     padding: 0 28px 0 6px;
@@ -590,6 +595,9 @@ class DropdownTableWidget extends HTMLElement {
     this._writeHierarchies = {};               // {DIM: "HIERARQUIA"} da tabela do setUserInput
     this._noValueMembers = { RESPONSABILIDADE: ["CLIENTE"] }; // membros que gravam 0 em todas as medidas
     this._deleteValue = "0";                   // "apagar": setUserInput recusa vazio
+    // Liberação + base NÃO APLICÁVEL: a dimensão (chave) libera as demais e as medidas; o membro
+    // listado copia os valores da base (combinação toda em NÃO APLICÁVEL), que nunca é gravada
+    this._baseCopyMembers = { RESPONSABILIDADE: ["SAPORE"] };
     this._availableDimensions = "[]";
 
     // ── Estado de edição ──
@@ -955,7 +963,10 @@ class DropdownTableWidget extends HTMLElement {
         vbKeys.push(vbKeyById[this._dimRealId(mainKey)] || mainKey);
       }
 
-      // Por conta, fica a linha com maior soma absoluta das medidas (a combinação gravada)
+      // Por conta, fica a linha com maior soma absoluta das medidas (a combinação gravada).
+      // Regra de liberação ativa: antes a prioridade (real ≠ 0 → CLIENTE → base → zeradas)
+      var gate = this._gateConfig();
+      this._memberLabelIndex = {};
       var best = {};
       for (var r = 0; r < vb.data.length; r++) {
         var row = vb.data[r];
@@ -968,7 +979,14 @@ class DropdownTableWidget extends HTMLElement {
             if (!isNaN(n)) { val = val + Math.abs(n); }
           }
         }
-        if (!best[acc] || val > best[acc].val) { best[acc] = { row: row, val: val }; }
+        var rank = 0;
+        if (gate) {
+          var combo = this._rowComboAddr(row, function(i) { return vbKeys[i]; });
+          rank = this._comboRank(combo.addr, combo.labels, val > 0, null);
+        }
+        if (!best[acc] || rank > best[acc].rank || (rank === best[acc].rank && val > best[acc].val)) {
+          best[acc] = { row: row, val: val, rank: rank };
+        }
       }
 
       var map = {};
@@ -1237,6 +1255,8 @@ class DropdownTableWidget extends HTMLElement {
         this._noValueMembers = nvmAny ? nvm : { RESPONSABILIDADE: ["CLIENTE"] };
       }
       if (cfg.deleteValue      !== undefined) { this._deleteValue      = String(cfg.deleteValue); }
+      // Campo vazio no painel = regra desligada (comportamento anterior)
+      if (cfg.baseCopyMembers  !== undefined) { this._baseCopyMembers  = this._parseRuleLines(cfg.baseCopyMembers, true); }
       if (cfg.saveBtnLabel     !== undefined) {
         var btnEl = this.shadowRoot.getElementById("dt-save-btn");
         if (btnEl) { btnEl.textContent = cfg.saveBtnLabel || "Salvar"; }
@@ -1351,22 +1371,28 @@ class DropdownTableWidget extends HTMLElement {
     return out;
   }
 
-  // "DIM|~|[DIM].[H].&[ID]|||..." → [{dim, member}] com a hierarquia da tabela de gravação
-  _addrToPairs(addrStr) {
+  // "DIM|~|MEMBRO|||..." → [{dim, member}] como estão no endereço (sem trocar a hierarquia)
+  _addrToPairsRaw(addrStr) {
     var pairs = [];
     var parts = String(addrStr || "").split("|||");
     for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      var sep = p.indexOf("|~|");
+      var sep = parts[i].indexOf("|~|");
       if (sep === -1) { continue; }
-      var dim = p.substring(0, sep).trim();
-      var mem = p.substring(sep + 3).trim();
-      if (!dim || !mem) { continue; }
-      var hier = this._writeHierarchies[dim];
-      if (hier && mem.indexOf(".&[") !== -1) {
-        mem = "[" + dim + "].[" + hier + "].&[" + this._cleanMemberId(mem) + "]";
+      var dim = parts[i].substring(0, sep).trim();
+      var mem = parts[i].substring(sep + 3).trim();
+      if (dim && mem) { pairs.push({ dim: dim, member: mem }); }
+    }
+    return pairs;
+  }
+
+  // "DIM|~|[DIM].[H].&[ID]|||..." → [{dim, member}] com a hierarquia da tabela de gravação
+  _addrToPairs(addrStr) {
+    var pairs = this._addrToPairsRaw(addrStr);
+    for (var i = 0; i < pairs.length; i++) {
+      var hier = this._writeHierarchies[pairs[i].dim];
+      if (hier && pairs[i].member.indexOf(".&[") !== -1) {
+        pairs[i].member = "[" + pairs[i].dim + "].[" + hier + "].&[" + this._cleanMemberId(pairs[i].member) + "]";
       }
-      pairs.push({ dim: dim, member: mem });
     }
     return pairs;
   }
@@ -1378,11 +1404,14 @@ class DropdownTableWidget extends HTMLElement {
     return keys.join("|");
   }
 
-  // Membro configurado como "não recebe valor" (ex: RESPONSABILIDADE=CLIENTE;NÃO APLICÁVEL)
-  // Compara pelo ID e pela descrição do membro (o ID técnico pode não ser o texto "CLIENTE")
-  _isNoValueAddress(pairs) {
+  // Membro configurado como "não recebe valor" (ex: RESPONSABILIDADE=CLIENTE)
+  _isNoValueAddress(pairs) { return this._matchesRule(pairs, this._noValueMembers); }
+
+  // Algum par {dim, member} está num membro da regra {DIM: [MEMBRO, ...]}? Compara ID limpo e
+  // descrição, sem acento/caixa/espaços (o ID técnico pode não ser o texto "CLIENTE")
+  _matchesRule(pairs, rules) {
     for (var i = 0; i < pairs.length; i++) {
-      var rule = this._noValueMembers[pairs[i].dim];
+      var rule = rules[pairs[i].dim];
       if (!rule) { continue; }
       var idNorm = this._normalizeLabel(this._cleanMemberId(pairs[i].member));
       var labelNorm = this._normalizeLabel(this._memberLabel(pairs[i].dim, pairs[i].member));
@@ -1392,6 +1421,107 @@ class DropdownTableWidget extends HTMLElement {
       }
     }
     return false;
+  }
+
+  _addrToPairsList(addrObj) {
+    var pairs = [];
+    for (var k in addrObj) { pairs.push({ dim: k, member: addrObj[k] }); }
+    return pairs;
+  }
+
+  // ─── Base NÃO APLICÁVEL + liberação (painel → "Liberação e base NÃO APLICÁVEL") ───
+  // Regra ativa só no modo sem script e quando a dimensão configurada é um dropdown do binding.
+  // Retorna {key: "dimensions_N", dim: "RESPONSABILIDADE", members: ["SAPORE"]} ou null.
+  _gateConfig() {
+    if (!this._metadata || !this._metadata.feeds || !this._isExplicitDropdownMode()) { return null; }
+    var count = this._metadata.feeds.dimensions.values.length;
+    for (var dim in (this._baseCopyMembers || {})) {
+      for (var i = 1; i < count; i++) {
+        var key = "dimensions_" + i;
+        if (this._dimRealId(key) === dim && this._isDropdownDimension(key)) {
+          return { key: key, dim: dim, members: this._baseCopyMembers[dim] };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Membro vazio ou o membro padrão (emptyDefaultLabel, ex: NÃO APLICÁVEL), por ID, descrição
+  // ou pela opção padrão da dimensão
+  _isDefaultMemberId(feedKey, member, label, nodeId) {
+    if (!member) { return true; }
+    var target = this._normalizeLabel(this._emptyDefaultLabel);
+    if (!target) { return false; }
+    if (this._normalizeLabel(this._cleanMemberId(member)) === target) { return true; }
+    if (label && this._normalizeLabel(label) === target) { return true; }
+    if (this._normalizeLabel(this._memberLabel(this._dimRealId(feedKey), member)) === target) { return true; }
+    var def = this._getDefaultMember(feedKey, [nodeId || ""], null);
+    return !!(def && this._cleanMemberId(def.value) === this._cleanMemberId(member));
+  }
+
+  // Base = todas as dimensões de dropdown vazias ou em NÃO APLICÁVEL.
+  // addrObj: {DIM_REAL: membro}; labels (opcional): {DIM_REAL: descrição}; nodeRow: linha do binding
+  _isBaseAddress(addrObj, labels, nodeRow) {
+    if (!this._metadata || !this._metadata.feeds) { return false; }
+    var count = this._metadata.feeds.dimensions.values.length;
+    var dropdownDims = 0;
+    for (var i = 1; i < count; i++) {
+      var key = "dimensions_" + i;
+      if (!this._isDropdownDimension(key)) { continue; }
+      dropdownDims++;
+      var real = this._dimRealId(key);
+      var nodeId = nodeRow ? (nodeRow[key] || {}).id : "";
+      if (!this._isDefaultMemberId(key, addrObj[real], labels ? labels[real] : "", nodeId)) { return false; }
+    }
+    return dropdownDims > 0;
+  }
+
+  // Linha do binding como endereço {DIM_REAL: id} + descrições (dimensões de dropdown)
+  _rowComboAddr(rowData, keyOf) {
+    var addr = {}, labels = {};
+    var count = this._metadata.feeds.dimensions.values.length;
+    for (var i = 1; i < count; i++) {
+      var key = "dimensions_" + i;
+      var c = rowData[keyOf ? keyOf(i) : key] || {};
+      var real = this._dimRealId(key);
+      if (c.id && this._cleanMemberId(c.id) !== "#") { addr[real] = c.id; labels[real] = c.label || ""; }
+    }
+    return { addr: addr, labels: labels };
+  }
+
+  // Prioridade de uma combinação gravada (regra ativa): 3 = combinação real com valor ≠ 0;
+  // 2 = membro "não recebe valor" (ex: CLIENTE = 0); 1 = base NÃO APLICÁVEL; 0 = demais zeradas
+  _comboRank(addr, labels, nonZero, nodeRow) {
+    if (this._isBaseAddress(addr, labels, nodeRow)) { return 1; }
+    if (nonZero) { return 3; }
+    if (this._isNoValueAddress(this._addrToPairsList(addr))) { return 2; }
+    // Descrição que veio na própria linha do binding (as opções podem ainda não ter carregado)
+    for (var dim in labels) {
+      var rule = this._noValueMembers[dim];
+      for (var j = 0; rule && labels[dim] && j < rule.length; j++) {
+        if (this._normalizeLabel(rule[j]) === this._normalizeLabel(labels[dim])) { return 2; }
+      }
+    }
+    return 0;
+  }
+
+  // Dimensão de liberação (ex: RESPONSABILIDADE) ainda em NÃO APLICÁVEL na linha → demais
+  // dropdowns e medidas travados
+  _gateBlocks(addrObj, gate) {
+    gate = gate || this._gateConfig();
+    if (!gate) { return false; }
+    return this._isDefaultMemberId(gate.key, addrObj[gate.dim], "", "");
+  }
+
+  // Linha base da conta no binding (valores pré-definidos pela Data Action), ou -1
+  _baseRowIndex(accountId) {
+    for (var r = 0; r < (this._data || []).length; r++) {
+      var row = this._data[r];
+      if ((row["dimensions_0"] || {}).id !== accountId || !this._rowHasData(row)) { continue; }
+      var combo = this._rowComboAddr(row);
+      if (this._isBaseAddress(combo.addr, combo.labels, row)) { return r; }
+    }
+    return -1;
   }
 
   // Descrição de um membro (dimensão pelo ID real) a partir das opções e seleções conhecidas.
@@ -1446,6 +1576,17 @@ class DropdownTableWidget extends HTMLElement {
       writes.push({ pairs: pairs, measureId: measureId, value: value, sources: [source], failed: false });
     }
 
+    // Regra de liberação ativa: a base NÃO APLICÁVEL (valores pré-definidos pela Data Action)
+    // nunca é gravada — trocar a partir dela copia o valor, e voltar para ela só zera a anterior
+    var protectBase = this._gateConfig() !== null;
+    var isBase = function(addrStr) {
+      if (!protectBase) { return false; }
+      var obj = {};
+      var raw = self._addrToPairsRaw(addrStr);
+      for (var p = 0; p < raw.length; p++) { obj[raw[p].dim] = raw[p].member; }
+      return self._isBaseAddress(obj, null, null);
+    };
+
     for (var i = 0; i < (this._pendingChanges || []).length; i++) {
       var ch = this._pendingChanges[i];
       var mId = ch.measureId || "";
@@ -1454,9 +1595,10 @@ class DropdownTableWidget extends HTMLElement {
       var newPairs = this._addrToPairs(ch.newAddr);
       // Combinação mudou: apaga o endereço antigo (sem sobrescrever um valor novo já gravado nele).
       // noMove: a linha não tinha valor — não há o que apagar na combinação antiga.
-      if (!ch.noMove && ch.oldAddr && ch.oldAddr !== ch.newAddr && oldPairs.length > 0) {
+      if (!ch.noMove && ch.oldAddr && ch.oldAddr !== ch.newAddr && oldPairs.length > 0 && !isBase(ch.oldAddr)) {
         put(oldPairs, mId, this._deleteValue, true, i);
       }
+      if (isBase(ch.newAddr)) { continue; }
       var value = ch.value === undefined || ch.value === null ? "" : String(ch.value).trim();
       if (value === "" || this._isNoValueAddress(newPairs)) { value = this._deleteValue; }
       put(newPairs, mId, value, false, i);
@@ -1541,37 +1683,36 @@ class DropdownTableWidget extends HTMLElement {
   //  "noValue"  → alguma dimensão num membro que não recebe valor (ex: RESPONSABILIDADE=CLIENTE):
   //               medidas travadas mostrando 0 (é o que será gravado)
   //  "noDims"   → todas as dimensões de dropdown em NÃO APLICÁVEL (ou sem valor): escolha as
-  //               dimensões antes de informar valores
+  //               dimensões antes de informar valores. Com a regra de liberação ativa: a dimensão
+  //               de liberação (ex: RESPONSABILIDADE) em NÃO APLICÁVEL — a linha mostra a base
+  //               pré-definida, travada
   _getRowLockState(rowIndex) {
     if (!this._isExplicitDropdownMode() || !this._data || !this._data[rowIndex]) { return ""; }
     var addr = this._buildRowAddrObj(rowIndex, null, true);
-    var pairs = [];
-    for (var ak in addr) { pairs.push({ dim: ak, member: addr[ak] }); }
-    if (this._isNoValueAddress(pairs)) { return "noValue"; }
-    var count = this._metadata.feeds.dimensions.values.length;
-    var dropdownDims = 0;
-    var notApplicable = 0;
-    var defaultNorm = this._normalizeLabel(this._emptyDefaultLabel);
-    for (var i = 1; i < count; i++) {
-      var key = "dimensions_" + i;
-      if (!this._isDropdownDimension(key)) { continue; }
-      dropdownDims++;
-      var member = addr[this._dimRealId(key)];
-      if (!member || (defaultNorm && this._normalizeLabel(this._cleanMemberId(member)) === defaultNorm)) {
-        notApplicable++;
-        continue;
-      }
-      var def = this._getDefaultMember(key, [(this._data[rowIndex][key] || {}).id], null);
-      if (def && def.value === member) { notApplicable++; }
-    }
-    return dropdownDims > 0 && notApplicable === dropdownDims ? "noDims" : "";
+    if (this._isNoValueAddress(this._addrToPairsList(addr))) { return "noValue"; }
+    var gate = this._gateConfig();
+    if (gate) { return this._gateBlocks(addr, gate) ? "noDims" : ""; }
+    return this._isBaseAddress(addr, null, this._data[rowIndex]) ? "noDims" : "";
   }
 
-  // Aplica o bloqueio nas células de medida da linha (render e após troca de dropdown)
+  // Aplica o bloqueio nas células de medida da linha (render e após troca de dropdown) e, com a
+  // regra de liberação ativa, nos demais dropdowns enquanto a liberação estiver em NÃO APLICÁVEL
   _applyRowLock(rowIndex, trEl) {
     var tr = trEl || this.shadowRoot.querySelector('tbody tr[data-row-index="' + rowIndex + '"]');
     if (!tr) { return; }
     var state = this._getRowLockState(rowIndex);
+    var gate = this._gateConfig();
+    var gateLabel = gate ? (this._dimLabels[parseInt(gate.key.replace("dimensions_", ""), 10)] || gate.dim) : "";
+    var ddLocked = !!gate && state !== "noValue" && this._gateBlocks(this._buildRowAddrObj(rowIndex, null, true), gate);
+    var dds = tr.querySelectorAll(".cell-dropdown");
+    for (var d = 0; d < dds.length; d++) {
+      var dd = dds[d];
+      if (!dd._feedKey || dd._feedKey === "dimensions_0" || (gate && dd._feedKey === gate.key)) { continue; }
+      var lock = ddLocked;
+      dd.classList.toggle("dt-dd-locked", lock);
+      dd.tabIndex = lock ? -1 : 0;
+      dd.title = lock ? "Escolha " + gateLabel + " primeiro" : "";
+    }
     var inputs = tr.querySelectorAll("td.dt-mcell input");
     for (var i = 0; i < inputs.length; i++) {
       var inp = inputs[i];
@@ -1591,9 +1732,18 @@ class DropdownTableWidget extends HTMLElement {
         inp.value = this._deleteValue === "" ? "0" : this._deleteValue;
         inp.title = "Responsabilidade sem valor (ex: CLIENTE) — grava " + (this._deleteValue === "" ? "0" : this._deleteValue);
       } else {
-        inp.title = "Escolha as dimensões antes de informar valores";
+        inp.title = gate ? "Valor pré-definido (NÃO APLICÁVEL) — escolha " + gateLabel + " para editar" : "Escolha as dimensões antes de informar valores";
       }
     }
+  }
+
+  // Dropdown travado pela regra de liberação (o clique é ignorado)
+  _isDropdownLocked(rowIndex, feedKey) {
+    var gate = this._gateConfig();
+    if (!gate || !feedKey || feedKey === "dimensions_0" || feedKey === gate.key) { return false; }
+    var addr = this._buildRowAddrObj(rowIndex, null, true);
+    if (this._isNoValueAddress(this._addrToPairsList(addr))) { return false; }
+    return this._gateBlocks(addr, gate);
   }
   // Limpa no DOM a última medida editada (sem re-render)
   clearMeasureInput() {
@@ -2625,6 +2775,7 @@ class DropdownTableWidget extends HTMLElement {
     // Evita exibir linha zerada (ex: CLIENTE=0) quando existe linha com valor real (ex: SAPORE=6)
     var bestRowByDim0 = {};
     var combosByAccount = {};
+    var gateCfg = this._gateConfig(); // regra de liberação: base NÃO APLICÁVEL só aparece sem combinação real
     for (var br = 0; br < this._data.length; br++) {
       var brCell = this._data[br]["dimensions_0"] || {};
       if (!brCell.id) { continue; }
@@ -2662,8 +2813,16 @@ class DropdownTableWidget extends HTMLElement {
           if (!brSaved[bsk] || ((this._data[br][bsk] || {}).id !== brSaved[bsk].id)) { brMatchesSaved = false; break; }
         }
       }
-      // Combinações completas com valor ≠ 0 por conta (mais de uma = dado inconsistente)
-      if (brNonZero && brLeaves === dimensions.length - 1) {
+      // Regra de liberação: só combinações completas entram na prioridade (real ≠ 0 → CLIENTE →
+      // base → zeradas); linhas de nó ficam abaixo de todas
+      var brRank = -1;
+      if (gateCfg && brHasData && brLeaves === dimensions.length - 1) {
+        var brCombo = this._rowComboAddr(this._data[br]);
+        brRank = this._comboRank(brCombo.addr, brCombo.labels, brNonZero, this._data[br]);
+      }
+      // Combinações completas com valor ≠ 0 por conta (mais de uma = dado inconsistente).
+      // A base NÃO APLICÁVEL (valores pré-definidos) não conta.
+      if (brNonZero && brLeaves === dimensions.length - 1 && brRank !== 1) {
         if (!combosByAccount[brCell.id]) { combosByAccount[brCell.id] = {}; }
         combosByAccount[brCell.id][brComboKey] = true;
       }
@@ -2672,12 +2831,14 @@ class DropdownTableWidget extends HTMLElement {
       if (brBest === undefined) { brWins = true; }
       else if (brHasData !== brBest.hasData) { brWins = brHasData; }
       else if (!brHasData) { brWins = brLeaves < brBest.leaves; }
+      else if (gateCfg && brMatchesSaved !== brBest.matchesSaved) { brWins = brMatchesSaved; }
+      else if (gateCfg && brRank !== brBest.rank) { brWins = brRank > brBest.rank; }
       else if (brNonZero !== brBest.nonZero) { brWins = brNonZero; }
       else if (brLeaves !== brBest.leaves) { brWins = brLeaves > brBest.leaves; }
       else if (brMatchesSaved !== brBest.matchesSaved) { brWins = brMatchesSaved; }
       else { brWins = brVal > brBest.val; }
       if (brWins) {
-        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal, leaves: brLeaves, hasData: brHasData, nonZero: brNonZero, matchesSaved: brMatchesSaved };
+        bestRowByDim0[brCell.id] = { rowIndex: br, val: brVal, leaves: brLeaves, hasData: brHasData, nonZero: brNonZero, matchesSaved: brMatchesSaved, rank: brRank };
       }
     }
     this._multiComboAccounts = {};
@@ -3100,6 +3261,7 @@ class DropdownTableWidget extends HTMLElement {
     var wrapper = document.createElement("div");
     wrapper.className = "cell-dropdown";
     wrapper.tabIndex  = 0;
+    wrapper._feedKey  = dimensionId; // usado pela trava de liberação (_applyRowLock)
     // Aplica alinhamento via justify-content
     var align = self._cellAlign || "left";
     if (align === "center") { wrapper.style.justifyContent = "center"; }
@@ -3121,6 +3283,7 @@ class DropdownTableWidget extends HTMLElement {
 
     wrapper.addEventListener("click", function(e) {
       e.stopPropagation();
+      if (!onPick && self._isDropdownLocked(rowIndex, dimensionId)) { self._closeDropdown(); return; }
       var effectiveId = wrapper._currentId !== undefined ? wrapper._currentId : currentId;
       self._openDropdown(wrapper, rowIndex, dimensionId, effectiveId, options, onPick);
     });
@@ -3238,6 +3401,13 @@ class DropdownTableWidget extends HTMLElement {
     this._localSelections[dim0Key][dimensionId] = { id: technicalId, label: memberLabel };
     this._selectionRowIndex[dim0Key] = rowIndex;
 
+    // Liberação voltou para NÃO APLICÁVEL: as demais dimensões (travadas) voltam junto, e a linha
+    // volta a ser a base
+    var gate = this._gateConfig();
+    if (gate && dimensionId === gate.key && this._isDefaultMemberId(gate.key, technicalId, memberLabel, "")) {
+      this._resetDropdownsToDefault(rowIndex, gate.key);
+    }
+
     if (cellWrapper) {
       var valSpan = cellWrapper.querySelector(".cell-value");
       if (valSpan) { valSpan.textContent = memberLabel; valSpan.className = "cell-value"; }
@@ -3250,6 +3420,9 @@ class DropdownTableWidget extends HTMLElement {
     var newAddr = this._serializeAddrObj(targetObj);
     this._newRowAddrStr = newAddr;
     var change = this._registerDropdownMove(rowIndex, this._oldRowAddrStr, newAddr, targetObj);
+
+    // Voltou para a base (regra de liberação): a linha mostra de novo os valores pré-definidos
+    if (this._gateConfig() && this._isBaseAddress(targetObj, null, null)) { this._showBaseValues(rowIndex, newAddr); }
 
     // Responsabilidade CLIENTE trava/mostra 0; sair de tudo NÃO APLICÁVEL libera as medidas
     this._applyRowLock(rowIndex);
@@ -3269,6 +3442,49 @@ class DropdownTableWidget extends HTMLElement {
       pendingChanges:         this._serializePendingChanges(this._pendingChanges)
     });
     this._emitEvent("onDropdownChanged", this._selectedCellData);
+  }
+
+  // Seleção local do membro padrão (NÃO APLICÁVEL) em todas as dimensões de dropdown da linha,
+  // exceto exceptKey; atualiza as células na tela
+  _resetDropdownsToDefault(rowIndex, exceptKey) {
+    var rowData = this._data[rowIndex] || {};
+    var dim0Key = this._rowKey(rowIndex);
+    var tr = this.shadowRoot.querySelector('tbody tr[data-row-index="' + rowIndex + '"]');
+    var dds = tr ? tr.querySelectorAll(".cell-dropdown") : [];
+    var count = this._metadata.feeds.dimensions.values.length;
+    for (var i = 1; i < count; i++) {
+      var key = "dimensions_" + i;
+      if (key === exceptKey || !this._isDropdownDimension(key)) { continue; }
+      var def = this._getDefaultMember(key, [(rowData[key] || {}).id], null);
+      if (!def) { continue; }
+      this._localSelections[dim0Key][key] = { id: def.value, label: def.label };
+      for (var d = 0; d < dds.length; d++) {
+        if (dds[d]._feedKey !== key) { continue; }
+        var span = dds[d].querySelector(".cell-value");
+        if (span) { span.textContent = def.label; span.className = "cell-value"; }
+        dds[d]._currentId = def.value;
+        dds[d].classList.add("changed-cell");
+      }
+    }
+  }
+
+  // Valores da base NÃO APLICÁVEL da conta (Data Action) de volta na linha: inputs, medidas locais
+  // e valor exibido do endereço. Sem linha base no binding, as medidas ficam vazias.
+  _showBaseValues(rowIndex, baseAddr) {
+    var bi = this._baseRowIndex(this._rowKey(rowIndex));
+    var baseRow = bi === -1 ? {} : this._data[bi];
+    var tr = this.shadowRoot.querySelector('tbody tr[data-row-index="' + rowIndex + '"]');
+    var inputs = tr ? tr.querySelectorAll("td.dt-mcell input") : [];
+    var count = this._metadata.feeds.measures ? this._metadata.feeds.measures.values.length : 0;
+    if (!this._localMeasures[rowIndex]) { this._localMeasures[rowIndex] = {}; }
+    for (var i = 0; i < count; i++) {
+      var key = "measures_" + i;
+      var text = this._formatMeasureCell(baseRow[key]);
+      // "" (sem valor) também fica registrado: a próxima troca copia da base, não da linha exibida
+      this._localMeasures[rowIndex][key] = this._toCanonicalNumber(text);
+      this._setLocalCellValue(baseAddr, this._getMeasureIdByKey(key), text);
+      if (inputs[i]) { inputs[i].value = text; inputs[i]._valueBeforeLock = text; }
+    }
   }
 
   // Alterações pendentes da troca de combinação. Move só as medidas que têm valor (zera a

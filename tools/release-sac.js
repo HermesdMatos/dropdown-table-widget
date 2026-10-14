@@ -106,10 +106,17 @@ function main() {
     const baseTag = wc.tag.replace(/-dev$/, "");
     wc.tag = dev ? baseTag + "-dev" : baseTag;
     if (dev) {
-      // Sem ?tag= na URL hospedada: o nome do elemento DEV vai direto no padrão do arquivo
-      const from = '"' + baseTag + '";';
-      if (text.indexOf(from) === -1) { throw new Error("Tag padrão não encontrada em " + file + ": " + from); }
-      text = text.replace(from, '"' + wc.tag + '";');
+      // Sem ?tag= na URL hospedada: o nome do elemento DEV vai direto na variável da tag
+      // (DT_TAG no widget, STYLING_TAG no painel). Só a atribuição — o comentário acima dela
+      // também contém o nome entre aspas e não pode ser o alvo da troca.
+      const assign = new RegExp('((?:var|let|const)\\s+(?:DT_TAG|STYLING_TAG)\\s*=\\s*)"' + baseTag + '";');
+      if (!assign.test(text)) { throw new Error("Atribuição da tag não encontrada em " + file + " (DT_TAG/STYLING_TAG = \"" + baseTag + "\")"); }
+      text = text.replace(assign, '$1"' + wc.tag + '";');
+    }
+    // Conferência: a variável da tag precisa valer exatamente a tag declarada no JSON
+    const defined = text.match(/(?:var|let|const)\s+(?:DT_TAG|STYLING_TAG)\s*=\s*"([^"]+)";/);
+    if (!defined || defined[1] !== wc.tag) {
+      throw new Error(file + ": o elemento seria registrado como \"" + (defined ? defined[1] : "?") + "\", mas o JSON declara \"" + wc.tag + "\"");
     }
     const data = Buffer.from(text, "utf8");
     entries.push({ name: file, data: data });

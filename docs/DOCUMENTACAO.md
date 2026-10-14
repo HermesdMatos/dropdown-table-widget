@@ -373,6 +373,8 @@ flowchart TD
 
 ### 5.6 `_registerDropdownMove` — mover valores na troca de combinação
 
+> Com a regra **"Liberação e base NÃO APLICÁVEL"** ativa (RN-31), o movimento abaixo continua sendo registrado, mas a lista de gravação (`_buildWriteList`) **nunca grava na base**: sair da base vira **cópia** (a base não é zerada) e voltar para a base só zera a combinação anterior.
+
 ```mermaid
 flowchart TD
     M0(["_registerDropdownMove"]) --> M1["noValueTarget = _isNoValueAddress(destino) (ex.: CLIENTE)"]
@@ -769,6 +771,7 @@ Destino: modelo de planejamento → SAC atualiza os bindings → widget redesenh
 | `writeHierarchies` | Textarea "Hierarquias" | `DIM=HIERARQUIA` por linha: troca a hierarquia do membro na gravação. |
 | `noValueMembers` | Textarea "Membros que gravam 0" | `DIM=MEMBRO1;MEMBRO2`. Vazio = `RESPONSABILIDADE=CLIENTE`. |
 | `deleteValue` | "Valor para apagar" | Valor gravado ao apagar/zerar (padrão `0`). |
+| `baseCopyMembers` | "Liberação e base NÃO APLICÁVEL" | `DIM=MEMBRO` (padrão `RESPONSABILIDADE=SAPORE`; vazio = regra desligada). Liga RN-29 a RN-32. |
 
 > `fontStyle` e `textDecoration` são aceitos por `applyStyleConfig`, mas o painel atual não os envia.
 
@@ -1095,7 +1098,28 @@ Nome: _getRowLockState(rowIndex) / _applyRowLock(rowIndex, trEl)  (#L1545 / #L15
 Objetivo: calcular ("noValue" | "noDims" | "") e aplicar o bloqueio nos inputs da linha.
 Efeito colateral: "noValue" troca o texto do input para o valor para apagar (0) e guarda o anterior em _valueBeforeLock;
                   ao desbloquear, restaura.
-Regras: RN-10, RN-11, RN-27.
+Regras: RN-10, RN-11, RN-27, RN-29, RN-30.
+```
+
+```text
+Nome: _gateConfig / _isDefaultMemberId / _isBaseAddress / _gateBlocks / _isDropdownLocked
+Objetivo: regra "Liberação e base NÃO APLICÁVEL" (baseCopyMembers, padrão RESPONSABILIDADE=SAPORE).
+  _gateConfig → {key, dim, members} se a dimensão configurada é um dropdown do binding (modo sem script), senão null.
+  _isDefaultMemberId → membro vazio ou NÃO APLICÁVEL (ID limpo, descrição ou opção padrão).
+  _isBaseAddress → todas as dimensões de dropdown em NÃO APLICÁVEL (a "base" gravada pela Data Action).
+  _gateBlocks → a dimensão de liberação está em NÃO APLICÁVEL (trava medidas e demais dropdowns).
+  _isDropdownLocked → o clique no dropdown é ignorado enquanto a liberação estiver em NÃO APLICÁVEL.
+Regras: RN-29, RN-30.
+```
+
+```text
+Nome: _comboRank / _rowComboAddr / _baseRowIndex / _showBaseValues / _resetDropdownsToDefault
+Objetivo: base pré-definida na tela e na escolha da combinação exibida.
+  _comboRank → 3 real ≠ 0, 2 "não recebe valor" (CLIENTE), 1 base, 0 demais zeradas (usado em _render e _processValuesBinding).
+  _baseRowIndex / _showBaseValues → ao voltar para NÃO APLICÁVEL, a linha mostra de novo os valores da base da conta.
+  _resetDropdownsToDefault → a liberação voltou para NÃO APLICÁVEL: as demais dimensões voltam junto (a linha vira a base).
+Efeito colateral: _showBaseValues altera _localMeasures, _localData e os inputs da linha.
+Regras: RN-31, RN-32.
 ```
 
 ### 9.6 Gravação
@@ -1290,6 +1314,10 @@ Nome: _debugLog  (#L899)  — logs "[DropdownTable]" só com debugMode.
 | RN-26 | Rótulos de nó não são seleção | Legado: seleção de RESPONSAVEL, Periodos, FONTE, ... | Ignora e restaura o valor anterior | Não grava nó | `_isPlaceholderSelection` |
 | RN-27 | Bloqueios só no modo sem script | Modo legado | RN-10 e RN-11 não travam a tela (a gravação ainda aplica RN-10) | Compatibilidade | `_getRowLockState` |
 | RN-28 | Delete com células selecionadas | Tecla Delete com seleção de células de medida | Dispara `onCellsDeleteRequested`; o widget não apaga | Tratamento cabe ao script | `_bindSelectionKeys`, `_dispatchCellsDelete` |
+| RN-29 | Base NÃO APLICÁVEL pré-definida | Regra `baseCopyMembers` ativa (padrão `RESPONSABILIDADE=SAPORE`) e a dimensão existe entre os dropdowns | A combinação toda em NÃO APLICÁVEL (gravada por uma Data Action) aparece com as medidas travadas mostrando seus valores | Usuário vê o valor sugerido antes de decidir | `_gateConfig`, `_isBaseAddress`, `_getRowLockState` |
+| RN-30 | Responsabilidade primeiro | Mesma regra; Responsabilidade em NÃO APLICÁVEL | Demais dropdowns da linha travados ("Escolha … primeiro"); voltar a Responsabilidade para NÃO APLICÁVEL leva as demais junto | Preenchimento em ordem | `_applyRowLock`, `_isDropdownLocked`, `_resetDropdownsToDefault` |
+| RN-31 | Copiar da base, nunca gravar nela | Troca a partir da base (SAPORE, CLIENTE ou outro) ou volta para ela | A base nunca é destino nem é zerada: SAPORE recebe os valores (cópia), CLIENTE recebe 0; voltar para a base só zera a combinação anterior e mostra os valores da base | Valores pré-definidos sempre preservados | `_buildWriteList` (`protectBase`), `_showBaseValues` |
+| RN-32 | Prioridade de exibição com base | Regra ativa e a conta tem base + combinações gravadas | Combinação real ≠ 0 → membro "não recebe valor" (CLIENTE) → base → zeradas; a seleção salva na sessão vem antes; a base não conta para o ⚠ | Mostra a combinação escolhida pelo usuário | `_comboRank`, `_render` (`bestRowByDim0`), `_processValuesBinding` |
 
 ---
 
@@ -1519,7 +1547,10 @@ flowchart TD
 | Célula mostra "Selecionar..." em vez de NÃO APLICÁVEL | Membro padrão não existe nas opções ou campo vazio no painel | Painel → Valor inicial; opções da dimensão | Ajustar o texto (comparação ignora acento/caixa). |
 | Valor gravado não aparece no dropdown | `valuesBinding` não configurado ou dimensões não estão no nível folha | Builder → valuesBinding; diagnóstico `valuesBinding` | Configurar conta + dimensões folha + medida. |
 | Valor da medida aparece em dobro (ex.: 525 em vez de 262,5) | Binding sem os mesmos filtros de versão/data da story (💬 caso real) | Filtros do `myDataBinding` vs Tabela | Alinhar filtros. |
-| Medidas bloqueadas | Tudo NÃO APLICÁVEL (RN-11) ou membro "não recebe valor" (RN-10) | Tooltip do input | Escolher as dimensões / revisar `noValueMembers`. |
+| Medidas bloqueadas | Tudo NÃO APLICÁVEL (RN-11), Responsabilidade em NÃO APLICÁVEL (RN-29) ou membro "não recebe valor" (RN-10) | Tooltip do input | Escolher a Responsabilidade (SAPORE) / revisar `noValueMembers`. |
+| Periodicidade/Fonte não abrem | Responsabilidade ainda em NÃO APLICÁVEL (RN-30) | Tooltip "Escolha … primeiro" | Escolher a Responsabilidade antes. |
+| Valores da base não aparecem | Data Action não gravou para o cliente/versão/data filtrados, ou o binding não traz o nível folha NÃO APLICÁVEL | Tabela nativa filtrada em NÃO APLICÁVEL; modo diagnóstico | Rodar a Data Action / incluir as folhas no binding. |
+| Ao recarregar, aparece CLIENTE (0) em vez da base | Conta foi salva em CLIENTE e depois voltada para NÃO APLICÁVEL: o 0 continua gravado (RN-32 prioriza CLIENTE) | Tabela nativa da conta | Data Action de limpeza dos zeros (ou re-executar o preset). |
 | CLIENTE não grava 0 | Dimensão/membro com outro nome; painel com regra diferente | Painel → Gravação | Ajustar `DIM=MEMBRO`. |
 | "Preenchimento obrigatório" no save | `deleteValue` vazio | Painel → Valor para apagar | Usar `0`. |
 | `setUserInput` falha (linha vermelha) | Hierarquia errada, membro inexistente, sem permissão, célula bloqueada, contexto da Tabela | Diagnóstico `[DropdownTable] Gravação`; `writeHierarchies` | Corrigir hierarquia/permissões/filtros. |
@@ -1545,7 +1576,8 @@ flowchart TD
 | Preciso... | Onde procurar | Observação |
 |---|---|---|
 | Alterar uma regra de gravação | `_buildWriteList`, `_registerDropdownMove`, `_isNoValueAddress` | Atualizar testes H, I, J. |
-| Alterar uma regra de bloqueio | `_getRowLockState`, `_applyRowLock` | Testes I1–I4, J1. |
+| Alterar uma regra de bloqueio | `_getRowLockState`, `_applyRowLock` | Testes I1–I4, J1, P1–P10. |
+| Alterar a base NÃO APLICÁVEL / liberação | Painel → "Liberação e base NÃO APLICÁVEL" (sem código); `_gateConfig`, `_isBaseAddress`, `_comboRank`, `_buildWriteList` (`protectBase`) | Testes P1–P10. |
 | Alterar o membro padrão | Painel → Valor inicial (sem código) ou `_emptyDefaultLabel` no construtor | Testes G. |
 | Alterar a regra do CLIENTE | Painel → Gravação (sem código) ou `_noValueMembers` no construtor e em `applyStyleConfig` | O padrão aparece em dois lugares do widget e no painel. |
 | Adicionar um campo ao painel | `style-panel.js` (HTML do template, `COLOR_FIELDS` ou `_submit`/`set styleConfig`) + `applyStyleConfig` | Cor nova: uma linha em `COLOR_FIELDS` + variável CSS no widget (`CSS_VARS_*`). |
@@ -1574,6 +1606,7 @@ flowchart TD
 |---|---|---|
 | Adicionar/remover dimensão no `myDataBinding` | `_render`, `_buildRowAddrObj`, `_buildWriteList` (endereço obrigatório), painel (Dropdowns), `valuesBinding`, Tabela de gravação | Alto |
 | Renomear `RESPONSABILIDADE` ou `CLIENTE` no modelo | `_noValueMembers` (padrão), painel → Gravação, `_isNoValueAddress`, bloqueio | Alto |
+| Renomear `SAPORE` ou mudar a Data Action do preset | `_baseCopyMembers` (padrão), painel → "Liberação e base NÃO APLICÁVEL", RN-29 a RN-32 | Alto |
 | Renomear/remover o membro `NÃO APLICAVEL` | `_getDefaultMember`, endereço, bloqueio RN-11, painel → Valor inicial | Alto |
 | Mudar hierarquia de uma dimensão de dropdown | `writeHierarchies` (painel), `_addrToPairs`, `_resolveTechnicalId` | Alto |
 | Mudar a hierarquia de contas | Grupos/subgrupos/netos (`_render`), `createMembers` (script), lista de grupos | Alto |

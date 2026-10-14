@@ -44,6 +44,12 @@
 <h2>C — modo legado (setRowValues + setDropdownOptions, como hoje em produção)</h2>
 <div class="widget-box"><dropdowntable-widget id="wR" style="display:block;width:900px;height:200px"></dropdowntable-widget></div>
 <div class="widget-box"><dropdowntable-widget id="wR2" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wP1" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wP2" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wP3" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wP4" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wP5" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wP6" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
 <script src="/mock-binding.js"></script>
@@ -455,6 +461,89 @@
     rIn = R2w.shadowRoot.querySelectorAll('tr[data-row-index="2"] input');
     check("R8 clearMeasureInput limpa a medida editada (CUSTO), não a primeira (QTDE)",
       rMid === "CUSTO" && rIn[1].value === "" && rIn[0].value !== "", { id: rMid, qtde: rIn[0].value, custo: rIn[1].value });
+
+    // ── P ─────────────────────────────────────────────────────────
+    // Base NÃO APLICÁVEL pré-definida (Data Action) + liberação por RESPONSABILIDADE=SAPORE
+    function pRow(w, ri) { return w.shadowRoot.querySelector('tr[data-row-index="' + ri + '"]'); }
+    function pVals(w, ri) {
+      return Array.prototype.map.call(pRow(w, ri).querySelectorAll("td.dt-mcell input"), function(i) { return i.value + (i.disabled ? "(trav)" : ""); }).join("|");
+    }
+    function pWrites(w) {
+      var n = w.getWriteCount(), out = [];
+      for (var k = 0; k < n; k++) {
+        var parts = [];
+        for (var d = 0; d < w.getWriteDimensionCount(k); d++) {
+          var dim = w.getWriteDimensionId(k, d);
+          if (dim === "CONTA") { continue; }
+          var m = w.getWriteMemberId(k, d).match(/&\[([^\]]+)\]$/);
+          parts.push(dim + "=" + (m ? m[1] : w.getWriteMemberId(k, d)));
+        }
+        out.push(parts.sort().join(",") + ":" + w.getWriteMeasureId(k) + "=" + w.getWriteValue(k));
+      }
+      return out.sort();
+    }
+    async function pSetup(id, variant, styleConfig) {
+      var w = document.getElementById(id);
+      var sc = M.presetScenario(variant);
+      setup(w, { mainBinding: sc.binding, dataBindings: sc.dataBindings, styleConfig: styleConfig });
+      await tick(80);
+      return w;
+    }
+    var BASE_SAP = ["PERIODICIDADE=NA,RESPONSABILIDADE=SAP:CUSTO=10", "PERIODICIDADE=NA,RESPONSABILIDADE=SAP:QTDE=2"];
+
+    var P1 = await pSetup("wP1", "base");
+    var p1Per = dropdown(P1, 1, 1);
+    p1Per.click();
+    check("P1 base pré-definida: valores 2/10 travados e Periodicidade travada",
+      pVals(P1, 1) === "2(trav)|10,00(trav)" && p1Per.classList.contains("dt-dd-locked") && P1.shadowRoot.getElementById("dt-dropdown").classList.contains("hidden"),
+      { vals: pVals(P1, 1), travado: p1Per.classList.contains("dt-dd-locked") });
+    pick(P1, 1, 0, "SAPORE");
+    check("P2 SAPORE libera medidas (2/10) e Periodicidade",
+      pVals(P1, 1) === "2|10,00" && !dropdown(P1, 1, 1).classList.contains("dt-dd-locked"), pVals(P1, 1));
+    var p3 = pWrites(P1);
+    check("P3 copia a base para SAPORE e não grava na base", p3.join() === BASE_SAP.join(), p3);
+    pick(P1, 1, 1, "Mensal");
+    var p4 = pWrites(P1);
+    check("P4 SAPORE → Mensal: uma gravação por medida em SAPORE+Mensal, base intacta",
+      p4.join() === ["PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:CUSTO=10", "PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:QTDE=2"].join(), p4);
+
+    var P2w = await pSetup("wP2", "base");
+    pick(P2w, 1, 0, "CLIENTE");
+    var p5 = pWrites(P2w);
+    check("P5 base → CLIENTE: travado em 0, grava 0 em CLIENTE e não mexe na base",
+      pVals(P2w, 1) === "0(trav)|0(trav)" && p5.join() === ["PERIODICIDADE=NA,RESPONSABILIDADE=CLI:CUSTO=0", "PERIODICIDADE=NA,RESPONSABILIDADE=CLI:QTDE=0"].join(),
+      { vals: pVals(P2w, 1), writes: p5 });
+
+    var P3w = await pSetup("wP3", "saved");
+    check("P7 base + SAPORE gravado: exibe SAPORE/Mensal, sem alerta ⚠",
+      !pRow(P3w, 1) && !!pRow(P3w, 2) && dropdown(P3w, 2, 0).textContent.indexOf("SAPORE") !== -1 && !P3w.shadowRoot.querySelector(".dt-multi-combo") && pVals(P3w, 2) === "2|10,00",
+      { linha1: !!pRow(P3w, 1), resp: pRow(P3w, 2) && dropdown(P3w, 2, 0).textContent, vals: pRow(P3w, 2) && pVals(P3w, 2) });
+    pick(P3w, 2, 0, "CLIENTE");
+    var p6 = pWrites(P3w);
+    check("P6 SAPORE gravado → CLIENTE: zera SAPORE, CLIENTE = 0, base intacta",
+      p6.join() === ["PERIODICIDADE=MENSAL,RESPONSABILIDADE=CLI:CUSTO=0", "PERIODICIDADE=MENSAL,RESPONSABILIDADE=CLI:QTDE=0",
+                     "PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:CUSTO=0", "PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:QTDE=0"].join(), p6);
+
+    var P4w = await pSetup("wP4", "savedZero");
+    check("P8 base + SAPORE zerado: exibe a base travada",
+      !!pRow(P4w, 1) && !pRow(P4w, 2) && pVals(P4w, 1) === "2(trav)|10,00(trav)", { linha2: !!pRow(P4w, 2), vals: pRow(P4w, 1) && pVals(P4w, 1) });
+
+    var P5w = await pSetup("wP5", "saved");
+    pick(P5w, 2, 0, "NÃO APLICÁVEL");
+    var p9 = pWrites(P5w);
+    var p9Per = dropdown(P5w, 2, 1);
+    check("P9 SAPORE gravado → NÃO APLICÁVEL: zera SAPORE, não grava na base, volta a mostrar a base travada",
+      pVals(P5w, 2) === "2(trav)|10,00(trav)" && p9Per.textContent.indexOf("NÃO APLICÁVEL") !== -1 && p9Per.classList.contains("dt-dd-locked")
+        && p9.join() === ["PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:CUSTO=0", "PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:QTDE=0"].join(),
+      { vals: pVals(P5w, 2), per: p9Per.textContent, writes: p9 });
+
+    var P6w = await pSetup("wP6", "base", { baseCopyMembers: "" });
+    var p10Free = !dropdown(P6w, 1, 1).classList.contains("dt-dd-locked");
+    pick(P6w, 1, 0, "SAPORE");
+    var p10 = pWrites(P6w);
+    check("P10 regra desligada (campo vazio): comportamento anterior — move e zera a base",
+      p10Free && p10.join() === ["PERIODICIDADE=NA,RESPONSABILIDADE=NA:CUSTO=0", "PERIODICIDADE=NA,RESPONSABILIDADE=NA:QTDE=0"].concat(BASE_SAP).sort().join(),
+      { livre: p10Free, writes: p10 });
 
     // ── C ─────────────────────────────────────────────────────────
     var C = document.getElementById("wC");
