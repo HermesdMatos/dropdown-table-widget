@@ -6,19 +6,19 @@
   "vendor": "Custom",
   "license": "MIT",
   "id": "dropdowntable",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "webcomponents": [
     {
       "kind": "main",
       "tag": "dropdowntable-widget",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.14.0/dropdown-table-widget-v2.js",
-      "integrity": "sha256-EciWSV8af8hfMZZRJ06424VzrN12BhYNDHRJeX/emDw="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.15.0/dropdown-table-widget-v2.js",
+      "integrity": "sha256-LweWGXUnqpzB3V/PYs2EctSWkIsNPDlLH2PYhblvgn4="
     },
     {
       "kind": "styling",
       "tag": "dropdowntable-styling",
-      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.14.0/style-panel.js",
-      "integrity": "sha256-14UMdirm8fIcbwytxKeSuTee1e5sTwl3AL+cTdl80eM="
+      "url": "https://cdn.jsdelivr.net/gh/HermesdMatos/dropdown-table-widget@v2.15.0/style-panel.js",
+      "integrity": "sha256-MJxWZEFh1xoP15eEXVezVhsBN3D1CNGOAVK5/iNgzFU="
     }
   ],
   "properties": {
