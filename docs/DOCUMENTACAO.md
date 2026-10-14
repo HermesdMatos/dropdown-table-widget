@@ -1,8 +1,8 @@
 # Documentação do Projeto — Dropdown Table Widget (SAP Analytics Cloud)
 
-> Versão documentada: **v2.14.0** (tag `v2.14.0`, `main` em `0893942`).
+> Versão documentada: **v2.15.0** (tag `v2.15.0`).
 > Base: código real do repositório (`dropdown-table-widget-v2.js`, `style-panel.js`, `dropdowntable.json`, `tools/`, `test/`) e `README.md`.
-> As referências de linha (`#Lnnn`) valem para a v2.14.0 e mudam com o tempo: procure sempre pelo **nome da função**.
+> As referências de linha (`#Lnnn`) valem para a v2.15.0 e mudam com o tempo: procure sempre pelo **nome da função**.
 
 ## Convenções desta documentação
 
@@ -20,7 +20,7 @@
 
 | Item | Resumo |
 |---|---|
-| **Projeto** | Dropdown Table Widget (`id: dropdowntable`, versão 2.14.0) |
+| **Projeto** | Dropdown Table Widget (`id: dropdowntable`, versão 2.15.0) |
 | **Objetivo** | Permitir o planejamento de despesas por conta numa tabela em que as dimensões de cada linha (ex.: Periodicidade, Fonte da Informação, Responsabilidade) são escolhidas numa **lista suspensa**, como a validação de dados do Excel, e as medidas são digitadas na própria tabela. |
 | **Tecnologia** | Custom Widget do SAP Analytics Cloud (Web Component em JavaScript puro, Shadow DOM, sem bibliotecas). Painel de estilo próprio. Contrato SAC em JSON. Ferramentas de release e testes em Node.js. |
 | **Componentes principais** | 1) Widget `dropdown-table-widget-v2.js` (tabela, regras, lista de gravação). 2) Painel `style-panel.js` (cores, dropdowns, regras de gravação). 3) Contrato `dropdowntable.json` (propriedades, métodos, eventos, bindings). 4) Scripts da story (salvar, criar/excluir membro). 5) Ferramentas `tools/` e testes `test/`. |
@@ -28,7 +28,7 @@
 | **Principais regras** | Membro padrão **NÃO APLICAVEL** em células sem valor; Responsabilidade **CLIENTE** grava 0 e trava as medidas; todas as dimensões em NÃO APLICÁVEL bloqueiam as medidas; trocar a combinação **move** o valor (zera a antiga); célula apagada grava **0**; falhas continuam pendentes; troca de contexto descarta pendências com aviso; exclusão de conta com valor é bloqueada. |
 | **Pontos críticos** | A gravação depende de uma **Tabela de planejamento na story** filtrada no mesmo contexto do widget; IDs e hierarquias das dimensões (`writeHierarchies`); nomes `RESPONSABILIDADE`/`CLIENTE` e `NÃO APLICAVEL` como regras padrão; integridade (hash) do JSON na publicação; formato de endereço com separadores `\|~\|`, `\|\|\|`, `§`, `###`. |
 | **Dependências** | SAC (API de Custom Widget, bindings, `getMembers`), API de planejamento da Tabela (`setUserInput`, `submitData`) e do modelo (`createMembers`, `deleteMembers`) nos scripts da story. Hospedagem dos arquivos: jsDelivr (tag fixa) ou pacote JSON + zip hospedado no próprio SAC. |
-| **Status** | Em produção na v2.14.0. 71 testes automáticos passando (harness no navegador) e teste de convivência PROD + DEV. |
+| **Status** | Em produção na v2.15.0 (inclui a base NÃO APLICÁVEL pré-definida, RN-29 a RN-32). 82 testes automáticos passando (harness no navegador), teste de convivência PROD + DEV e validação do usuário no SAC (DEV). |
 
 ---
 
@@ -80,13 +80,14 @@ O widget **não grava sozinho no modelo**: a API de Custom Widget do SAC não of
 | `dropdowntable.json` | Contrato do widget de **produção** (propriedades, métodos, eventos, bindings, URLs e hashes). | Importado no SAC. |
 | `dropdowntable-dev.json` | Contrato do widget **DEV** (`id: dropdowntable_dev`, tags `-dev`). | Gerado por `tools/release-dev.js`. |
 | `releases/dropdowntable-v2.11.25.json` | Contrato da versão anterior (rollback), apontando para jsDelivr na tag `v2.11.25`. | — |
-| `releases/dropdowntable-v2.14.0.json` | Cópia do contrato de produção v2.14.0. | — |
+| `releases/dropdowntable-v2.14.0.json` | Contrato de produção v2.14.0 (rollback). | — |
+| `releases/dropdowntable-v2.15.0.json` | Contrato de produção v2.15.0 (jsDelivr). Para hospedar no SAC: `node tools/release-sac.js v2.15.0` (JSON + zip em `dist/`). | — |
 | `tools/lib.js` | Funções comuns de release (git, hash SRI, URL do CDN, conferência). | — |
 | `tools/release-dev.js` | Gera o JSON DEV apontando para o commit atual (jsDelivr). | — |
 | `tools/release-prod.js` | Gera o JSON de produção apontando para uma tag (jsDelivr). | — |
 | `tools/release-sac.js` | Gera **JSON + zip** para hospedar o widget no próprio SAC. | Presente na pasta; **ainda não versionado** no momento desta documentação. Saída em `dist/` (ignorada pelo git). |
 | `test/server.js` | Servidor local de testes (porta 5180). | — |
-| `test/harness.html` | 71 testes automáticos no navegador. | — |
+| `test/harness.html` | 82 testes automáticos no navegador. | — |
 | `test/mock-binding.js` | Simula os bindings e a DataSource do SAC. | Dados fictícios (C1, C2, Ana, Bruno, QTDE, CUSTO). |
 | `test/coexist.html` | Verifica PROD + DEV carregados na mesma página. | — |
 | `README.md` | Configuração, scripts da story e processo de release. | — |
@@ -777,7 +778,7 @@ Destino: modelo de planejamento → SAC atualiza os bindings → widget redesenh
 
 ### 7.3 Contrato — `dropdowntable.json`
 
-- **Identificação:** `id: dropdowntable`, `name: Dropdown Table Widget`, `newInstancePrefix: dropdowntable` (instâncias `dropdowntable_1`, ...), `version: 2.14.0`.
+- **Identificação:** `id: dropdowntable`, `name: Dropdown Table Widget`, `newInstancePrefix: dropdowntable` (instâncias `dropdowntable_1`, ...), `version: 2.15.0`.
 - **Webcomponents:** `main` (tag `dropdowntable-widget`) e `styling` (tag `dropdowntable-styling`), cada um com `url` e `integrity` (SHA-256).
 - **Bindings:** ver seção 14.3.
 - **Propriedades, métodos e eventos:** ver seção 8.3 e 14.
@@ -869,7 +870,7 @@ Ver seção 7.4 (`tools/`) e 7.5 (`test/`).
 
 ## 9. Funções
 
-> Ordem: ciclo de vida → binding → opções → regras → gravação → edição → membros → interface. Linhas de referência da v2.14.0.
+> Ordem: ciclo de vida → binding → opções → regras → gravação → edição → membros → interface. Linhas de referência aproximadas (v2.15.0).
 
 ### 9.1 Ciclo de vida
 
@@ -1555,7 +1556,7 @@ flowchart TD
 | "Preenchimento obrigatório" no save | `deleteValue` vazio | Painel → Valor para apagar | Usar `0`. |
 | `setUserInput` falha (linha vermelha) | Hierarquia errada, membro inexistente, sem permissão, célula bloqueada, contexto da Tabela | Diagnóstico `[DropdownTable] Gravação`; `writeHierarchies` | Corrigir hierarquia/permissões/filtros. |
 | "N alterações sem todas as dimensões ficaram de fora" | Endereço incompleto (RN-13) | Diagnóstico (`ignoradasPorEnderecoIncompleto`) | Escolher todas as dimensões; checar membro padrão. |
-| "Nenhuma alteração pendente" em dobro | Listeners duplicados (versões < v2.14) | Versão do JSON importado | Atualizar para v2.14.0. |
+| "Nenhuma alteração pendente" em dobro | Listeners duplicados (versões < v2.14) | Versão do JSON importado | Atualizar para v2.14.0 ou posterior. |
 | Salvar não responde | Script não chama `clearPendingChanges` (proteção de 10s) | Script `onSaveRequested` | Incluir a chamada no final. |
 | Alterações somem ao trocar o cliente | RN-18 (intencional) | Aviso amarelo / `onPendingChangesDiscarded` | Salvar antes de trocar o contexto. |
 | Valor salvo "volta" após o save | Refresh fora da janela pós-save ou modelo não gravou | `clearPendingChanges`, retorno do `setUserInput` | Verificar gravação; recarregar. |
@@ -1717,6 +1718,6 @@ flowchart TD
 - **Componentes cobertos:** widget, painel, contrato, bindings (4), scripts da story (3 + eventos sem tratamento identificado), ferramentas (4), testes (4), arquivos legados da pasta pai.
 - **Funções:** todas as funções com efeito de negócio estão nas seções 9.1–9.9; funções puramente visuais estão agrupadas em 9.9.
 - **Regras:** RN-01 a RN-28 conferidas contra o código; cada uma aponta a função onde está.
-- **Diagramas:** nomes de funções, propriedades e condições conferidos com a v2.14.0.
+- **Diagramas:** nomes de funções, propriedades e condições conferidos com a v2.15.0.
 - **Contradições encontradas e registradas (não corrigidas, conforme solicitado):** textos do JSON (`getDeleteMemberId`, `measureChangeAddrStr`, `dimensionFilter*`) e do painel ("Nenhuma marcada"); `_showSaveButton` sem configuração; `tools/release-sac.js` ainda não versionado.
 - **Não identificado no código:** nomes reais de modelo, medidas, Tabela de gravação, páginas, Data Actions, tratamento dos eventos de filtro/exclusão/Delete na story.

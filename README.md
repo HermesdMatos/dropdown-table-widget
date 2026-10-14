@@ -141,7 +141,7 @@ A partir daí, merges na `main` não afetam a produção.
 ### Cada versão
 
 1. Pull Request da branch → merge na `main`.
-2. `git tag v2.14.0 && git push origin v2.14.0`
-3. `node tools/release-prod.js v2.14.0 --check` → commit do `dropdowntable.json` na `main`.
+2. `git tag vX.Y.Z && git push origin vX.Y.Z`
+3. `node tools/release-prod.js vX.Y.Z --check` → commit do `dropdowntable.json` na `main` (jsDelivr), **ou** `node tools/release-sac.js vX.Y.Z` → JSON + zip em `dist/` para hospedar no próprio SAC (Criar widget a partir de arquivo).
 4. No SAC: importar `dropdowntable.json` e validar a story de produção.
 5. **Rollback**: reimportar o `dropdowntable.json` da versão anterior (ex: `git show v2.11.25:dropdowntable.json`). As URLs ficam fixas no tag, então a versão antiga continua publicada.

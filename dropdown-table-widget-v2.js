@@ -1,4 +1,4 @@
-// Dropdown Table Widget (SAP Analytics Cloud custom widget) — v2.14.0
+// Dropdown Table Widget (SAP Analytics Cloud custom widget) — v2.15.0
 //
 // Tabela de planejamento: contas em linhas, dimensões escolhidas por dropdown (validação de
 // dados), medidas editáveis e lista de gravação pronta para Table.getPlanning().setUserInput().
