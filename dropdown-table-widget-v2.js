@@ -1460,8 +1460,10 @@ class DropdownTableWidget extends HTMLElement {
   }
 
   // Base = todas as dimensões de dropdown vazias ou em NÃO APLICÁVEL.
-  // addrObj: {DIM_REAL: membro}; labels (opcional): {DIM_REAL: descrição}; nodeRow: linha do binding
-  _isBaseAddress(addrObj, labels, nodeRow) {
+  // addrObj: {DIM_REAL: membro}; labels (opcional): {DIM_REAL: descrição}; nodeRow: linha do binding.
+  // strict: todas as dimensões presentes (na gravação, endereço incompleto não é base — vai para
+  // as ignoradas e o usuário é avisado)
+  _isBaseAddress(addrObj, labels, nodeRow, strict) {
     if (!this._metadata || !this._metadata.feeds) { return false; }
     var count = this._metadata.feeds.dimensions.values.length;
     var dropdownDims = 0;
@@ -1470,6 +1472,7 @@ class DropdownTableWidget extends HTMLElement {
       if (!this._isDropdownDimension(key)) { continue; }
       dropdownDims++;
       var real = this._dimRealId(key);
+      if (strict && !addrObj[real]) { return false; }
       var nodeId = nodeRow ? (nodeRow[key] || {}).id : "";
       if (!this._isDefaultMemberId(key, addrObj[real], labels ? labels[real] : "", nodeId)) { return false; }
     }
@@ -1494,22 +1497,14 @@ class DropdownTableWidget extends HTMLElement {
   _comboRank(addr, labels, nonZero, nodeRow) {
     if (this._isBaseAddress(addr, labels, nodeRow)) { return 1; }
     if (nonZero) { return 3; }
-    if (this._isNoValueAddress(this._addrToPairsList(addr))) { return 2; }
-    // Descrição que veio na própria linha do binding (as opções podem ainda não ter carregado)
-    for (var dim in labels) {
-      var rule = this._noValueMembers[dim];
-      for (var j = 0; rule && labels[dim] && j < rule.length; j++) {
-        if (this._normalizeLabel(rule[j]) === this._normalizeLabel(labels[dim])) { return 2; }
-      }
-    }
-    return 0;
+    // Também pela descrição que veio na própria linha do binding (as opções podem não ter carregado)
+    var noValue = this._isNoValueAddress(this._addrToPairsList(addr)) || this._isNoValueAddress(this._addrToPairsList(labels));
+    return noValue ? 2 : 0;
   }
 
-  // Dimensão de liberação (ex: RESPONSABILIDADE) ainda em NÃO APLICÁVEL na linha → demais
-  // dropdowns e medidas travados
+  // Dimensão de liberação (ex: RESPONSABILIDADE) ainda em NÃO APLICÁVEL → demais dropdowns e
+  // medidas travados
   _gateBlocks(addrObj, gate) {
-    gate = gate || this._gateConfig();
-    if (!gate) { return false; }
     return this._isDefaultMemberId(gate.key, addrObj[gate.dim], "", "");
   }
 
@@ -1584,7 +1579,7 @@ class DropdownTableWidget extends HTMLElement {
       var obj = {};
       var raw = self._addrToPairsRaw(addrStr);
       for (var p = 0; p < raw.length; p++) { obj[raw[p].dim] = raw[p].member; }
-      return self._isBaseAddress(obj, null, null);
+      return self._isBaseAddress(obj, null, null, true);
     };
 
     for (var i = 0; i < (this._pendingChanges || []).length; i++) {
@@ -1686,32 +1681,31 @@ class DropdownTableWidget extends HTMLElement {
   //               dimensões antes de informar valores. Com a regra de liberação ativa: a dimensão
   //               de liberação (ex: RESPONSABILIDADE) em NÃO APLICÁVEL — a linha mostra a base
   //               pré-definida, travada
-  _getRowLockState(rowIndex) {
+  _getRowLockState(rowIndex, gate) {
     if (!this._isExplicitDropdownMode() || !this._data || !this._data[rowIndex]) { return ""; }
     var addr = this._buildRowAddrObj(rowIndex, null, true);
     if (this._isNoValueAddress(this._addrToPairsList(addr))) { return "noValue"; }
-    var gate = this._gateConfig();
     if (gate) { return this._gateBlocks(addr, gate) ? "noDims" : ""; }
     return this._isBaseAddress(addr, null, this._data[rowIndex]) ? "noDims" : "";
   }
 
   // Aplica o bloqueio nas células de medida da linha (render e após troca de dropdown) e, com a
   // regra de liberação ativa, nos demais dropdowns enquanto a liberação estiver em NÃO APLICÁVEL
+  // (com a regra ativa, "noDims" é exatamente esse caso)
   _applyRowLock(rowIndex, trEl) {
     var tr = trEl || this.shadowRoot.querySelector('tbody tr[data-row-index="' + rowIndex + '"]');
     if (!tr) { return; }
-    var state = this._getRowLockState(rowIndex);
     var gate = this._gateConfig();
+    var state = this._getRowLockState(rowIndex, gate);
     var gateLabel = gate ? (this._dimLabels[parseInt(gate.key.replace("dimensions_", ""), 10)] || gate.dim) : "";
-    var ddLocked = !!gate && state !== "noValue" && this._gateBlocks(this._buildRowAddrObj(rowIndex, null, true), gate);
+    var ddLocked = !!gate && state === "noDims";
     var dds = tr.querySelectorAll(".cell-dropdown");
     for (var d = 0; d < dds.length; d++) {
       var dd = dds[d];
       if (!dd._feedKey || dd._feedKey === "dimensions_0" || (gate && dd._feedKey === gate.key)) { continue; }
-      var lock = ddLocked;
-      dd.classList.toggle("dt-dd-locked", lock);
-      dd.tabIndex = lock ? -1 : 0;
-      dd.title = lock ? "Escolha " + gateLabel + " primeiro" : "";
+      dd.classList.toggle("dt-dd-locked", ddLocked);
+      dd.tabIndex = ddLocked ? -1 : 0;
+      dd.title = ddLocked ? "Escolha " + gateLabel + " primeiro" : "";
     }
     var inputs = tr.querySelectorAll("td.dt-mcell input");
     for (var i = 0; i < inputs.length; i++) {
@@ -1741,9 +1735,7 @@ class DropdownTableWidget extends HTMLElement {
   _isDropdownLocked(rowIndex, feedKey) {
     var gate = this._gateConfig();
     if (!gate || !feedKey || feedKey === "dimensions_0" || feedKey === gate.key) { return false; }
-    var addr = this._buildRowAddrObj(rowIndex, null, true);
-    if (this._isNoValueAddress(this._addrToPairsList(addr))) { return false; }
-    return this._gateBlocks(addr, gate);
+    return this._getRowLockState(rowIndex, gate) === "noDims";
   }
   // Limpa no DOM a última medida editada (sem re-render)
   clearMeasureInput() {
@@ -3422,7 +3414,7 @@ class DropdownTableWidget extends HTMLElement {
     var change = this._registerDropdownMove(rowIndex, this._oldRowAddrStr, newAddr, targetObj);
 
     // Voltou para a base (regra de liberação): a linha mostra de novo os valores pré-definidos
-    if (this._gateConfig() && this._isBaseAddress(targetObj, null, null)) { this._showBaseValues(rowIndex, newAddr); }
+    if (gate && this._isBaseAddress(targetObj, null, null)) { this._showBaseValues(rowIndex, newAddr); }
 
     // Responsabilidade CLIENTE trava/mostra 0; sair de tudo NÃO APLICÁVEL libera as medidas
     this._applyRowLock(rowIndex);
@@ -3480,8 +3472,9 @@ class DropdownTableWidget extends HTMLElement {
     for (var i = 0; i < count; i++) {
       var key = "measures_" + i;
       var text = this._formatMeasureCell(baseRow[key]);
+      var num = this._parseLocaleNumber(text);
       // "" (sem valor) também fica registrado: a próxima troca copia da base, não da linha exibida
-      this._localMeasures[rowIndex][key] = this._toCanonicalNumber(text);
+      this._localMeasures[rowIndex][key] = isNaN(num) ? "" : num;
       this._setLocalCellValue(baseAddr, this._getMeasureIdByKey(key), text);
       if (inputs[i]) { inputs[i].value = text; inputs[i]._valueBeforeLock = text; }
     }
@@ -3492,10 +3485,8 @@ class DropdownTableWidget extends HTMLElement {
   // sem valor (ex: CLIENTE): todas as medidas vão a 0, inclusive as vazias.
   // Retorna {value, measureId} da primeira medida registrada (para measureChange*).
   _registerDropdownMove(rowIndex, oldAddr, newAddr, targetObj) {
-    var targetPairs = [];
-    for (var tk in targetObj) { targetPairs.push({ dim: tk, member: targetObj[tk] }); }
     this._memberLabelIndex = {};
-    var noValueTarget = this._isNoValueAddress(targetPairs);
+    var noValueTarget = this._isNoValueAddress(this._addrToPairsList(targetObj));
 
     var feedCount = this._metadata.feeds.measures ? this._metadata.feeds.measures.values.length : 0;
     var keys = [];

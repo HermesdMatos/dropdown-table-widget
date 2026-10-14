@@ -50,6 +50,7 @@
 <div class="widget-box"><dropdowntable-widget id="wP4" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
 <div class="widget-box"><dropdowntable-widget id="wP5" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
 <div class="widget-box"><dropdowntable-widget id="wP6" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
+<div class="widget-box"><dropdowntable-widget id="wP7" style="display:block;width:900px;height:160px"></dropdowntable-widget></div>
 <div class="widget-box"><dropdowntable-widget id="wC" style="display:block;width:900px;height:220px"></dropdowntable-widget></div>
 
 <script src="/mock-binding.js"></script>
@@ -536,6 +537,15 @@
       pVals(P5w, 2) === "2(trav)|10,00(trav)" && p9Per.textContent.indexOf("NÃO APLICÁVEL") !== -1 && p9Per.classList.contains("dt-dd-locked")
         && p9.join() === ["PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:CUSTO=0", "PERIODICIDADE=MENSAL,RESPONSABILIDADE=SAP:QTDE=0"].join(),
       { vals: pVals(P5w, 2), per: p9Per.textContent, writes: p9 });
+
+    // Endereço incompleto (falta Periodicidade) não pode ser confundido com a base: vai para as
+    // ignoradas (aviso ao usuário), não some em silêncio
+    var P7w = await pSetup("wP7", "base");
+    var pIncomplete = "CONTA|~|" + M.CONTA + "[C1]|||RESPONSABILIDADE|~|[RESPONSABILIDADE].[H1].&[NA]|||";
+    P7w._pendingChanges = [{ type: "measure", rowIndex: 1, oldAddr: pIncomplete, newAddr: pIncomplete, value: "5", measureId: "QTDE" }];
+    var p11n = P7w.getWriteCount();
+    check("P11 endereço incompleto com a regra ativa entra em getWriteSkippedCount",
+      p11n === 0 && P7w.getWriteSkippedCount() === 1, { gravacoes: p11n, ignoradas: P7w.getWriteSkippedCount() });
 
     var P6w = await pSetup("wP6", "base", { baseCopyMembers: "" });
     var p10Free = !dropdown(P6w, 1, 1).classList.contains("dt-dd-locked");
